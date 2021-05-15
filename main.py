@@ -13,8 +13,6 @@ basedir = pathlib.Path('/') / 'Users' / 'Shared' / 'iTunes Media' / 'Music'
 def main():
     db = Database()
 
-    album_refs = set()
-
     # for path in basedir.rglob('*.mp3'):
     #     track = scan_mp3(path)
     #     print(track)
@@ -26,10 +24,6 @@ def main():
         track.Album = db.album(albumref)  # also updates albumref.Id
         print("  Album %s (%s==%s): Track %s" % (albumref.Title, track.Album, albumref.Id, track.Title))
         albumref.Tracks.append(track)
-
-        album_refs.add((albumref.Artist, albumref.Title))
-        # print(track.Id)
-        # print(albumref)
 
     # dump all albums
     print("Albums:")
