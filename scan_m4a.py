@@ -3,10 +3,8 @@ import logging
 import dateutil.parser
 import mutagen.mp4
 
-# from model import Track
 from schema import Album, Track
 
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
