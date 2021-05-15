@@ -23,7 +23,7 @@ def scan_m4a(absolute_path):
 
     def get_tag_text_value(keys):
         val = get_tag_value(keys)
-        return val if val else ""
+        return val
 
     def get_m_of_n(keys):
         val = get_tag_value(keys)
@@ -50,6 +50,7 @@ def scan_m4a(absolute_path):
         MusicBrainzTrackId=None,
         MusicBrainzArtistId=None,
     )
+
     albumref = Album(
         Title=get_tag_text_value(['\xa9alb']),
         Artist=get_tag_text_value(['aART', '\xa9ART']),
@@ -57,4 +58,5 @@ def scan_m4a(absolute_path):
         MusicBrainzAlbumId=None,
         MusicBrainzAlbumArtistId=None,
     )
+
     return track, albumref
