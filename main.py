@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from database import Database
 from schema import Album, Track
-# from scan_mp3 import scan_mp3
+from scan_mp3 import scan_mp3
 from scan_m4a import scan_m4a
 
 basedir = pathlib.Path('/') / 'Users' / 'Shared' / 'iTunes Media' / 'Music'
@@ -13,15 +13,17 @@ basedir = pathlib.Path('/') / 'Users' / 'Shared' / 'iTunes Media' / 'Music'
 def main():
     db = Database()
 
-    # for path in basedir.rglob('*.mp3'):
-    #     track = scan_mp3(path)
-    #     print(track)
-    for path in basedir.rglob('*.m4a'):
-        track, albumref = scan_m4a(path)  # These are pure object models - no ids or cross references yet
-        # fill in ids and cross-references
+    def set_cross_refs(track: Track, albumref: Album):
         db.track(track)  # updates track.Id
-        track.Album = db.album(albumref)  # also updates albumref.Id
-        albumref.Tracks.append(track)
+        track.Album = db.album(albumref)  # also updates albumref.Id and adds track to albumref.Tracks
+
+    for path in basedir.rglob('*.mp3'):
+        track, albumref = scan_mp3(path)
+        set_cross_refs(track, albumref)
+
+    for path in basedir.rglob('*.m4a'):
+        track, albumref = scan_m4a(path)
+        set_cross_refs(track, albumref)
 
     # dump all albums
     print("Albums:")
@@ -37,8 +39,8 @@ def main():
     print("Tracks:")
     tracks = db.session.execute(select(Track).order_by(Track.Artist, Track.Album, Track.TrackNumber))
     for track in tracks.scalars().all():
-        print("Artist: '%s', Album id: %s, Track number: %s, Track title: '%s', Genre: '%s'" % (
-            track.Artist, track.Album, track.TrackNumber, track.Title, track.Genre))
+        print("Id: %s, Artist: '%s', Album id: %s, Track number: %s, Track title: '%s', Genre: '%s'" % (
+            track.Id, track.Artist, track.Album, track.TrackNumber, track.Title, track.Genre))
     print("\n\n")
 
 
