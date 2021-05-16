@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, LargeBinary, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -34,3 +34,5 @@ class Track(Base):
     MusicBrainzTrackId = Column(String)
     MusicBrainzArtistId = Column(String)
     Album = Column(Integer, ForeignKey("Albums.Id"))
+    ArtworkPath = Column(String)  # either this or the next will be populated
+    ArtworkBlob = Column(LargeBinary)

@@ -2,6 +2,7 @@ import dateutil.parser
 import logging
 import mutagen.mp3
 
+import scan_common
 from schema import Album, Track
 
 logger = logging.getLogger(__name__)
@@ -58,6 +59,13 @@ def scan_mp3(absolute_path):
                     pass  # try any remaining timestamps in the list
         return None
 
+    def get_image_tag_value():
+        val = mp3.tags.get('APIC:')
+        return val.data if val else None
+
+    artwork_path = scan_common.find_coverart_file(absolute_path)
+    artwork_blob = None if artwork_path else get_image_tag_value()
+
     track = Track(
         Filepath=str(absolute_path),
         Title=get_first_tag_text_value(['TIT2']),
@@ -71,7 +79,9 @@ def scan_mp3(absolute_path):
         ReleaseDate=get_tag_datetime_value(['TDRL', 'TDOR', 'TYER', 'TDRC']),
         MusicBrainzTrackId=(parse_ufid(mp3.tags.get('UFID:http://musicbrainz.org'))
                             or get_first_tag_text_value(['TXXX:MusicBrainz Release Track Id'])),
-        MusicBrainzArtistId=get_first_tag_text_value(['TXXX:MusicBrainz Artist Id'])
+        MusicBrainzArtistId=get_first_tag_text_value(['TXXX:MusicBrainz Artist Id']),
+        ArtworkPath=artwork_path,
+        ArtworkBlob=artwork_blob
     )
 
     albumref = Album(
@@ -83,8 +93,3 @@ def scan_mp3(absolute_path):
     )
 
     return track, albumref
-
-
-#     def get_image_tag_value():
-#         val = mp3.tags.get('APIC:')
-#         return val.data if val else None

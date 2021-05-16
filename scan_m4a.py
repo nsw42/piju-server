@@ -3,6 +3,7 @@ import logging
 import dateutil.parser
 import mutagen.mp4
 
+import scan_common
 from schema import Album, Track
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,13 @@ def scan_m4a(absolute_path):
         logger.debug("Parsing datetime: %s", val)
         return dateutil.parser.isoparse(val) if val else None
 
+    def get_tag_image_value(keys):
+        val = get_tag_value(keys)
+        return val  # no post-processing seems to be necessary
+
+    artwork_path = scan_common.find_coverart_file(absolute_path)
+    artwork_blob = None if artwork_path else get_tag_image_value(['covr'])
+
     track = Track(
         Filepath=str(absolute_path),
         Title=get_tag_text_value(['\xa9nam']),
@@ -47,6 +55,8 @@ def scan_m4a(absolute_path):
         ReleaseDate=get_tag_datetime_value(['\xa9day']),
         MusicBrainzTrackId=None,
         MusicBrainzArtistId=None,
+        ArtworkPath=artwork_path,
+        ArtworkBlob=artwork_blob
     )
 
     albumref = Album(
