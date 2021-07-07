@@ -66,7 +66,7 @@ def get_track(trackid):
         except NotFoundException:
             abort(404, description="Unknown track id")
         rtn = {
-            'id': track.Id,
+            'link': '/tracks/%u' % track.Id,
             'artist': track.Artist,
             'title': track.Title,
             'genre': track.Genre,
