@@ -47,6 +47,23 @@ class Database():
             assert False
         return albumref.Id
 
+    def get_album_by_id(self, albumid: int):
+        """
+        Return the Album object for a given id.
+        Raises NotFoundException for an unknown id
+        """
+        res = self.session.query(Album).filter(
+            Album.Id == albumid
+        )
+        count = res.count()
+        if count == 0:
+            raise NotFoundException()
+        elif count == 1:
+            return res.first()
+        else:
+            logging.fatal("Multiple results for a given album id")
+            assert False
+
     def track(self, trackref: Track):
         """
         Return the Id for the given Track reference
@@ -74,6 +91,23 @@ class Database():
             assert False
         return trackref.Id
 
+    def get_track_by_id(self, trackid: int):
+        """
+        Return the Track object for a given id.
+        Raises NotFoundException for an unknown id
+        """
+        res = self.session.query(Track).filter(
+            Track.Id == trackid
+        )
+        count = res.count()
+        if count == 0:
+            raise NotFoundException()
+        elif count == 1:
+            return res.first()
+        else:
+            logging.fatal("Multiple results for a given track id")
+            assert False
+
     def get_nr_tracks(self):
         return self.session.query(Track).with_entities(func.count(Track.Id)).scalar()
 
@@ -90,3 +124,14 @@ class Database():
         """
         result = self.session.execute(select(Track).order_by(Track.Artist, Track.Album, Track.TrackNumber))
         return result.scalars().all()
+
+
+class DatabaseAccess:
+    def __init__(self):
+        self.db = Database()
+
+    def __enter__(self):
+        return self.db
+
+    def __exit__(self, type, value, traceback):
+        self.db.commit()
