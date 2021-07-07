@@ -3,8 +3,8 @@ import logging
 import dateutil.parser
 import mutagen.mp4
 
-import scan_common
-from schema import Album, Track
+from ..database.schema import Album, Track
+from .common import find_coverart_file
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ def scan_m4a(absolute_path):
         val = get_tag_value(keys)
         return val  # no post-processing seems to be necessary
 
-    artwork_path = scan_common.find_coverart_file(absolute_path)
+    artwork_path = find_coverart_file(absolute_path)
     artwork_blob = None if artwork_path else get_tag_image_value(['covr'])
 
     track = Track(

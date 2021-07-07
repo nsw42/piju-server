@@ -18,7 +18,7 @@ class Album(Base):
 
 
 class Track(Base):
-    __tablename__ = 'Tables'
+    __tablename__ = 'Tracks'
 
     Id = Column(Integer, primary_key=True)
     Filepath = Column(String)

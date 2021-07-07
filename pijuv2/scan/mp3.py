@@ -2,8 +2,8 @@ import dateutil.parser
 import logging
 import mutagen.mp3
 
-import scan_common
-from schema import Album, Track
+from ..database.schema import Album, Track
+from .common import find_coverart_file
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ def scan_mp3(absolute_path):
         val = mp3.tags.get('APIC:')
         return val.data if val else None
 
-    artwork_path = scan_common.find_coverart_file(absolute_path)
+    artwork_path = find_coverart_file(absolute_path)
     artwork_blob = None if artwork_path else get_image_tag_value()
 
     track = Track(
