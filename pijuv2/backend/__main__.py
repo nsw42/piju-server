@@ -29,7 +29,7 @@ def album_json(album, include_tracks):
     }
     if include_tracks:
         tracks = list(album.Tracks)
-        tracks = sorted(tracks, key=lambda track: track.TrackNumber)
+        tracks = sorted(tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0)
         rtn['tracks'] = ['/tracks/%u' % track.Id for track in tracks]
     return rtn
 
