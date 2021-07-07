@@ -1,7 +1,9 @@
-from queue import Queue
 import json
+import mimetypes
+from pathlib import Path
+from queue import Queue
 
-from flask import Flask, abort
+from flask import abort, Flask, Response
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
 from .workqueue import WorkRequests
@@ -9,6 +11,8 @@ from .workthread import WorkerThread
 
 app = Flask(__name__)
 music_dir = '/Users/Shared/iTunes Media/Music'
+
+mimetypes.init()
 
 
 @app.route("/")
@@ -22,14 +26,21 @@ def current_status():
 
 
 def album_json(album, include_tracks):
+    tracks = list(album.Tracks)
+    tracks = sorted(tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0)
+    for track in tracks:
+        if track.ArtworkPath or track.ArtworkBlob:
+            artwork = '/artwork/%u' % track.Id
+            break
+    else:
+        artwork = None
     rtn = {
         'link': '/albums/%u' % album.Id,
         'artist': album.Artist,
         'title': album.Title,
+        'artwork': artwork,
     }
     if include_tracks:
-        tracks = list(album.Tracks)
-        tracks = sorted(tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0)
         rtn['tracks'] = ['/tracks/%u' % track.Id for track in tracks]
     return rtn
 
@@ -73,8 +84,38 @@ def get_track(trackid):
             'tracknumber': track.TrackNumber,
             'trackcount': track.TrackCount,
             'album': '/albums/%u' % track.Album,
+            'artwork': ('/artwork/%u' % track.Id) if (track.ArtworkPath or track.ArtworkBlob) else None,
         }
         return json.dumps(rtn)
+
+
+@app.route("/artwork/<trackid>")
+def get_artwork(trackid):
+    with DatabaseAccess() as db:
+        try:
+            track = db.get_track_by_id(trackid)
+        except NotFoundException:
+            abort(404, description="Unknown track id")
+
+        if track.ArtworkPath:
+            path = Path(track.ArtworkPath)
+            mime = mimetypes.types_map[path.suffix]
+            with open(track.ArtworkPath, 'rb') as handle:
+                data = handle.read()
+            return Response(data, mimetype=mime)
+
+        elif track.ArtworkBlob:
+            if track.ArtworkBlob[:3] == b'\xff\xd8\xff':
+                mime = mimetypes.types_map['.jpg']
+            elif track.ArtworkBlob[:8] == b'\x89\x50\x4e\x47\x0d\x0a\x1a\x0a':
+                mime = mimetypes.types_map['.png']
+            else:
+                abort(500, description="Unknown mime type")
+
+            return Response(track.ArtworkBlob, mimetype=mime)
+
+        else:
+            abort(404, description="Unknown track id")
 
 
 if __name__ == '__main__':
