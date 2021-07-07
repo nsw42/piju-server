@@ -70,8 +70,8 @@ class Database():
         """
         res = self.session.query(Track).filter(
             Track.Title == trackref.Title,
-            Track.Duration == trackref.Title,
-            Track.Artist == trackref.Title,
+            Track.Duration == trackref.Duration,
+            Track.Artist == trackref.Artist,
             Track.VolumeNumber == trackref.VolumeNumber,
             Track.TrackNumber == trackref.TrackNumber,
             Track.ReleaseDate == trackref.ReleaseDate,
