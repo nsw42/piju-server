@@ -23,7 +23,7 @@ def current_status():
 
 def album_json(album, include_tracks):
     rtn = {
-        'id': album.Id,
+        'link': '/albums/%u' % album.Id,
         'artist': album.Artist,
         'title': album.Title,
     }
