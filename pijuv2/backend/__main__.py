@@ -1,3 +1,4 @@
+from functools import wraps
 import json
 import mimetypes
 from pathlib import Path
@@ -16,14 +17,12 @@ music_dir = '/Users/Shared/iTunes Media/Music'
 mimetypes.init()
 
 
-@app.route("/")
-def current_status():
-    with DatabaseAccess() as db:
-        rtn = {
-            'WorkerStatus': app.worker.current_status,
-            'NumberTracks': db.get_nr_tracks(),
-        }
-    return json.dumps(rtn)
+def returns_json(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        r = f(*args, **kwargs)
+        return Response(r, mimetype='application/json')
+    return decorated_function
 
 
 def json_album(album: Album, include_tracks: bool):
@@ -43,6 +42,7 @@ def json_album(album: Album, include_tracks: bool):
         'artist': album.Artist,
         'title': album.Title,
         'artwork': artwork,
+        'genres': [link_genre(genre) for genre in album.Genres],
     }
     if include_tracks:
         rtn['tracks'] = ['/tracks/%u' % track.Id for track in tracks]
@@ -67,7 +67,19 @@ def link_genre(genre: Genre):
     return '/genres/%u' % genre.Id
 
 
+@app.route("/")
+@returns_json
+def current_status():
+    with DatabaseAccess() as db:
+        rtn = {
+            'WorkerStatus': app.worker.current_status,
+            'NumberTracks': db.get_nr_tracks(),
+        }
+    return json.dumps(rtn)
+
+
 @app.route("/albums")
+@returns_json
 def get_all_albums():
     with DatabaseAccess() as db:
         rtn = []
@@ -77,6 +89,7 @@ def get_all_albums():
 
 
 @app.route("/albums/<albumid>")
+@returns_json
 def get_album(albumid):
     with DatabaseAccess() as db:
         try:
@@ -87,30 +100,34 @@ def get_album(albumid):
 
 
 @app.route("/genres")
+@returns_json
 def get_all_genres():
     with DatabaseAccess() as db:
         rtn = []
         for genre in db.get_all_genres():
             rtn.append(json_genre(genre, include_albums=False))
-        return Response(json.dumps(rtn), mimetype='application/json')
+        return json.dumps(rtn)
 
 
 @app.route("/genres/<genreid>")
+@returns_json
 def get_genre(genreid):
     with DatabaseAccess() as db:
         try:
             genre = db.get_genre_by_id(genreid)
         except NotFoundException:
             abort(404, description="Unknown genre id")
-        return Response(json.dumps(json_genre(genre, include_albums=True)), mimetype='application/json')
+        return json.dumps(json_genre(genre, include_albums=True))
 
 
 @app.route("/tracks")
+@returns_json
 def get_all_tracks():
     abort(404)  # TODO
 
 
 @app.route("/tracks/<trackid>")
+@returns_json
 def get_track(trackid):
     with DatabaseAccess() as db:
         try:
