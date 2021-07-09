@@ -6,12 +6,13 @@ from .m4a import scan_m4a
 from .mp3 import scan_mp3
 
 
+# TODO: This is starting to feel like it belongs in the database class
 def set_cross_refs(db: Database, track: Track, albumref: Album):
     track = db.ensure_track_exists(track)
+    # ensure_track_exists() ensures that track.Genre is a genre id
     album = db.ensure_album_exists(albumref)
-    genre = db.ensure_genre_exists(track.Genre)
+    genre = db.get_genre_by_id(track.Genre)
     track.Album = album.Id
-    track.Genre = genre.Id
     if genre not in album.Genres:
         album.Genres.append(genre)
     # setting track.Album automatically creates the back-reference in album.Tracks,

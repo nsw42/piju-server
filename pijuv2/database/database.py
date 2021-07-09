@@ -49,7 +49,7 @@ class Database():
             logging.fatal("Multiple results found for an album reference")
             assert False
 
-    def ensure_genre_exists(self, genre_name: str):
+    def ensure_genre_exists(self, genre_name: str) -> Genre:
         """
         Ensure the given genre exists
         """
@@ -69,13 +69,13 @@ class Database():
             logging.fatal("Multiple results found for a genre")
             assert False
 
-    def ensure_track_exists(self, trackref: Track):
+    def ensure_track_exists(self, trackref: Track) -> Track:
         """
         Return the Id for the given Track reference
         Also looks up trackref.Genre in the database if it's a string, and replaces it with a fk to the genre table
         """
-        # if isinstance(trackref.Genre, str):
-        #     trackref.Genre = self.genre(trackref.Genre).Id
+        if isinstance(trackref.Genre, str):
+            trackref.Genre = self.ensure_genre_exists(trackref.Genre).Id
         res = self.session.query(Track).filter(
             Track.Title == trackref.Title,
             Track.Duration == trackref.Duration,
