@@ -78,7 +78,7 @@ def current_status():
     return json.dumps(rtn)
 
 
-@app.route("/albums")
+@app.route("/albums/")
 @returns_json
 def get_all_albums():
     with DatabaseAccess() as db:
@@ -99,7 +99,7 @@ def get_album(albumid):
         return json.dumps(json_album(album, include_tracks=True))
 
 
-@app.route("/genres")
+@app.route("/genres/")
 @returns_json
 def get_all_genres():
     with DatabaseAccess() as db:
@@ -120,7 +120,7 @@ def get_genre(genreid):
         return json.dumps(json_genre(genre, include_albums=True))
 
 
-@app.route("/tracks")
+@app.route("/tracks/")
 @returns_json
 def get_all_tracks():
     abort(404)  # TODO
