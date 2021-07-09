@@ -1,8 +1,23 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, LargeBinary, String
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, LargeBinary, String, Table
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
 Base = declarative_base()
+
+
+album_genre_association_table = Table('association', Base.metadata,
+                                      Column('genre_id', Integer, ForeignKey('Genres.Id')),
+                                      Column('album_id', Integer, ForeignKey('Albums.Id')))
+
+
+class Genre(Base):
+    __tablename__ = 'Genres'
+
+    Id = Column(Integer, primary_key=True)
+    Name = Column(String)
+    Albums = relationship("Album",
+                          secondary=album_genre_association_table,
+                          back_populates="Genres")
 
 
 class Album(Base):
@@ -15,6 +30,9 @@ class Album(Base):
     MusicBrainzAlbumId = Column(String)
     MusicBrainzAlbumArtistId = Column(String)
     Tracks = relationship("Track")
+    Genres = relationship("Genre",
+                          secondary=album_genre_association_table,
+                          back_populates="Albums")
 
 
 class Track(Base):
@@ -26,7 +44,7 @@ class Track(Base):
     Duration = Column(Integer)
     Composer = Column(String)
     Artist = Column(String)
-    Genre = Column(String)
+    Genre = Column(Integer, ForeignKey("Genres.Id"))
     VolumeNumber = Column(Integer)
     TrackCount = Column(Integer)
     TrackNumber = Column(Integer)
