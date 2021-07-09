@@ -34,9 +34,6 @@ def json_album(album: Album, include_tracks: bool):
             break
     else:
         artwork = None
-    # genres = []
-    # for genre in album.Genres:
-    #     genres.append(genre_link(genre))
     rtn = {
         'link': link_album(album),
         'artist': album.Artist,
