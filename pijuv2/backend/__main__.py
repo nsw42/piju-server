@@ -4,7 +4,7 @@ import mimetypes
 from pathlib import Path
 from queue import Queue
 
-from flask import abort, Flask, Response
+from flask import abort, Flask, Response, url_for
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
 from ..database.schema import Album, Genre, Track
@@ -30,52 +30,44 @@ def json_album(album: Album, include_tracks: bool):
     tracks = sorted(tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0)
     for track in tracks:
         if track.ArtworkPath or track.ArtworkBlob:
-            artwork = '/artwork/%u' % track.Id
+            artwork = url_for('get_artwork', trackid=track.Id)
             break
     else:
         artwork = None
     rtn = {
-        'link': link_album(album),
+        'link': url_for('get_album', albumid=album.Id),
         'artist': album.Artist,
         'title': album.Title,
         'artwork': artwork,
-        'genres': [link_genre(genre) for genre in album.Genres],
+        'genres': [url_for('get_genre', genreid=genre.Id) for genre in album.Genres],
     }
     if include_tracks:
-        rtn['tracks'] = ['/tracks/%u' % track.Id for track in tracks]
+        rtn['tracks'] = [url_for('get_track', trackid=track.Id) for track in tracks]
     return rtn
 
 
 def json_genre(genre: Genre, include_albums: bool):
     rtn = {
-        'link': link_genre(genre),
+        'link': url_for('get_genre', genreid=genre.Id),
         'name': genre.Name,
     }
     if include_albums:
-        rtn['albums'] = [link_album(album) for album in genre.Albums]
+        rtn['albums'] = [url_for('get_album', albumid=album.Id) for album in genre.Albums]
     return rtn
 
 
 def json_track(track: Track):
     rtn = {
-        'link': '/tracks/%u' % track.Id,
+        'link': url_for('get_track', trackid=track.Id),
         'artist': track.Artist,
         'title': track.Title,
         'genre': track.Genre,
         'tracknumber': track.TrackNumber,
         'trackcount': track.TrackCount,
-        'album': '/albums/%u' % track.Album,
-        'artwork': ('/artwork/%u' % track.Id) if (track.ArtworkPath or track.ArtworkBlob) else None,
+        'album': url_for('get_album', albumid=track.Album),
+        'artwork': url_for('get_artwork', trackid=track.Id) if (track.ArtworkPath or track.ArtworkBlob) else None,
     }
     return rtn
-
-
-def link_album(album: Album):
-    return '/albums/%u' % album.Id
-
-
-def link_genre(genre: Genre):
-    return '/genres/%u' % genre.Id
 
 
 @app.route("/")
