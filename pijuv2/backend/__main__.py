@@ -7,7 +7,7 @@ from queue import Queue
 from flask import abort, Flask, Response
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
-from ..database.schema import Album, Genre
+from ..database.schema import Album, Genre, Track
 from .workqueue import WorkRequests
 from .workthread import WorkerThread
 
@@ -53,6 +53,20 @@ def json_genre(genre: Genre, include_albums: bool):
     }
     if include_albums:
         rtn['albums'] = [link_album(album) for album in genre.Albums]
+    return rtn
+
+
+def json_track(track: Track):
+    rtn = {
+        'link': '/tracks/%u' % track.Id,
+        'artist': track.Artist,
+        'title': track.Title,
+        'genre': track.Genre,
+        'tracknumber': track.TrackNumber,
+        'trackcount': track.TrackCount,
+        'album': '/albums/%u' % track.Album,
+        'artwork': ('/artwork/%u' % track.Id) if (track.ArtworkPath or track.ArtworkBlob) else None,
+    }
     return rtn
 
 
@@ -120,7 +134,11 @@ def get_genre(genreid):
 @app.route("/tracks/")
 @returns_json
 def get_all_tracks():
-    abort(404)  # TODO
+    with DatabaseAccess() as db:
+        rtn = []
+        for track in db.get_all_tracks():
+            rtn.append(json_track(track))
+        return json.dumps(rtn)
 
 
 @app.route("/tracks/<trackid>")
@@ -131,17 +149,7 @@ def get_track(trackid):
             track = db.get_track_by_id(trackid)
         except NotFoundException:
             abort(404, description="Unknown track id")
-        rtn = {
-            'link': '/tracks/%u' % track.Id,
-            'artist': track.Artist,
-            'title': track.Title,
-            'genre': track.Genre,
-            'tracknumber': track.TrackNumber,
-            'trackcount': track.TrackCount,
-            'album': '/albums/%u' % track.Album,
-            'artwork': ('/artwork/%u' % track.Id) if (track.ArtworkPath or track.ArtworkBlob) else None,
-        }
-        return json.dumps(rtn)
+        return json.dumps(json_track(track))
 
 
 @app.route("/artwork/<trackid>")
