@@ -6,6 +6,7 @@ from queue import Queue
 from flask import abort, Flask, Response
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
+from ..database.schema import Album, Genre
 from .workqueue import WorkRequests
 from .workthread import WorkerThread
 
@@ -25,7 +26,7 @@ def current_status():
     return json.dumps(rtn)
 
 
-def album_json(album, include_tracks):
+def json_album(album: Album, include_tracks: bool):
     tracks = list(album.Tracks)
     tracks = sorted(tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0)
     for track in tracks:
@@ -34,8 +35,11 @@ def album_json(album, include_tracks):
             break
     else:
         artwork = None
+    # genres = []
+    # for genre in album.Genres:
+    #     genres.append(genre_link(genre))
     rtn = {
-        'link': '/albums/%u' % album.Id,
+        'link': link_album(album),
         'artist': album.Artist,
         'title': album.Title,
         'artwork': artwork,
@@ -45,12 +49,30 @@ def album_json(album, include_tracks):
     return rtn
 
 
+def json_genre(genre: Genre, include_albums: bool):
+    rtn = {
+        'link': link_genre(genre),
+        'name': genre.Name,
+    }
+    if include_albums:
+        rtn['albums'] = [link_album(album) for album in genre.Albums]
+    return rtn
+
+
+def link_album(album: Album):
+    return '/albums/%u' % album.Id
+
+
+def link_genre(genre: Genre):
+    return '/genres/%u' % genre.Id
+
+
 @app.route("/albums")
 def get_all_albums():
     with DatabaseAccess() as db:
         rtn = []
         for album in db.get_all_albums():
-            rtn.append(album_json(album, include_tracks=False))
+            rtn.append(json_album(album, include_tracks=False))
         return json.dumps(rtn)
 
 
@@ -61,7 +83,26 @@ def get_album(albumid):
             album = db.get_album_by_id(albumid)
         except NotFoundException:
             abort(404, description="Unknown album id")
-        return json.dumps(album_json(album, include_tracks=True))
+        return json.dumps(json_album(album, include_tracks=True))
+
+
+@app.route("/genres")
+def get_all_genres():
+    with DatabaseAccess() as db:
+        rtn = []
+        for genre in db.get_all_genres():
+            rtn.append(json_genre(genre, include_albums=False))
+        return Response(json.dumps(rtn), mimetype='application/json')
+
+
+@app.route("/genres/<genreid>")
+def get_genre(genreid):
+    with DatabaseAccess() as db:
+        try:
+            genre = db.get_genre_by_id(genreid)
+        except NotFoundException:
+            abort(404, description="Unknown genre id")
+        return Response(json.dumps(json_genre(genre, include_albums=True)), mimetype='application/json')
 
 
 @app.route("/tracks")

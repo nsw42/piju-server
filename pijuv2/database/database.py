@@ -1,4 +1,5 @@
 import logging
+from typing import List
 
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
@@ -115,7 +116,7 @@ class Database():
             logging.fatal("Multiple results for a given album id")
             assert False
 
-    def get_all_albums(self):
+    def get_all_albums(self) -> List[Album]:
         """
         Primarily for debugging
         """
