@@ -197,7 +197,7 @@ def update_player_play():
                 try:
                     play_from_index = track_ids.index(trackid)
                 except ValueError:
-                    play_from_index = 0
+                    abort(400, "Requested track is not in the specified album")
             app.player.play_from_queue_index(play_from_index)
 
         elif trackid:
