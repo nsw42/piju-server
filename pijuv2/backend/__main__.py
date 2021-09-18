@@ -102,7 +102,7 @@ def get_album(albumid):
         try:
             album = db.get_album_by_id(albumid)
         except NotFoundException:
-            abort(404, description="Unknown album id")
+            abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
         return json.dumps(json_album(album, include_tracks=True))
 
 
@@ -123,7 +123,7 @@ def get_genre(genreid):
         try:
             genre = db.get_genre_by_id(genreid)
         except NotFoundException:
-            abort(404, description="Unknown genre id")
+            abort(HTTPStatus.NOT_FOUND, description="Unknown genre id")
         return json.dumps(json_genre(genre, include_albums=True))
 
 
@@ -144,7 +144,7 @@ def get_track(trackid):
         try:
             track = db.get_track_by_id(trackid)
         except NotFoundException:
-            abort(404, description="Unknown track id")
+            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
         return json.dumps(json_track(track))
 
 
@@ -154,7 +154,7 @@ def get_artwork(trackid):
         try:
             track = db.get_track_by_id(trackid)
         except NotFoundException:
-            abort(404, description="Unknown track id")
+            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
 
         if track.ArtworkPath:
             path = Path(track.ArtworkPath)
@@ -174,7 +174,7 @@ def get_artwork(trackid):
             return Response(track.ArtworkBlob, mimetype=mime)
 
         else:
-            abort(404, description="Unknown track id")
+            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
 
 
 @app.route("/player/play", methods=['POST'])
@@ -187,7 +187,7 @@ def update_player_play():
             try:
                 albumid = db.get_album_by_id(albumid)
             except NotFoundException:
-                abort(404, description="Unknown album id")
+                abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
             queue = list(sorted(albumid.Tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0))
             app.player.set_queue(queue)
             if trackid is None:
@@ -197,18 +197,18 @@ def update_player_play():
                 try:
                     play_from_index = track_ids.index(trackid)
                 except ValueError:
-                    abort(400, "Requested track is not in the specified album")
+                    abort(HTTPStatus.BAD_REQUEST, "Requested track is not in the specified album")
             app.player.play_from_queue_index(play_from_index)
 
         elif trackid:
             try:
                 track = db.get_track_by_id(trackid)
             except NotFoundException:
-                abort(404, description="Unknown track id")
+                abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
             app.player.play_song(track.Filepath)
 
         else:
-            abort(400, description='Album or track must be specified')
+            abort(HTTPStatus.BAD_REQUEST, description='Album or track must be specified')
     return ('', HTTPStatus.NO_CONTENT)
 
 
