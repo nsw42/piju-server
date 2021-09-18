@@ -8,16 +8,18 @@ python -m pijuv2.backend
 
 ## REST API
 
-Todo
+See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 
 ## Dependencies
 
 * [Flask](https://flask.palletsprojects.com)
+* pexpect (4.8.0)
 
 ## Backlog
 
 * Refactor/code tidy of the backend code
 * Move `set_cross_refs` functionality into `ensure_track_exists` in database layer
+* Bug fix: mpyg321 will sometimes crash with a pexpect EOF
 
 ### Done
 
@@ -37,5 +39,5 @@ Todo
 
 ## Credits
 
-* `mpyg321.py` is based on <https://github.com/4br3mm0rd/mpyg321> (v1.4, with updates made to record the current track position,
+* `mpyg321.py` is based on <https://github.com/4br3mm0rd/mpyg321> (v1.4.1), with updates made to record the current track position,
   and also switched to Enum class.
