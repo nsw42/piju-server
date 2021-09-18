@@ -64,7 +64,7 @@ def json_track(track: Track):
         'genre': track.Genre,
         'tracknumber': track.TrackNumber,
         'trackcount': track.TrackCount,
-        'album': url_for('get_album', albumid=track.Album),
+        'album': url_for('get_album', albumid=track.Album) if track.Album else '',
         'artwork': url_for('get_artwork', trackid=track.Id) if (track.ArtworkPath or track.ArtworkBlob) else None,
     }
     return rtn
