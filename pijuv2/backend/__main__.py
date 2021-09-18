@@ -1,13 +1,15 @@
 from functools import wraps
+from http import HTTPStatus
 import json
 import mimetypes
 from pathlib import Path
 from queue import Queue
 
-from flask import abort, Flask, Response, url_for
+from flask import abort, Flask, request, Response, url_for
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
 from ..database.schema import Album, Genre, Track
+from ..player.player import MusicPlayer
 from .workqueue import WorkRequests
 from .workthread import WorkerThread
 
@@ -76,6 +78,8 @@ def current_status():
     with DatabaseAccess() as db:
         rtn = {
             'WorkerStatus': app.worker.current_status,
+            'PlayerStatus': str(app.player.status),
+            'CurrentTrack': app.player.song_path,  # TODO: This should really be a track id
             'NumberTracks': db.get_nr_tracks(),
         }
     return json.dumps(rtn)
@@ -173,10 +177,58 @@ def get_artwork(trackid):
             abort(404, description="Unknown track id")
 
 
+@app.route("/player/play", methods=['POST'])
+def update_player_play():
+    data = request.get_json()
+    with DatabaseAccess() as db:
+        albumid = data.get('album')
+        trackid = data.get('track')
+        if albumid:
+            try:
+                albumid = db.get_album_by_id(albumid)
+            except NotFoundException:
+                abort(404, description="Unknown album id")
+            queue = list(sorted(albumid.Tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0))
+            app.player.set_queue(queue)
+            if trackid is None:
+                play_from_index = 0
+            else:
+                track_ids = [track.Id for track in queue]
+                try:
+                    play_from_index = track_ids.index(trackid)
+                except ValueError:
+                    play_from_index = 0
+            app.player.play_from_queue_index(play_from_index)
+
+        elif trackid:
+            try:
+                track = db.get_track_by_id(trackid)
+            except NotFoundException:
+                abort(404, description="Unknown track id")
+            app.player.play_song(track.Filepath)
+
+        else:
+            abort(400, description='Album or track must be specified')
+    return ('', HTTPStatus.NO_CONTENT)
+
+
+@app.route("/player/pause", methods=['POST'])
+def update_player_pause():
+    app.player.pause()
+    return ('', HTTPStatus.NO_CONTENT)
+
+
+@app.route("/player/resume", methods=['POST'])
+def update_player_resume():
+    app.player.resume()
+    return ('', HTTPStatus.NO_CONTENT)
+
+
 if __name__ == '__main__':
     db = Database()  # pre-create tables
     queue = Queue()
     queue.put((WorkRequests.ScanDirectory, music_dir))
     app.worker = WorkerThread(queue)
     app.worker.start()
+    app.player = MusicPlayer()
     app.run(debug=True, use_reloader=False)
