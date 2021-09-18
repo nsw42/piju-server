@@ -7,13 +7,16 @@ from sqlalchemy.orm import Session
 from .schema import Base, Album, Genre, Track
 
 
+FILENAME = 'file.db'
+
+
 class NotFoundException(Exception):
     pass
 
 
 class Database():
     def __init__(self):
-        self.engine = create_engine('sqlite:///file.db')
+        self.engine = create_engine('sqlite:///' + FILENAME)
         self.session = Session(self.engine)
 
         # ensure tables exist
