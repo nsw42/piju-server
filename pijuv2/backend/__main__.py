@@ -76,10 +76,11 @@ def json_track(track: Track):
 @returns_json
 def current_status():
     with DatabaseAccess() as db:
+        track = db.get_track_by_id(app.player.current_track_id) if app.player.current_track_id else None
         rtn = {
             'WorkerStatus': app.worker.current_status,
             'PlayerStatus': str(app.player.status),
-            'CurrentTrack': app.player.song_path,  # TODO: This should really be a track id
+            'CurrentTrack': {} if track is None else json_track(track),
             'NumberTracks': db.get_nr_tracks(),
         }
     return json.dumps(rtn)
