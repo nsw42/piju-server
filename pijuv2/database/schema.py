@@ -54,3 +54,5 @@ class Track(Base):
     Album = Column(Integer, ForeignKey("Albums.Id"))
     ArtworkPath = Column(String)  # either this or the next will be populated
     ArtworkBlob = Column(LargeBinary)
+    ArtworkWidth = Column(Integer)
+    ArtworkHeight = Column(Integer)

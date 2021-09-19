@@ -59,6 +59,7 @@ def json_genre(genre: Genre, include_albums: bool):
 
 
 def json_track(track: Track):
+    has_artwork = track.ArtworkPath or track.ArtworkBlob
     rtn = {
         'link': url_for('get_track', trackid=track.Id),
         'artist': track.Artist,
@@ -67,7 +68,8 @@ def json_track(track: Track):
         'tracknumber': track.TrackNumber,
         'trackcount': track.TrackCount,
         'album': url_for('get_album', albumid=track.Album) if track.Album else '',
-        'artwork': url_for('get_artwork', trackid=track.Id) if (track.ArtworkPath or track.ArtworkBlob) else None,
+        'artwork': url_for('get_artwork', trackid=track.Id) if has_artwork else None,
+        'artworkinfo': url_for('get_artwork_info', trackid=track.Id) if has_artwork else None,
     }
     return rtn
 
@@ -147,6 +149,24 @@ def get_track(trackid):
         except NotFoundException:
             abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
         return json.dumps(json_track(track))
+
+
+@app.route("/artworkinfo/<trackid>")
+@returns_json
+def get_artwork_info(trackid):
+    with DatabaseAccess() as db:
+        try:
+            track = db.get_track_by_id(trackid)
+        except NotFoundException:
+            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+
+        has_artwork = (track.ArtworkPath or track.ArtworkBlob)
+        rtn = {
+            "width": track.ArtworkWidth,
+            "height": track.ArtworkHeight,
+            "image": url_for('get_artwork', trackid=trackid) if has_artwork else None,
+        }
+        return json.dumps(rtn)
 
 
 @app.route("/artwork/<trackid>")

@@ -4,7 +4,7 @@ import dateutil.parser
 import mutagen.mp4
 
 from ..database.schema import Album, Track
-from .common import find_coverart_file
+from .common import find_coverart_file, get_artwork_size
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,7 @@ def scan_m4a(absolute_path):
 
     artwork_path = find_coverart_file(absolute_path)
     artwork_blob = None if artwork_path else get_tag_image_value(['covr'])
+    artwork_size = get_artwork_size(artwork_path, artwork_blob)
 
     track = Track(
         Filepath=str(absolute_path),
@@ -56,7 +57,9 @@ def scan_m4a(absolute_path):
         MusicBrainzTrackId=None,
         MusicBrainzArtistId=None,
         ArtworkPath=artwork_path,
-        ArtworkBlob=artwork_blob
+        ArtworkBlob=artwork_blob,
+        ArtworkWidth=artwork_size.width,
+        ArtworkHeight=artwork_size.height,
     )
 
     albumref = Album(

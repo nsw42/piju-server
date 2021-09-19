@@ -3,7 +3,7 @@ import logging
 import mutagen.mp3
 
 from ..database.schema import Album, Track
-from .common import find_coverart_file
+from .common import find_coverart_file, get_artwork_size
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +65,7 @@ def scan_mp3(absolute_path):
 
     artwork_path = find_coverart_file(absolute_path)
     artwork_blob = None if artwork_path else get_image_tag_value()
+    artwork_size = get_artwork_size(artwork_path, artwork_blob)
 
     track = Track(
         Filepath=str(absolute_path),
@@ -81,7 +82,9 @@ def scan_mp3(absolute_path):
                             or get_first_tag_text_value(['TXXX:MusicBrainz Release Track Id'])),
         MusicBrainzArtistId=get_first_tag_text_value(['TXXX:MusicBrainz Artist Id']),
         ArtworkPath=artwork_path,
-        ArtworkBlob=artwork_blob
+        ArtworkBlob=artwork_blob,
+        ArtworkWidth=artwork_size.width if artwork_size else None,
+        ArtworkHeight=artwork_size.height if artwork_size else None,
     )
 
     albumref = Album(
