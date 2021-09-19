@@ -195,7 +195,7 @@ def get_artwork(trackid):
             return Response(track.ArtworkBlob, mimetype=mime)
 
         else:
-            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+            abort(HTTPStatus.NOT_FOUND, description="Track has no artwork")
 
 
 @app.route("/player/play", methods=['POST'])
