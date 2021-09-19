@@ -14,6 +14,7 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 
 * [Flask](https://flask.palletsprojects.com)
 * pexpect (4.8.0)
+* Pillow
 
 ## Backlog
 
