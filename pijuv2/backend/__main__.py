@@ -225,6 +225,18 @@ def update_player_resume():
     return ('', HTTPStatus.NO_CONTENT)
 
 
+@app.route("/player/next", methods=['POST'])
+def update_player_next():
+    app.player.next()
+    return ('', HTTPStatus.NO_CONTENT)
+
+
+@app.route("/player/previous", methods=['POST'])
+def update_player_prev():
+    app.player.prev()
+    return ('', HTTPStatus.NO_CONTENT)
+
+
 if __name__ == '__main__':
     db = Database()  # pre-create tables
     queue = Queue()
