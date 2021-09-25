@@ -5,6 +5,7 @@ import mimetypes
 from pathlib import Path
 from pijuv2.player.mpyg321 import PlayerStatus
 from queue import Queue
+import sys
 
 from flask import abort, Flask, request, Response, url_for
 
@@ -216,18 +217,39 @@ def get_artwork(trackid):
             abort(HTTPStatus.NOT_FOUND, description="Track has no artwork")
 
 
+def extract_id(uri_or_id):
+    """
+    >>> extract_id("/albums/85")
+    85
+    >>> extract_id("/tracks/123")
+    123
+    >>> extract_id("/albums/12X")
+    >>> extract_id("123")
+    123
+    >>> extract_id("cat")
+    >>> extract_id(432)
+    432
+    """
+    if uri_or_id and isinstance(uri_or_id, str) and '/' in uri_or_id:
+        # this is a uri, map it to a string representation of an id, then fall-through
+        uri_or_id = uri_or_id.rsplit('/', 1)[1]
+    if uri_or_id and isinstance(uri_or_id, str) and uri_or_id.isdigit():
+        uri_or_id = int(uri_or_id)
+    return uri_or_id if isinstance(uri_or_id, int) else None
+
+
 @app.route("/player/play", methods=['POST'])
 def update_player_play():
     data = request.get_json()
     with DatabaseAccess() as db:
-        albumid = data.get('album')
-        trackid = data.get('track')
-        if albumid:
+        albumid = extract_id(data.get('album'))
+        trackid = extract_id(data.get('track'))
+        if albumid is not None:
             try:
-                albumid = db.get_album_by_id(albumid)
+                album = db.get_album_by_id(albumid)
             except NotFoundException:
                 abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
-            queue = list(sorted(albumid.Tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0))
+            queue = list(sorted(album.Tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0))
             app.player.set_queue(queue)
             if trackid is None:
                 play_from_index = 0
@@ -276,10 +298,14 @@ def update_player_prev():
 
 
 if __name__ == '__main__':
-    db = Database()  # pre-create tables
-    queue = Queue()
-    queue.put((WorkRequests.ScanDirectory, music_dir))
-    app.worker = WorkerThread(queue)
-    app.worker.start()
-    app.player = MusicPlayer()
-    app.run(debug=True, use_reloader=False)
+    if len(sys.argv) > 1 and sys.argv[1] in ('-t', '--doctest'):
+        import doctest
+        doctest.testmod()
+    else:
+        db = Database()  # pre-create tables
+        queue = Queue()
+        queue.put((WorkRequests.ScanDirectory, music_dir))
+        app.worker = WorkerThread(queue)
+        app.worker.start()
+        app.player = MusicPlayer()
+        app.run(debug=True, use_reloader=False)
