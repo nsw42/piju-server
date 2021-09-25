@@ -58,8 +58,8 @@ def scan_m4a(absolute_path):
         MusicBrainzArtistId=None,
         ArtworkPath=artwork_path,
         ArtworkBlob=artwork_blob,
-        ArtworkWidth=artwork_size.width,
-        ArtworkHeight=artwork_size.height,
+        ArtworkWidth=artwork_size.width if artwork_size else None,
+        ArtworkHeight=artwork_size.height if artwork_size else None,
     )
 
     albumref = Album(
