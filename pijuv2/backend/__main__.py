@@ -33,15 +33,22 @@ def json_album(album: Album, include_tracks: bool):
     tracks = sorted(tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0)
     for track in tracks:
         if track.ArtworkPath or track.ArtworkBlob:
-            artwork = url_for('get_artwork', trackid=track.Id)
+            artwork_uri = url_for('get_artwork', trackid=track.Id)
+            artwork_width = track.ArtworkWidth
+            artwork_height = track.ArtworkHeight
             break
     else:
-        artwork = None
+        artwork_uri = artwork_width = artwork_height = None
+
     rtn = {
         'link': url_for('get_album', albumid=album.Id),
         'artist': album.Artist,
         'title': album.Title,
-        'artwork': artwork,
+        'artwork': {
+            'link': artwork_uri,
+            'width': artwork_width,
+            'height': artwork_height
+        },
         'genres': [url_for('get_genre', genreid=genre.Id) for genre in album.Genres],
     }
     if include_tracks:
