@@ -3,6 +3,7 @@ from http import HTTPStatus
 import json
 import mimetypes
 from pathlib import Path
+from pijuv2.player.mpyg321 import PlayerStatus
 from queue import Queue
 
 from flask import abort, Flask, request, Response, url_for
@@ -74,6 +75,16 @@ def json_track(track: Track):
     return rtn
 
 
+PLAYER_STATUS_REPRESENTATION = {
+    PlayerStatus.INSTANCIATED: "stopped",
+    PlayerStatus.PLAYING: "playing",
+    PlayerStatus.PAUSED: "paused",
+    PlayerStatus.RESUMING: "playing",
+    PlayerStatus.STOPPING: "stopped",
+    PlayerStatus.QUITTED: "stopped"
+}
+
+
 @app.route("/")
 @returns_json
 def current_status():
@@ -81,7 +92,7 @@ def current_status():
         track = db.get_track_by_id(app.player.current_track_id) if app.player.current_track_id else None
         rtn = {
             'WorkerStatus': app.worker.current_status,
-            'PlayerStatus': str(app.player.status),
+            'PlayerStatus': PLAYER_STATUS_REPRESENTATION.get(app.player.status, "stopped"),
             'CurrentTrack': {} if track is None else json_track(track),
             'NumberTracks': db.get_nr_tracks(),
         }
