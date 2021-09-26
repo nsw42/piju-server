@@ -1,10 +1,9 @@
 import logging
 
-import dateutil.parser
 import mutagen.mp4
 
 from ..database.schema import Album, Track
-from .common import find_coverart_file, get_artwork_size
+from .common import find_coverart_file, get_artwork_size, parse_datetime_str
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,7 @@ def scan_m4a(absolute_path):
     def get_tag_datetime_value(keys):
         val = get_tag_value(keys)
         logger.debug("Parsing datetime: %s", val)
-        return dateutil.parser.isoparse(val) if val else None
+        return parse_datetime_str(val) if val else None
 
     def get_tag_image_value(keys):
         val = get_tag_value(keys)

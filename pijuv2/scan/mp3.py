@@ -1,9 +1,8 @@
-import dateutil.parser
 import logging
 import mutagen.mp3
 
 from ..database.schema import Album, Track
-from .common import find_coverart_file, get_artwork_size
+from .common import find_coverart_file, get_artwork_size, parse_datetime_str
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +51,11 @@ def scan_mp3(absolute_path):
         val = get_tag_value(keys)
         if val:
             for datestr in val.text:
-                logger.debug("Parsing datetime: %s", str(datestr))
+                datestr = datestr.text
+                logger.debug("Parsing datetime: %s", datestr)
                 try:
-                    return dateutil.parser.parse(datestr.text)
-                except dateutil.parser._parser.ParserError:
+                    return parse_datetime_str(datestr)
+                except ValueError:
                     pass  # try any remaining timestamps in the list
         return None
 

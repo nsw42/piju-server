@@ -21,7 +21,6 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 * Refactor/code tidy of the backend code
 * Move `set_cross_refs` functionality into `ensure_track_exists` in database layer
 * Bug fix: mpyg321 will sometimes crash with a pexpect EOF - seemingly if calls are made too frequently
-* Bug fix: Figure out why duplicate tracks are being created when re-scanning on a different day
 
 ### Done
 
@@ -35,6 +34,7 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 * Scan: Compute/store the genres for an album
 * Scan: Figure out why duplicate tracks are being created (partially fixed)
 * Scan: Figure out where genres are being created with name 13 (etc)
+* Scan: Bug fix: duplicate tracks are being created when re-scanning on a different day (dateutil.parser)
 * Player: Add remote control of player to play album
 * Player: Add ability to specify start index when starting an album
 * Player: Add ability to play individual tracks
