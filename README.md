@@ -30,6 +30,7 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 * API: Include the artwork URI in `/albums` and `/albums/<albumid>`
 * API: Add `/artwork/<id>` and include artwork in `/tracks/<trackid>`
 * API: Add image width/height to db, and include it in `/artworkinfo/<id>`
+* API: Improvement: Allow track information to be included when retrieving album
 * Scan: Compute/store an artwork path for an album
 * Scan: Compute/store the genres for an album
 * Scan: Figure out why duplicate tracks are being created (partially fixed)

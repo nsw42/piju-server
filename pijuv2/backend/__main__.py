@@ -15,6 +15,13 @@ from ..player.player import MusicPlayer
 from .workqueue import WorkRequests
 from .workthread import WorkerThread
 
+
+class TrackInformationLevel:
+    NoTracks = 0
+    TrackLinks = 1
+    AllTrackInfo = 2
+
+
 app = Flask(__name__)
 music_dir = '/Users/Shared/iTunes Media/Music'
 
@@ -29,7 +36,7 @@ def returns_json(f):
     return decorated_function
 
 
-def json_album(album: Album, include_tracks: bool):
+def json_album(album: Album, include_tracks: TrackInformationLevel):
     tracks = list(album.Tracks)
     tracks = sorted(tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0)
     for track in tracks:
@@ -52,8 +59,10 @@ def json_album(album: Album, include_tracks: bool):
         },
         'genres': [url_for('get_genre', genreid=genre.Id) for genre in album.Genres],
     }
-    if include_tracks:
+    if include_tracks == TrackInformationLevel.TrackLinks:
         rtn['tracks'] = [url_for('get_track', trackid=track.Id) for track in tracks]
+    elif include_tracks == TrackInformationLevel.AllTrackInfo:
+        rtn['tracks'] = [json_track(track) for track in tracks]
     return rtn
 
 
@@ -113,19 +122,26 @@ def get_all_albums():
     with DatabaseAccess() as db:
         rtn = []
         for album in db.get_all_albums():
-            rtn.append(json_album(album, include_tracks=False))
+            rtn.append(json_album(album, include_tracks=TrackInformationLevel.NoTracks))
         return json.dumps(rtn)
 
 
 @app.route("/albums/<albumid>")
 @returns_json
 def get_album(albumid):
+    track_info = request.args.get('tracks', '').lower()
+    if track_info == 'none':
+        track_info = TrackInformationLevel.NoTracks
+    elif track_info == 'all':
+        track_info = TrackInformationLevel.AllTrackInfo
+    else:
+        track_info = TrackInformationLevel.TrackLinks
     with DatabaseAccess() as db:
         try:
             album = db.get_album_by_id(albumid)
         except NotFoundException:
             abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
-        return json.dumps(json_album(album, include_tracks=True))
+        return json.dumps(json_album(album, include_tracks=track_info))
 
 
 @app.route("/genres/")
