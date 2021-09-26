@@ -52,6 +52,7 @@ def json_album(album: Album, include_tracks: TrackInformationLevel):
         'link': url_for('get_album', albumid=album.Id),
         'artist': album.Artist,
         'title': album.Title,
+        'releasedate': album.ReleaseYear,
         'artwork': {
             'link': artwork_uri,
             'width': artwork_width,

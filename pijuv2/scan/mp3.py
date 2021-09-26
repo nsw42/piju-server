@@ -93,6 +93,7 @@ def scan_mp3(absolute_path):
         VolumeCount=get_m_of_n(['TPOS'])[1],
         MusicBrainzAlbumId=get_first_tag_text_value(['TXXX:MusicBrainz Album Id']),
         MusicBrainzAlbumArtistId=get_first_tag_text_value(['TXXX:MusicBrainz Album Artist Id']),
+        ReleaseYear=track.ReleaseDate.year if track.ReleaseDate else None
     )
 
     return track, albumref

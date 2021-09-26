@@ -39,6 +39,7 @@ class Database():
             Album.Title == albumref.Title,
             Album.Artist == albumref.Artist
         )
+        # TODO: use res.one_or_none() ??
         count = res.count()
         if count == 0:
             # Artist does not exist
@@ -47,7 +48,12 @@ class Database():
             self.session.refresh(albumref)
             return albumref
         elif count == 1:
-            return res.first()
+            album = res.first()
+            if (album.ReleaseYear is None) or (albumref.ReleaseYear is not None
+                                               and album.ReleaseYear < albumref.ReleaseYear):
+                album.ReleaseYear = albumref.ReleaseYear
+                self.session.commit()
+            return album
         else:
             logging.fatal("Multiple results found for an album reference")
             assert False
@@ -59,6 +65,7 @@ class Database():
         res = self.session.query(Genre).filter(
             Genre.Name == genre_name
         )
+        # TODO: use res.one_or_none() ??
         count = res.count()
         if count == 0:
             genre = Genre(Name=genre_name)

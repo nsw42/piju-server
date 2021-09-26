@@ -29,6 +29,7 @@ class Album(Base):
     VolumeCount = Column(Integer)
     MusicBrainzAlbumId = Column(String)
     MusicBrainzAlbumArtistId = Column(String)
+    ReleaseYear = Column(Integer)
     Tracks = relationship("Track")
     Genres = relationship("Genre",
                           secondary=album_genre_association_table,

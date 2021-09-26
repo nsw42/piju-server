@@ -67,6 +67,7 @@ def scan_m4a(absolute_path):
         VolumeCount=get_m_of_n(['disk'])[1],
         MusicBrainzAlbumId=None,
         MusicBrainzAlbumArtistId=None,
+        ReleaseYear=track.ReleaseDate.year if track.ReleaseDate else None
     )
 
     return track, albumref
