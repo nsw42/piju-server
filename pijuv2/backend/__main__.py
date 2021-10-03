@@ -325,4 +325,4 @@ if __name__ == '__main__':
         app.worker = WorkerThread(queue)
         app.worker.start()
         app.player = MusicPlayer()
-        app.run(debug=True, use_reloader=False)
+        app.run(use_reloader=False)
