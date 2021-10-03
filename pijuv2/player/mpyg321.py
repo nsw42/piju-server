@@ -310,6 +310,7 @@ class MPyg321Player:
             self.player.sendline("VOLUME {}".format(percent))
         if self.player_version == "mpg321":
             self.player.sendline("GAIN {}".format(percent))
+        self.current_volume = percent
 
     def silence_mpyg_output(self):
         """Improves performance by silencing the mpg123 process frame output"""

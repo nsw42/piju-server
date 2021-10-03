@@ -9,6 +9,7 @@ class MusicPlayer(MPyg321Player):
     def __init__(self, queue: List[Track] = []):
         self.set_queue(queue)
         super().__init__()
+        self.volume(100)
 
     def set_queue(self, queue: List[Track]):
         self.queued_files = [track.Filepath for track in queue]

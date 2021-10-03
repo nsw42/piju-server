@@ -112,6 +112,7 @@ def current_status():
         rtn = {
             'WorkerStatus': app.worker.current_status,
             'PlayerStatus': PLAYER_STATUS_REPRESENTATION.get(app.player.status, "stopped"),
+            'PlayerVolume': app.player.current_volume,
             'CurrentTrack': {} if track is None else json_track(track),
             'NumberTracks': db.get_nr_tracks(),
         }
@@ -313,6 +314,22 @@ def update_player_next():
 def update_player_prev():
     app.player.prev()
     return ('', HTTPStatus.NO_CONTENT)
+
+
+@app.route("/player/volume", methods=['GET', 'POST'])
+def player_volume():
+    if request.method == 'GET':
+        return {"volume": app.player.current_volume}
+
+    elif request.method == 'POST':
+        data = request.get_json()
+        try:
+            volume = data.get('volume')
+            volume = int(volume)
+            app.player.volume(volume)
+            return ('', HTTPStatus.NO_CONTENT)
+        except (AttributeError, KeyError, ValueError):
+            abort(HTTPStatus.BAD_REQUEST, description='Volume must be specified and numeric')
 
 
 if __name__ == '__main__':
