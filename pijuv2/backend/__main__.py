@@ -3,7 +3,7 @@ from http import HTTPStatus
 import json
 import mimetypes
 from pathlib import Path
-from pijuv2.player.mpyg321 import PlayerStatus
+import resource
 from queue import Queue
 import sys
 
@@ -11,6 +11,7 @@ from flask import abort, Flask, request, Response, url_for
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
 from ..database.schema import Album, Genre, Track
+from ..player.mpyg321 import PlayerStatus
 from ..player.player import MusicPlayer
 from .workqueue import WorkRequests
 from .workthread import WorkerThread
@@ -319,6 +320,7 @@ if __name__ == '__main__':
         import doctest
         doctest.testmod()
     else:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
         db = Database()  # pre-create tables
         queue = Queue()
         queue.put((WorkRequests.ScanDirectory, music_dir))
