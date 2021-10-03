@@ -24,9 +24,6 @@ class Database():
 
         self.session.commit()
 
-    def __del__(self):
-        self.commit()
-
     def commit(self):
         self.session.commit()
 
