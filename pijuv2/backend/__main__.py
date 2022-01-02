@@ -1,13 +1,11 @@
-from functools import wraps
 from http import HTTPStatus
-import json
 import mimetypes
 from pathlib import Path
 import resource
 from queue import Queue
 import sys
 
-from flask import abort, Flask, request, Response, url_for
+from flask import abort, Flask, jsonify, request, Response, url_for
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
 from ..database.schema import Album, Genre, Track
@@ -27,14 +25,6 @@ app = Flask(__name__)
 music_dir = '/Users/Shared/iTunes Media/Music'
 
 mimetypes.init()
-
-
-def returns_json(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        r = f(*args, **kwargs)
-        return Response(r, mimetype='application/json')
-    return decorated_function
 
 
 def json_album(album: Album, include_tracks: TrackInformationLevel):
@@ -105,7 +95,6 @@ PLAYER_STATUS_REPRESENTATION = {
 
 
 @app.route("/")
-@returns_json
 def current_status():
     with DatabaseAccess() as db:
         track = db.get_track_by_id(app.player.current_track_id) if app.player.current_track_id else None
@@ -116,21 +105,19 @@ def current_status():
             'CurrentTrack': {} if track is None else json_track(track),
             'NumberTracks': db.get_nr_tracks(),
         }
-    return json.dumps(rtn)
+    return jsonify(rtn)
 
 
 @app.route("/albums/")
-@returns_json
 def get_all_albums():
     with DatabaseAccess() as db:
         rtn = []
         for album in db.get_all_albums():
             rtn.append(json_album(album, include_tracks=TrackInformationLevel.NoTracks))
-        return json.dumps(rtn)
+        return jsonify(rtn)
 
 
 @app.route("/albums/<albumid>")
-@returns_json
 def get_album(albumid):
     track_info = request.args.get('tracks', '').lower()
     if track_info == 'none':
@@ -144,53 +131,48 @@ def get_album(albumid):
             album = db.get_album_by_id(albumid)
         except NotFoundException:
             abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
-        return json.dumps(json_album(album, include_tracks=track_info))
+        return jsonify(json_album(album, include_tracks=track_info))
 
 
 @app.route("/genres/")
-@returns_json
 def get_all_genres():
     with DatabaseAccess() as db:
         rtn = []
         for genre in db.get_all_genres():
             rtn.append(json_genre(genre, include_albums=False))
-        return json.dumps(rtn)
+        return jsonify(rtn)
 
 
 @app.route("/genres/<genreid>")
-@returns_json
 def get_genre(genreid):
     with DatabaseAccess() as db:
         try:
             genre = db.get_genre_by_id(genreid)
         except NotFoundException:
             abort(HTTPStatus.NOT_FOUND, description="Unknown genre id")
-        return json.dumps(json_genre(genre, include_albums=True))
+        return jsonify(json_genre(genre, include_albums=True))
 
 
 @app.route("/tracks/")
-@returns_json
 def get_all_tracks():
     with DatabaseAccess() as db:
         rtn = []
         for track in db.get_all_tracks():
             rtn.append(json_track(track))
-        return json.dumps(rtn)
+        return jsonify(rtn)
 
 
 @app.route("/tracks/<trackid>")
-@returns_json
 def get_track(trackid):
     with DatabaseAccess() as db:
         try:
             track = db.get_track_by_id(trackid)
         except NotFoundException:
             abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
-        return json.dumps(json_track(track))
+        return jsonify(json_track(track))
 
 
 @app.route("/artworkinfo/<trackid>")
-@returns_json
 def get_artwork_info(trackid):
     with DatabaseAccess() as db:
         try:
@@ -204,7 +186,7 @@ def get_artwork_info(trackid):
             "height": track.ArtworkHeight,
             "image": url_for('get_artwork', trackid=trackid) if has_artwork else None,
         }
-        return json.dumps(rtn)
+        return jsonify(rtn)
 
 
 @app.route("/artwork/<trackid>")
