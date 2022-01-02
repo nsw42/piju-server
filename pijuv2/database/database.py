@@ -2,7 +2,8 @@ import logging
 from typing import List
 
 from sqlalchemy import create_engine, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.pool import QueuePool
 
 from .schema import Base, Album, Genre, Track
 
@@ -16,8 +17,8 @@ class NotFoundException(Exception):
 
 class Database():
     def __init__(self):
-        self.engine = create_engine('sqlite:///' + FILENAME)
-        self.session = Session(self.engine)
+        self.engine = create_engine('sqlite:///' + FILENAME, poolclass=QueuePool)
+        self.session = scoped_session(sessionmaker(bind=self.engine))
 
         # ensure tables exist
         Base.metadata.create_all(self.engine)
@@ -191,3 +192,4 @@ class DatabaseAccess:
 
     def __exit__(self, type, value, traceback):
         self.db.commit()
+        del self.db
