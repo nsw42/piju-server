@@ -220,7 +220,8 @@ def get_artwork(trackid):
             mime = mimetypes.types_map[path.suffix]
             with open(track.ArtworkPath, 'rb') as handle:
                 data = handle.read()
-            return Response(data, mimetype=mime)
+
+            return Response(data, headers={'Cache-Control': 'max-age=300'}, mimetype=mime)
 
         elif track.ArtworkBlob:
             if track.ArtworkBlob[:3] == b'\xff\xd8\xff':
@@ -230,7 +231,7 @@ def get_artwork(trackid):
             else:
                 abort(500, description="Unknown mime type")
 
-            return Response(track.ArtworkBlob, mimetype=mime)
+            return Response(track.ArtworkBlob, headers={'Cache-Control': 'max-age=300'}, mimetype=mime)
 
         else:
             abort(HTTPStatus.NOT_FOUND, description="Track has no artwork")
