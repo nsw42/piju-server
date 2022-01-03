@@ -3,7 +3,7 @@ import pathlib
 from queue import Queue
 import threading
 
-from ..database.database import Database
+from ..database.database import DatabaseAccess
 from ..scan.directory import scan_directory
 from .workqueue import WorkRequests
 
@@ -15,19 +15,16 @@ class WorkerThread(threading.Thread):
         self.current_status = 'Not started'
 
     def run(self):
-        print("WorkerThread: %s" % threading.get_native_id())
+        print(f"WorkerThread: id={threading.get_native_id()} ident={threading.current_thread().ident}")
         while True:
             self.current_status = 'Idle'
             request = self.work_queue.get()
 
-            db = Database()
+            with DatabaseAccess() as db:
+                if request[0] == WorkRequests.ScanDirectory:
+                    dir_to_scan = pathlib.Path(request[1])
+                    self.current_status = 'Scanning %s' % dir_to_scan
+                    scan_directory(dir_to_scan, db)
 
-            if request[0] == WorkRequests.ScanDirectory:
-                dir_to_scan = pathlib.Path(request[1])
-                self.current_status = 'Scanning %s' % dir_to_scan
-                scan_directory(dir_to_scan, db)
-
-            else:
-                logging.error("Unrecognised request: %s" % request[0])
-
-            del db
+                else:
+                    logging.error("Unrecognised request: %s" % request[0])
