@@ -1,0 +1,6 @@
+Flask
+Pillow
+SQLAlchemy
+flake8
+mutagen
+pexpect
