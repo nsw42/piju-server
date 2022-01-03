@@ -65,6 +65,7 @@ def scan_m4a(absolute_path):
         Title=get_tag_text_value(['\xa9alb']),
         Artist=get_tag_text_value(['aART', '\xa9ART']),
         VolumeCount=get_m_of_n(['disk'])[1],
+        IsCompilation=False,  # TODO
         MusicBrainzAlbumId=None,
         MusicBrainzAlbumArtistId=None,
         ReleaseYear=track.ReleaseDate.year if track.ReleaseDate else None

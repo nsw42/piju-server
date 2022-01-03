@@ -91,6 +91,7 @@ def scan_mp3(absolute_path):
         Title=get_first_tag_text_value(['TALB']),
         Artist=get_first_tag_text_value(['TPE2', 'TPE1']),
         VolumeCount=get_m_of_n(['TPOS'])[1],
+        IsCompilation=True if (get_first_tag_text_value(['TCMP']) == '1') else False,
         MusicBrainzAlbumId=get_first_tag_text_value(['TXXX:MusicBrainz Album Id']),
         MusicBrainzAlbumArtistId=get_first_tag_text_value(['TXXX:MusicBrainz Album Artist Id']),
         ReleaseYear=track.ReleaseDate.year if track.ReleaseDate else None

@@ -33,14 +33,19 @@ class Database():
         Ensure the given album reference is present in the database,
         and return a fully populated object.
         """
-        res = self.session.query(Album).filter(
-            Album.Title == albumref.Title,
-            Album.Artist == albumref.Artist
-        )
+        if albumref.IsCompilation:
+            res = self.session.query(Album).filter(
+                Album.Title == albumref.Title
+            )
+        else:
+            res = self.session.query(Album).filter(
+                Album.Title == albumref.Title,
+                Album.Artist == albumref.Artist
+            )
         # TODO: use res.one_or_none() ??
         count = res.count()
         if count == 0:
-            # Artist does not exist
+            # Album does not exist
             self.session.add(albumref)
             self.session.commit()
             self.session.refresh(albumref)

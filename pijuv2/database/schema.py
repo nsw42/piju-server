@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, LargeBinary, String, Table
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, LargeBinary, String, Table
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -30,6 +30,7 @@ class Album(Base):
     MusicBrainzAlbumId = Column(String)
     MusicBrainzAlbumArtistId = Column(String)
     ReleaseYear = Column(Integer)
+    IsCompilation = Column(Boolean)
     Tracks = relationship("Track")
     Genres = relationship("Genre",
                           secondary=album_genre_association_table,
