@@ -3,6 +3,7 @@ from typing import List
 
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.pool import QueuePool
 
 from .schema import Base, Album, Genre, Track
@@ -11,8 +12,39 @@ from .schema import Base, Album, Genre, Track
 FILENAME = 'file.db'
 
 
-class NotFoundException(Exception):
-    pass
+class PijuDatabaseException(Exception):
+    """
+    Base class for all database exceptions
+    """
+
+
+class NotFoundException(PijuDatabaseException):
+    """
+    The requested item could not be found
+    """
+
+
+class DatabaseIntegrityException(PijuDatabaseException):
+    """
+    Something is amiss with the database.
+    Typically caused by finding multiple results when
+    at most one was expected.
+    """
+
+
+class UnknownException(PijuDatabaseException):
+    """
+    Something bad happened, but it's not clear what
+    """
+
+
+def convert_exception_class(exc):
+    if isinstance(exc, NoResultFound):
+        return NotFoundException
+    elif isinstance(exc, MultipleResultsFound):
+        return DatabaseIntegrityException
+    else:
+        return UnknownException
 
 
 class Database():
@@ -120,14 +152,10 @@ class Database():
         res = self.session.query(Album).filter(
             Album.Id == albumid
         )
-        count = res.count()
-        if count == 0:
-            raise NotFoundException()
-        elif count == 1:
-            return res.first()
-        else:
-            logging.fatal("Multiple results for a given album id")
-            assert False
+        try:
+            return res.one()
+        except Exception as e:
+            raise convert_exception_class(e) from e
 
     def get_all_albums(self) -> List[Album]:
         """
@@ -161,14 +189,10 @@ class Database():
         res = self.session.query(Genre).filter(
             Genre.Id == genreid
         )
-        count = res.count()
-        if count == 0:
-            raise NotFoundException()
-        elif count == 1:
-            return res.first()
-        else:
-            logging.fatal("Multiple results for a given genre id")
-            assert False
+        try:
+            return res.one()
+        except Exception as e:
+            raise convert_exception_class(e) from e
 
     def get_track_by_id(self, trackid: int):
         """
@@ -178,14 +202,10 @@ class Database():
         res = self.session.query(Track).filter(
             Track.Id == trackid
         )
-        count = res.count()
-        if count == 0:
-            raise NotFoundException()
-        elif count == 1:
-            return res.first()
-        else:
-            logging.fatal("Multiple results for a given track id")
-            assert False
+        try:
+            return res.one()
+        except Exception as e:
+            raise convert_exception_class(e) from e
 
     def get_nr_tracks(self):
         return self.session.query(Track).with_entities(func.count(Track.Id)).scalar()
