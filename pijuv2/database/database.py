@@ -143,11 +143,14 @@ class Database():
         result = self.session.execute(select(Genre).order_by(Genre.Name))
         return result.scalars().all()
 
-    def get_all_tracks(self):
+    def get_all_tracks(self, limit=None):
         """
         Primarily for debugging
         """
-        result = self.session.execute(select(Track).order_by(Track.Artist, Track.Album, Track.TrackNumber))
+        query = self.session.query(Track).order_by(Track.Artist, Track.Album, Track.TrackNumber)
+        if limit:
+            query = query.limit(limit)
+        result = self.session.execute(query)
         return result.scalars().all()
 
     def get_genre_by_id(self, genreid: int):

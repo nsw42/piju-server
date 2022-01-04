@@ -156,9 +156,14 @@ def get_genre(genreid):
 
 @app.route("/tracks/")
 def get_all_tracks():
+    limit = request.args.get('limit', '')
+    if limit and limit.isdigit():
+        limit = int(limit)
+    else:
+        limit = None
     with DatabaseAccess() as db:
         rtn = []
-        for track in db.get_all_tracks():
+        for track in db.get_all_tracks(limit):
             rtn.append(json_track(track))
         return jsonify(rtn)
 
