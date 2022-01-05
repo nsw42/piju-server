@@ -14,7 +14,6 @@ class Config:
         return Path.home() / '.pijudrc'
 
     def __init__(self, config_filepath):
-        print(config_filepath)
         if config_filepath:
             self._init_from_file(config_filepath)
         else:
