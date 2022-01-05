@@ -4,7 +4,6 @@ import mimetypes
 from pathlib import Path
 import resource
 from queue import Queue
-import sys
 
 from flask import abort, Flask, jsonify, request, Response, url_for
 
