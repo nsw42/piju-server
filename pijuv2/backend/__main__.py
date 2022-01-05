@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 from http import HTTPStatus
 import mimetypes
 from pathlib import Path
@@ -11,6 +12,7 @@ from ..database.database import Database, DatabaseAccess, NotFoundException
 from ..database.schema import Album, Genre, Track
 from ..player.mpyg321 import PlayerStatus
 from ..player.player import MusicPlayer
+from .config import Config
 from .workqueue import WorkRequests
 from .workthread import WorkerThread
 
@@ -22,7 +24,6 @@ class TrackInformationLevel:
 
 
 app = Flask(__name__)
-music_dir = '/Users/Shared/iTunes Media/Music'
 
 mimetypes.init()
 
@@ -321,15 +322,34 @@ def player_volume():
             abort(HTTPStatus.BAD_REQUEST, description='Volume must be specified and numeric')
 
 
+def parse_args():
+    parser = ArgumentParser()
+    parser.add_argument('-t', '--doctest', action='store_true',
+                        help="Run self-test and exit")
+    parser.add_argument('-c', '--config', metavar='FILE', type=Path,
+                        help=f"Load configuration from FILE. Default is {str(Config.default_filepath())}")
+    parser.set_defaults(doctest=False,
+                        config=None)
+    args = parser.parse_args()
+    if args.config and not args.config.is_file():
+        parser.error(f"Specified configuration file ({str(args.config)}) could not be found")
+    if (args.config is None) and (Config.default_filepath().is_file()):
+        args.config = Config.default_filepath()
+    return args
+
+
 if __name__ == '__main__':
-    if len(sys.argv) > 1 and sys.argv[1] in ('-t', '--doctest'):
+    args = parse_args()
+
+    if args.doctest:
         import doctest
         doctest.testmod()
     else:
         resource.setrlimit(resource.RLIMIT_NOFILE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
+        config = Config(args.config)
         db = Database()  # pre-create tables
         queue = Queue()
-        queue.put((WorkRequests.ScanDirectory, music_dir))
+        queue.put((WorkRequests.ScanDirectory, config.music_dir))
         app.worker = WorkerThread(queue)
         app.worker.start()
         app.player = MusicPlayer()
