@@ -1,4 +1,6 @@
 import logging
+from pathlib import Path
+
 import mutagen.mp3
 
 from ..database.schema import Album, Track
@@ -11,7 +13,7 @@ def parse_ufid(ufid):
     return ufid.data.decode() if ufid else None
 
 
-def scan_mp3(absolute_path):
+def scan_mp3(absolute_path: Path):
     mp3 = mutagen.mp3.MP3(absolute_path)
     if not mp3.tags:
         logging.warning(f"No MP3 tags found in file '{absolute_path}'")
