@@ -16,7 +16,7 @@ def parse_ufid(ufid):
 def scan_mp3(absolute_path: Path):
     mp3 = mutagen.mp3.MP3(absolute_path)
     if not mp3.tags:
-        logging.warning(f"No MP3 tags found in file '{absolute_path}'")
+        logging.warning(f"{absolute_path}: no MP3 tags found. Skipping file.")
         return None, None
 
     def get_tag_value(keys):
