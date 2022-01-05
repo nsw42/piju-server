@@ -92,6 +92,10 @@ def scan_mp3(absolute_path: Path):
         ArtworkHeight=artwork_size.height if artwork_size else None,
     )
 
+    if not track.Title:
+        track.Title = absolute_path.with_suffix('').name
+        logging.warning(f"{absolute_path}: No track title found. Using {track.Title}.")
+
     albumref = Album(
         Title=get_first_tag_text_value(['TALB']),
         Artist=get_first_tag_text_value(['TPE2', 'TPE1']),
