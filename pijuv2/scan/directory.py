@@ -23,14 +23,16 @@ def scan_directory(basedir: pathlib.Path, db: Database, limit: int = None):
     i = 0
     for path in basedir.rglob('*.mp3'):
         track, albumref = scan_mp3(path)
-        set_cross_refs(db, track, albumref)
+        if track:
+            set_cross_refs(db, track, albumref)
         i += 1
         if (limit is not None) and (i >= limit):
             return
 
     for path in basedir.rglob('*.m4a'):
         track, albumref = scan_m4a(path)
-        set_cross_refs(db, track, albumref)
+        if track:
+            set_cross_refs(db, track, albumref)
         i += 1
         if (limit is not None) and (i >= limit):
             return

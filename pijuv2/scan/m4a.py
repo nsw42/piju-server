@@ -10,6 +10,9 @@ logger = logging.getLogger(__name__)
 
 def scan_m4a(absolute_path):
     mp4 = mutagen.mp4.MP4(absolute_path)
+    if not mp4.tags:
+        logging.warning(f"No M4A tags found in file '{absolute_path}'")
+        return None, None
 
     def get_tag_value(keys):
         for key in keys:
