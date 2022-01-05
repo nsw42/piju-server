@@ -353,4 +353,6 @@ if __name__ == '__main__':
         app.worker = WorkerThread(queue)
         app.worker.start()
         app.player = MusicPlayer()
-        app.run(use_reloader=False)
+        # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
+        # see https://developer.apple.com/forums/thread/682332
+        app.run(use_reloader=False, host='0.0.0.0')
