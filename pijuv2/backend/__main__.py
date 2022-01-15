@@ -249,6 +249,8 @@ def extract_id(uri_or_id):
 @app.route("/player/play", methods=['POST'])
 def update_player_play():
     data = request.get_json()
+    if not data:
+        abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
     with DatabaseAccess() as db:
         albumid = extract_id(data.get('album'))
         trackid = extract_id(data.get('track'))
