@@ -13,14 +13,22 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 ## Dependencies
 
 * [Flask](https://flask.palletsprojects.com)
+* mutagen
 * pexpect (4.8.0)
 * Pillow
+* SQLAlchemy
 
 ## Backlog
 
+* Detect changes to a file's metadata, and don't create duplicates
+* Detect files being deleted
+* Bug fix: Too many open files under heavy load
+* Bug fix: mpyg321 will sometimes crash with a pexpect EOF - seemingly if calls are made too frequently
+* Bug fix: Scanner is finding a lot of tracks without a title
+* Include album disk number to album json in the API
 * Refactor/code tidy of the backend code
 * Move `set_cross_refs` functionality into `ensure_track_exists` in database layer
-* Bug fix: mpyg321 will sometimes crash with a pexpect EOF - seemingly if calls are made too frequently
+* (Maybe) Add volume support
 
 ### Done
 
@@ -32,11 +40,14 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 * API: Add image width/height to db, and include it in `/artworkinfo/<id>`
 * API: Allow track information to be included when retrieving album
 * API: Include album year to album json in the API
+* API: (Tech debt) use jsonify or just return a dict, return than json.dumps
+* API/Database bug fix: `sqlite3.ProgrammingError: SQLite objects created in a thread can only be used in that same thread. The object was created in thread id 6117453824 and this is thread id 6151106560.` when accessing `/tracks` for the first time after scanning has finished.
 * Scan: Compute/store an artwork path for an album
 * Scan: Compute/store the genres for an album
 * Scan: Figure out why duplicate tracks are being created (partially fixed)
 * Scan: Figure out where genres are being created with name 13 (etc)
 * Scan: Bug fix: duplicate tracks are being created when re-scanning on a different day (dateutil.parser)
+* Scan: Bug fix: Cyberpunk 2077 OST is showing as multiple separate albums
 * Player: Add remote control of player to play album
 * Player: Add ability to specify start index when starting an album
 * Player: Add ability to play individual tracks
