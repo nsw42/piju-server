@@ -29,6 +29,7 @@ class MusicPlayer(MPyg321Player):
             self.play_from_queue_index(self.index + 1)
         else:
             self.stop()
+            self.current_track_id = None
 
     def prev(self):
         if True:
