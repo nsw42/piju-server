@@ -307,6 +307,12 @@ def update_player_prev():
     return ('', HTTPStatus.NO_CONTENT)
 
 
+@app.route("/player/stop", methods=['POST'])
+def update_player_stop():
+    app.player.stop()
+    return ('', HTTPStatus.NO_CONTENT)
+
+
 @app.route("/player/volume", methods=['GET', 'POST'])
 def player_volume():
     if request.method == 'GET':

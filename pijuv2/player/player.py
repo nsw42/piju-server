@@ -29,7 +29,6 @@ class MusicPlayer(MPyg321Player):
             self.play_from_queue_index(self.index + 1)
         else:
             self.stop()
-            self.current_track_id = None
 
     def prev(self):
         if True:
@@ -45,6 +44,10 @@ class MusicPlayer(MPyg321Player):
             self.pause()
         else:
             self.resume()
+
+    def stop(self):
+        super().stop()
+        self.current_track_id = None
 
     # callbacks
     def on_music_end(self):
