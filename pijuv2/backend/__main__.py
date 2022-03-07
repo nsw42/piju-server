@@ -104,6 +104,7 @@ def current_status():
             'PlayerStatus': PLAYER_STATUS_REPRESENTATION.get(app.player.status, "stopped"),
             'PlayerVolume': app.player.current_volume,
             'CurrentTrack': {} if track is None else json_track(track),
+            'NumberAlbums': db.get_nr_albums(),
             'NumberTracks': db.get_nr_tracks(),
         }
     return jsonify(rtn)
