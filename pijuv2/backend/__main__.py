@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 from http import HTTPStatus
 import mimetypes
+import os.path
 from pathlib import Path
 import resource
 from queue import Queue
@@ -330,6 +331,16 @@ def player_volume():
             abort(HTTPStatus.BAD_REQUEST, description='Volume must be specified and numeric')
 
 
+@app.route("/scanner/scan", methods=['POST'])
+def start_scan():
+    data = request.get_json()
+    subdir = data.get('dir')
+    scandir = config.music_dir if (subdir is None) else os.path.join(config.music_dir, subdir)
+    # TODO: Error checking on scandir
+    app.queue.put((WorkRequests.ScanDirectory, scandir))
+    return ('', HTTPStatus.NO_CONTENT)
+
+
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument('-t', '--doctest', action='store_true',
@@ -356,9 +367,9 @@ if __name__ == '__main__':
         resource.setrlimit(resource.RLIMIT_NOFILE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
         config = Config(args.config)
         db = Database()  # pre-create tables
-        queue = Queue()
-        queue.put((WorkRequests.ScanDirectory, config.music_dir))
-        app.worker = WorkerThread(queue)
+        app.queue = Queue()
+        app.queue.put((WorkRequests.ScanDirectory, config.music_dir))
+        app.worker = WorkerThread(app.queue)
         app.worker.start()
         app.player = MusicPlayer()
         # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
