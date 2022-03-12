@@ -48,8 +48,12 @@ def convert_exception_class(exc):
 
 
 class Database():
-    def __init__(self):
-        self.engine = create_engine('sqlite:///' + FILENAME, poolclass=QueuePool)
+    def __init__(self, filename=None, path=None):
+        if path:
+            filename = str(path)
+        elif filename is None:
+            filename = FILENAME
+        self.engine = create_engine('sqlite:///' + filename, poolclass=QueuePool)
         self.session = scoped_session(sessionmaker(bind=self.engine))
 
         # ensure tables exist
