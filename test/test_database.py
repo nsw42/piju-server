@@ -22,10 +22,21 @@ def test_one_compilation_one_album(tmp_path):
 
     assert db.get_nr_albums() == 0
 
-    album1 = db.ensure_album_exists(mk_compilation_albumref())
-    album2 = db.ensure_album_exists(mk_other_albumref())
-    album3 = db.ensure_album_exists(mk_compilation_albumref())
-    album4 = db.ensure_album_exists(mk_other_albumref())
+    db.ensure_album_exists(mk_compilation_albumref())
+
+    assert db.get_nr_albums() == 1
+
+    db.ensure_album_exists(mk_other_albumref())
+
+    assert db.get_nr_albums() == 2
+
+    db.ensure_album_exists(mk_compilation_albumref())
+
+    assert db.get_nr_albums() == 2
+
+    db.ensure_album_exists(mk_other_albumref())
+
+    assert db.get_nr_albums() == 2
 
 
 def test_one_album_one_compilation(tmp_path):
@@ -34,7 +45,18 @@ def test_one_album_one_compilation(tmp_path):
     assert db.get_nr_albums() == 0
 
     album1 = db.ensure_album_exists(mk_other_albumref())
+
+    assert db.get_nr_albums() == 1
+
     album2 = db.ensure_album_exists(mk_compilation_albumref())
+
+    assert db.get_nr_albums() == 2
+
     album3 = db.ensure_album_exists(mk_other_albumref())
+
+    assert db.get_nr_albums() == 2
+
     album4 = db.ensure_album_exists(mk_compilation_albumref())
+
+    assert db.get_nr_albums() == 2
 
