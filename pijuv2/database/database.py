@@ -70,14 +70,11 @@ class Database():
         and return a fully populated object.
         """
         if albumref.IsCompilation:
-            res = self.session.query(Album).filter(
-                Album.Title == albumref.Title
-            )
-        else:
-            res = self.session.query(Album).filter(
-                Album.Title == albumref.Title,
-                Album.Artist == albumref.Artist
-            )
+            albumref.Artist = None
+        res = self.session.query(Album).filter(
+            Album.Title == albumref.Title,
+            Album.Artist == albumref.Artist
+        )
         # TODO: use res.one_or_none() ??
         count = res.count()
         if count == 0:
