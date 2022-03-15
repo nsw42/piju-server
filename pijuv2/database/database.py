@@ -91,7 +91,7 @@ class Database():
                 self.session.commit()
             return album
         else:
-            logging.fatal("Multiple results found for an album reference")
+            logging.fatal(f"Multiple results found for album reference: {albumref.Artist}: {albumref.Title}")
             assert False
 
     def ensure_genre_exists(self, genre_name: str) -> Genre:
