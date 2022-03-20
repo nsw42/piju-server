@@ -1,12 +1,14 @@
 from argparse import ArgumentParser
+import gzip
 from http import HTTPStatus
+import json
 import mimetypes
 import os.path
 from pathlib import Path
 import resource
 from queue import Queue
 
-from flask import abort, Flask, jsonify, request, Response, url_for
+from flask import abort, Flask, make_response, request, Response, url_for
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
 from ..database.schema import Album, Genre, Track
@@ -26,6 +28,16 @@ class TrackInformationLevel:
 app = Flask(__name__)
 
 mimetypes.init()
+
+
+def gzippable_jsonify(content):
+    content = json.dumps(content, separators=(',', ':'))  # avoid whitespace in response
+    if 'gzip' in request.headers.get('Accept-Encoding', '').lower():
+        content = gzip.compress(content.encode('utf-8'), 5)
+    response = make_response(content)
+    response.headers['Content-Length'] = len(content)
+    response.headers['Content-Encoding'] = 'gzip'
+    return response
 
 
 def json_album(album: Album, include_tracks: TrackInformationLevel):
@@ -108,7 +120,7 @@ def current_status():
             'NumberAlbums': db.get_nr_albums(),
             'NumberTracks': db.get_nr_tracks(),
         }
-    return jsonify(rtn)
+    return gzippable_jsonify(rtn)
 
 
 @app.route("/albums/")
@@ -117,7 +129,7 @@ def get_all_albums():
         rtn = []
         for album in db.get_all_albums():
             rtn.append(json_album(album, include_tracks=TrackInformationLevel.NoTracks))
-        return jsonify(rtn)
+        return gzippable_jsonify(rtn)
 
 
 @app.route("/albums/<albumid>")
@@ -134,7 +146,7 @@ def get_album(albumid):
             album = db.get_album_by_id(albumid)
         except NotFoundException:
             abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
-        return jsonify(json_album(album, include_tracks=track_info))
+        return gzippable_jsonify(json_album(album, include_tracks=track_info))
 
 
 @app.route("/genres/")
@@ -143,7 +155,7 @@ def get_all_genres():
         rtn = []
         for genre in db.get_all_genres():
             rtn.append(json_genre(genre, include_albums=False))
-        return jsonify(rtn)
+        return gzippable_jsonify(rtn)
 
 
 @app.route("/genres/<genreid>")
@@ -153,7 +165,7 @@ def get_genre(genreid):
             genre = db.get_genre_by_id(genreid)
         except NotFoundException:
             abort(HTTPStatus.NOT_FOUND, description="Unknown genre id")
-        return jsonify(json_genre(genre, include_albums=True))
+        return gzippable_jsonify(json_genre(genre, include_albums=True))
 
 
 @app.route("/tracks/")
@@ -167,7 +179,7 @@ def get_all_tracks():
         rtn = []
         for track in db.get_all_tracks(limit):
             rtn.append(json_track(track))
-        return jsonify(rtn)
+        return gzippable_jsonify(rtn)
 
 
 @app.route("/tracks/<trackid>")
@@ -177,7 +189,7 @@ def get_track(trackid):
             track = db.get_track_by_id(trackid)
         except NotFoundException:
             abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
-        return jsonify(json_track(track))
+        return gzippable_jsonify(json_track(track))
 
 
 @app.route("/artworkinfo/<trackid>")
@@ -194,7 +206,7 @@ def get_artwork_info(trackid):
             "height": track.ArtworkHeight,
             "image": url_for('get_artwork', trackid=trackid) if has_artwork else None,
         }
-        return jsonify(rtn)
+        return gzippable_jsonify(rtn)
 
 
 @app.route("/artwork/<trackid>")
