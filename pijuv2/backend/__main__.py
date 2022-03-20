@@ -19,6 +19,12 @@ from .workqueue import WorkRequests
 from .workthread import WorkerThread
 
 
+class AlbumInformationLevel:
+    NoAlbums = 0
+    AlbumLinks = 1
+    AllAlbumInfo = 2
+
+
 class TrackInformationLevel:
     NoTracks = 0
     TrackLinks = 1
@@ -72,13 +78,15 @@ def json_album(album: Album, include_tracks: TrackInformationLevel):
     return rtn
 
 
-def json_genre(genre: Genre, include_albums: bool):
+def json_genre(genre: Genre, include_albums: AlbumInformationLevel):
     rtn = {
         'link': url_for('get_genre', genreid=genre.Id),
         'name': genre.Name,
     }
-    if include_albums:
+    if include_albums == AlbumInformationLevel.AlbumLinks:
         rtn['albums'] = [url_for('get_album', albumid=album.Id) for album in genre.Albums]
+    elif include_albums == AlbumInformationLevel.AllAlbumInfo:
+        rtn['albums'] = [json_album(album, include_tracks=TrackInformationLevel.AllTrackInfo) for album in genre.Albums]
     return rtn
 
 
@@ -154,18 +162,25 @@ def get_all_genres():
     with DatabaseAccess() as db:
         rtn = []
         for genre in db.get_all_genres():
-            rtn.append(json_genre(genre, include_albums=False))
+            rtn.append(json_genre(genre, include_albums=AlbumInformationLevel.NoAlbums))
         return gzippable_jsonify(rtn)
 
 
 @app.route("/genres/<genreid>")
 def get_genre(genreid):
+    album_info = request.args.get('albums', '').lower()
+    if album_info == 'none':
+        album_info = AlbumInformationLevel.NoAlbums
+    elif album_info == 'all':
+        album_info = AlbumInformationLevel.AllAlbumInfo
+    else:
+        album_info = AlbumInformationLevel.AlbumLinks
     with DatabaseAccess() as db:
         try:
             genre = db.get_genre_by_id(genreid)
         except NotFoundException:
             abort(HTTPStatus.NOT_FOUND, description="Unknown genre id")
-        return gzippable_jsonify(json_genre(genre, include_albums=True))
+        return gzippable_jsonify(json_genre(genre, include_albums=album_info))
 
 
 @app.route("/tracks/")
