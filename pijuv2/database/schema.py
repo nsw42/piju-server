@@ -10,6 +10,15 @@ album_genre_association_table = Table('association', Base.metadata,
                                       Column('album_id', Integer, ForeignKey('Albums.Id')))
 
 
+playlist_genre_association_table = Table('playlist_to_genres', Base.metadata,
+                                         Column('genre_id', Integer, ForeignKey('Genres.Id')),
+                                         Column('playlist_id', Integer, ForeignKey('Playlists.Id')))
+
+playlist_track_association_table = Table('playlist_to_track', Base.metadata,
+                                         Column('playlist_id', Integer, ForeignKey('Playlists.Id')),
+                                         Column('track_id', Integer, ForeignKey('Tracks.Id')))
+
+
 class Genre(Base):
     __tablename__ = 'Genres'
 
@@ -18,6 +27,9 @@ class Genre(Base):
     Albums = relationship("Album",
                           secondary=album_genre_association_table,
                           back_populates="Genres")
+    Playlists = relationship("Playlist",
+                             secondary=playlist_genre_association_table,
+                             back_populates="Genres")
 
 
 class Album(Base):
@@ -35,6 +47,18 @@ class Album(Base):
     Genres = relationship("Genre",
                           secondary=album_genre_association_table,
                           back_populates="Albums")
+
+
+class Playlist(Base):
+    __tablename__ = 'Playlists'
+
+    Id = Column(Integer, primary_key=True)
+    Title = Column(String)
+    Tracks = relationship("Track",
+                          secondary=playlist_track_association_table)
+    Genres = relationship("Genre",
+                          secondary=playlist_genre_association_table,
+                          back_populates="Playlists")
 
 
 class Track(Base):
