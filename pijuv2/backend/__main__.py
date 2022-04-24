@@ -145,17 +145,32 @@ PLAYER_STATUS_REPRESENTATION = {
 def build_playlist_from_api_data(db: Database, request) -> Playlist:
     data = request.get_json()
     title = data.get('title')
-    trackids = extract_ids(data.get('tracks'))
+    trackids = extract_ids(data.get('tracks', []))
+    m3u = data.get('m3u')
     if title in (None, ""):
         abort(HTTPStatus.BAD_REQUEST, "Playlist title must be specified")
-    if not trackids:
-        abort(HTTPStatus.BAD_REQUEST, "At least one track must be specified")
-    if None in trackids:
-        abort(HTTPStatus.BAD_REQUEST, "Invalid track reference")
-    try:
-        tracks = [db.get_track_by_id(trackid) for trackid in trackids]
-    except NotFoundException:
-        abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+    if (not trackids) and (not m3u):
+        abort(HTTPStatus.BAD_REQUEST, "Either a list of tracks or an m3u playlist must be specified")
+    if (trackids) and (m3u):
+        abort(HTTPStatus.BAD_REQUEST, "Only one of a list of tracks and an m3u playlist is permitted")
+    if m3u:
+        m3u = m3u.splitlines()
+        m3u = [line for line in m3u if line and not line.startswith('#')]
+        tracks = []
+        for filepath in m3u:
+            try:
+                fullpath = app.piju_config.music_dir / filepath
+                track = db.get_track_by_filepath(str(fullpath))
+                tracks.append(track)
+            except NotFoundException:
+                print(f"Could not find a track at {filepath} - looked in {fullpath}")
+    else:
+        if None in trackids:
+            abort(HTTPStatus.BAD_REQUEST, "Invalid track reference")
+        try:
+            tracks = [db.get_track_by_id(trackid) for trackid in trackids]
+        except NotFoundException:
+            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
     playlist_entries = []
     for index, track in enumerate(tracks):
         playlist_entries.append(PlaylistEntry(PlaylistIndex=index, TrackId=track.Id))
@@ -497,6 +512,7 @@ if __name__ == '__main__':
         resource.setrlimit(resource.RLIMIT_NOFILE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
         config = Config(args.config)
         db = Database()  # pre-create tables
+        app.piju_config = config
         app.queue = Queue()
         app.queue.put((WorkRequests.ScanDirectory, config.music_dir))
         app.worker = WorkerThread(app.queue)

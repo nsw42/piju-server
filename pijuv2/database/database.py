@@ -249,6 +249,19 @@ class Database():
         except Exception as e:
             raise convert_exception_class(e) from e
 
+    def get_track_by_filepath(self, path: str):
+        """
+        Return the Track object for a given file path.
+        Raises NotFoundException for an unknown path
+        """
+        res = self.session.query(Track).filter(
+            func.lower(Track.Filepath) == func.lower(path)
+        )
+        try:
+            return res.one()
+        except Exception as e:
+            raise convert_exception_class(e) from e
+
     def get_nr_albums(self):
         return self.session.query(Album).with_entities(func.count(Album.Id)).scalar()
 
