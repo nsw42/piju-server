@@ -137,6 +137,8 @@ def build_playlist_from_api_data(db: Database, request) -> Playlist:
     trackids = extract_ids(data.get('tracks'))
     if title in (None, ""):
         abort(HTTPStatus.BAD_REQUEST, "Playlist title must be specified")
+    if not trackids:
+        abort(HTTPStatus.BAD_REQUEST, "At least one track must be specified")
     if None in trackids:
         abort(HTTPStatus.BAD_REQUEST, "Invalid track reference")
     try:
