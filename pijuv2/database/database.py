@@ -178,6 +178,13 @@ class Database():
         result = self.session.execute(select(Genre).order_by(Genre.Name))
         return result.scalars().all()
 
+    def get_all_playlists(self):
+        """
+        Primarily for debugging
+        """
+        result = self.session.execute(select(Playlist).order_by(Playlist.Title))
+        return result.scalars().all()
+
     def get_all_tracks(self, limit=None):
         """
         Primarily for debugging

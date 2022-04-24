@@ -383,10 +383,14 @@ def player_volume():
             abort(HTTPStatus.BAD_REQUEST, description='Volume must be specified and numeric')
 
 
-@app.route("/playlists", methods=['GET', 'POST'])
+@app.route("/playlists/", methods=['GET', 'POST'])
 def playlists():
     if request.method == 'GET':
-        return 'TODO'
+        with DatabaseAccess() as db:
+            rtn = []
+            for playlist in db.get_all_playlists():
+                rtn.append(json_playlist(playlist, include_tracks=TrackInformationLevel.NoTracks))
+            return gzippable_jsonify(rtn)
     elif request.method == 'POST':
         data = request.get_json()
         title = data.get('title')
