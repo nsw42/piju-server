@@ -6,7 +6,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.pool import QueuePool
 
-from .schema import Base, Album, Genre, Track
+from .schema import Base, Album, Genre, Playlist, Track
 
 
 FILENAME = 'file.db'
@@ -63,6 +63,12 @@ class Database():
 
     def commit(self):
         self.session.commit()
+
+    def create_playlist(self, playlist: Playlist):
+        self.session.add(playlist)
+        self.session.commit()
+        self.session.refresh(playlist)
+        return playlist
 
     def ensure_album_exists(self, albumref: Album):
         """

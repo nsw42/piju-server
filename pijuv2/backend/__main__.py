@@ -11,7 +11,7 @@ from queue import Queue
 from flask import abort, Flask, make_response, request, Response, url_for
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
-from ..database.schema import Album, Genre, Track
+from ..database.schema import Album, Genre, Playlist, Track
 from ..player.mpyg321 import PlayerStatus
 from ..player.player import MusicPlayer
 from .config import Config
@@ -275,6 +275,14 @@ def extract_id(uri_or_id):
     return uri_or_id if isinstance(uri_or_id, int) else None
 
 
+def extract_ids(uris_or_ids):
+    """
+    >>> extract_ids(["/tracks/123", "456", 789])
+    [123, 456, 789]
+    """
+    return [extract_id(uri_or_id) for uri_or_id in uris_or_ids]
+
+
 @app.route("/player/play", methods=['POST'])
 def update_player_play():
     data = request.get_json()
@@ -356,6 +364,28 @@ def player_volume():
             return ('', HTTPStatus.NO_CONTENT)
         except (AttributeError, KeyError, ValueError):
             abort(HTTPStatus.BAD_REQUEST, description='Volume must be specified and numeric')
+
+
+@app.route("/playlists", methods=['GET', 'POST'])
+def playlists():
+    if request.method == 'GET':
+        return 'TODO'
+    elif request.method == 'POST':
+        data = request.get_json()
+        title = data.get('title')
+        trackids = extract_ids(data.get('tracks'))
+        if title in (None, ""):
+            abort(HTTPStatus.BAD_REQUEST, "Playlist title must be specified")
+        if None in trackids:
+            abort(HTTPStatus.BAD_REQUEST, "Invalid track reference")
+        with DatabaseAccess() as db:
+            try:
+                tracks = [db.get_track_by_id(trackid) for trackid in trackids]
+            except NotFoundException:
+                abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+            playlist = Playlist(Title=title, Tracks=tracks)
+            db.create_playlist(playlist)
+            return str(playlist.Id)
 
 
 @app.route("/scanner/scan", methods=['POST'])
