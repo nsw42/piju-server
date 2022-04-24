@@ -94,7 +94,7 @@ def json_genre(genre: Genre, include_albums: AlbumInformationLevel):
 def json_playlist(playlist: Playlist, include_tracks: TrackInformationLevel):
     tracks = list(playlist.Tracks)
     rtn = {
-        'link': url_for('get_playlist', playlistid=playlist.Id),
+        'link': url_for('one_playlist', playlistid=playlist.Id),
         'title': playlist.Title,
     }
     if include_tracks == TrackInformationLevel.TrackLinks:
@@ -431,7 +431,7 @@ def playlists():
 
 
 @app.route("/playlists/<playlistid>", methods=['DELETE', 'GET', 'PUT'])
-def get_playlist(playlistid):
+def one_playlist(playlistid):
     if request.method == 'GET':
         track_info = get_requested_track_info_level(request)
         with DatabaseAccess() as db:
