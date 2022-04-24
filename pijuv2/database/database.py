@@ -70,6 +70,15 @@ class Database():
         self.session.refresh(playlist)
         return playlist
 
+    def update_playlist(self, playlist: Playlist):
+        existing_playlist = self.get_playlist_by_id(playlist.Id)
+        if not existing_playlist:
+            raise NotFoundException(f"Playlist {playlist.Id} does not exist")
+        existing_playlist.Title = playlist.Title
+        existing_playlist.Tracks = playlist.Tracks
+        self.session.commit()
+        return existing_playlist
+
     def ensure_album_exists(self, albumref: Album):
         """
         Ensure the given album reference is present in the database,

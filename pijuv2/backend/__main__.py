@@ -129,6 +129,50 @@ PLAYER_STATUS_REPRESENTATION = {
 }
 
 
+def build_playlist_from_api_data(db: Database, request, playlistid: int) -> Playlist:
+    data = request.get_json()
+    title = data.get('title')
+    trackids = extract_ids(data.get('tracks'))
+    if title in (None, ""):
+        abort(HTTPStatus.BAD_REQUEST, "Playlist title must be specified")
+    if None in trackids:
+        abort(HTTPStatus.BAD_REQUEST, "Invalid track reference")
+    try:
+        tracks = [db.get_track_by_id(trackid) for trackid in trackids]
+    except NotFoundException:
+        abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+    return Playlist(Id=playlistid, Title=title, Tracks=tracks)
+
+
+def extract_id(uri_or_id):
+    """
+    >>> extract_id("/albums/85")
+    85
+    >>> extract_id("/tracks/123")
+    123
+    >>> extract_id("/albums/12X")
+    >>> extract_id("123")
+    123
+    >>> extract_id("cat")
+    >>> extract_id(432)
+    432
+    """
+    if uri_or_id and isinstance(uri_or_id, str) and '/' in uri_or_id:
+        # this is a uri, map it to a string representation of an id, then fall-through
+        uri_or_id = uri_or_id.rsplit('/', 1)[1]
+    if uri_or_id and isinstance(uri_or_id, str) and uri_or_id.isdigit():
+        uri_or_id = int(uri_or_id)
+    return uri_or_id if isinstance(uri_or_id, int) else None
+
+
+def extract_ids(uris_or_ids):
+    """
+    >>> extract_ids(["/tracks/123", "456", 789])
+    [123, 456, 789]
+    """
+    return [extract_id(uri_or_id) for uri_or_id in uris_or_ids]
+
+
 def get_requested_track_info_level(request):
     track_info = request.args.get('tracks', '').lower()
     if track_info == 'none':
@@ -271,35 +315,6 @@ def get_artwork(trackid):
             abort(HTTPStatus.NOT_FOUND, description="Track has no artwork")
 
 
-def extract_id(uri_or_id):
-    """
-    >>> extract_id("/albums/85")
-    85
-    >>> extract_id("/tracks/123")
-    123
-    >>> extract_id("/albums/12X")
-    >>> extract_id("123")
-    123
-    >>> extract_id("cat")
-    >>> extract_id(432)
-    432
-    """
-    if uri_or_id and isinstance(uri_or_id, str) and '/' in uri_or_id:
-        # this is a uri, map it to a string representation of an id, then fall-through
-        uri_or_id = uri_or_id.rsplit('/', 1)[1]
-    if uri_or_id and isinstance(uri_or_id, str) and uri_or_id.isdigit():
-        uri_or_id = int(uri_or_id)
-    return uri_or_id if isinstance(uri_or_id, int) else None
-
-
-def extract_ids(uris_or_ids):
-    """
-    >>> extract_ids(["/tracks/123", "456", 789])
-    [123, 456, 789]
-    """
-    return [extract_id(uri_or_id) for uri_or_id in uris_or_ids]
-
-
 @app.route("/player/play", methods=['POST'])
 def update_player_play():
     data = request.get_json()
@@ -392,32 +407,27 @@ def playlists():
                 rtn.append(json_playlist(playlist, include_tracks=TrackInformationLevel.NoTracks))
             return gzippable_jsonify(rtn)
     elif request.method == 'POST':
-        data = request.get_json()
-        title = data.get('title')
-        trackids = extract_ids(data.get('tracks'))
-        if title in (None, ""):
-            abort(HTTPStatus.BAD_REQUEST, "Playlist title must be specified")
-        if None in trackids:
-            abort(HTTPStatus.BAD_REQUEST, "Invalid track reference")
         with DatabaseAccess() as db:
-            try:
-                tracks = [db.get_track_by_id(trackid) for trackid in trackids]
-            except NotFoundException:
-                abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
-            playlist = Playlist(Title=title, Tracks=tracks)
+            playlist = build_playlist_from_api_data(db, request, None)
             db.create_playlist(playlist)
             return str(playlist.Id)
 
 
-@app.route("/playlists/<playlistid>")
+@app.route("/playlists/<playlistid>", methods=['GET', 'PUT'])
 def get_playlist(playlistid):
-    track_info = get_requested_track_info_level(request)
-    with DatabaseAccess() as db:
-        try:
-            playlist = db.get_playlist_by_id(playlistid)
-        except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
-        return gzippable_jsonify(json_playlist(playlist, include_tracks=track_info))
+    if request.method == 'GET':
+        track_info = get_requested_track_info_level(request)
+        with DatabaseAccess() as db:
+            try:
+                playlist = db.get_playlist_by_id(playlistid)
+            except NotFoundException:
+                abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
+            return gzippable_jsonify(json_playlist(playlist, include_tracks=track_info))
+    elif request.method == 'PUT':
+        with DatabaseAccess() as db:
+            playlist = build_playlist_from_api_data(db, request, playlistid)
+            db.update_playlist(playlist)
+            return str(playlist.Id)
 
 
 @app.route("/scanner/scan", methods=['POST'])
