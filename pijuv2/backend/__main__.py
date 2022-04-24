@@ -20,16 +20,22 @@ from .workqueue import WorkRequests
 from .workthread import WorkerThread
 
 
-class AlbumInformationLevel:
-    NoAlbums = 0
-    AlbumLinks = 1
-    AllAlbumInfo = 2
+class InformationLevel:
+    NoInfo = 0
+    Links = 1
+    AllInfo = 2
 
-
-class TrackInformationLevel:
-    NoTracks = 0
-    TrackLinks = 1
-    AllTrackInfo = 2
+    @staticmethod
+    def from_string(info: str, default: 'InformationLevel' = Links):
+        info = info.lower()
+        if info == 'none':
+            return InformationLevel.NoInfo
+        elif info == 'all':
+            return InformationLevel.AllInfo
+        elif info == 'links':
+            return InformationLevel.Links
+        else:
+            return default
 
 
 app = Flask(__name__)
@@ -47,7 +53,7 @@ def gzippable_jsonify(content):
     return response
 
 
-def json_album(album: Album, include_tracks: TrackInformationLevel):
+def json_album(album: Album, include_tracks: InformationLevel):
     tracks = list(album.Tracks)
     tracks = sorted(tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0)
     for track in tracks:
@@ -72,35 +78,40 @@ def json_album(album: Album, include_tracks: TrackInformationLevel):
         },
         'genres': [url_for('get_genre', genreid=genre.Id) for genre in album.Genres],
     }
-    if include_tracks == TrackInformationLevel.TrackLinks:
+    if include_tracks == InformationLevel.Links:
         rtn['tracks'] = [url_for('get_track', trackid=track.Id) for track in tracks]
-    elif include_tracks == TrackInformationLevel.AllTrackInfo:
+    elif include_tracks == InformationLevel.AllInfo:
         rtn['tracks'] = [json_track(track) for track in tracks]
     return rtn
 
 
-def json_genre(genre: Genre, include_albums: AlbumInformationLevel):
+def json_genre(genre: Genre, include_albums: InformationLevel, include_playlists: InformationLevel):
     rtn = {
         'link': url_for('get_genre', genreid=genre.Id),
         'name': genre.Name,
     }
-    if include_albums == AlbumInformationLevel.AlbumLinks:
+    if include_albums == InformationLevel.Links:
         rtn['albums'] = [url_for('get_album', albumid=album.Id) for album in genre.Albums]
-    elif include_albums == AlbumInformationLevel.AllAlbumInfo:
-        rtn['albums'] = [json_album(album, include_tracks=TrackInformationLevel.AllTrackInfo) for album in genre.Albums]
+    elif include_albums == InformationLevel.AllInfo:
+        rtn['albums'] = [json_album(album, include_tracks=InformationLevel.AllInfo) for album in genre.Albums]
+    if include_playlists == InformationLevel.Links:
+        rtn['playlists'] = [url_for('one_playlist', playlistid=playlist.Id) for playlist in genre.Playlists]
+    elif include_playlists == InformationLevel.AllInfo:
+        rtn['playlists'] = [json_playlist(playlist, include_tracks=InformationLevel.AllInfo)
+                            for playlist in genre.Playlists]
     return rtn
 
 
-def json_playlist(playlist: Playlist, include_tracks: TrackInformationLevel):
+def json_playlist(playlist: Playlist, include_tracks: InformationLevel):
     entries = list(playlist.Entries)
     rtn = {
         'link': url_for('one_playlist', playlistid=playlist.Id),
         'title': playlist.Title,
         'genres': [url_for('get_genre', genreid=genre.Id) for genre in playlist.Genres],
     }
-    if include_tracks == TrackInformationLevel.TrackLinks:
+    if include_tracks == InformationLevel.Links:
         rtn['tracks'] = [url_for('get_track', trackid=entry.TrackId) for entry in entries]
-    elif include_tracks == TrackInformationLevel.AllTrackInfo:
+    elif include_tracks == InformationLevel.AllInfo:
         rtn['tracks'] = [json_track(entry.Track) for entry in entries]
     return rtn
 
@@ -183,16 +194,6 @@ def extract_ids(uris_or_ids):
     return [extract_id(uri_or_id) for uri_or_id in uris_or_ids]
 
 
-def get_requested_track_info_level(request):
-    track_info = request.args.get('tracks', '').lower()
-    if track_info == 'none':
-        return TrackInformationLevel.NoTracks
-    elif track_info == 'all':
-        return TrackInformationLevel.AllTrackInfo
-    else:
-        return TrackInformationLevel.TrackLinks
-
-
 @app.route("/")
 def current_status():
     with DatabaseAccess() as db:
@@ -213,13 +214,13 @@ def get_all_albums():
     with DatabaseAccess() as db:
         rtn = []
         for album in db.get_all_albums():
-            rtn.append(json_album(album, include_tracks=TrackInformationLevel.NoTracks))
+            rtn.append(json_album(album, include_tracks=InformationLevel.NoInfo))
         return gzippable_jsonify(rtn)
 
 
 @app.route("/albums/<albumid>")
 def get_album(albumid):
-    track_info = get_requested_track_info_level(request)
+    track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
     with DatabaseAccess() as db:
         try:
             album = db.get_album_by_id(albumid)
@@ -233,25 +234,22 @@ def get_all_genres():
     with DatabaseAccess() as db:
         rtn = []
         for genre in db.get_all_genres():
-            rtn.append(json_genre(genre, include_albums=AlbumInformationLevel.NoAlbums))
+            rtn.append(json_genre(genre,
+                                  include_albums=InformationLevel.NoInfo,
+                                  include_playlists=InformationLevel.NoInfo))
         return gzippable_jsonify(rtn)
 
 
 @app.route("/genres/<genreid>")
 def get_genre(genreid):
-    album_info = request.args.get('albums', '').lower()
-    if album_info == 'none':
-        album_info = AlbumInformationLevel.NoAlbums
-    elif album_info == 'all':
-        album_info = AlbumInformationLevel.AllAlbumInfo
-    else:
-        album_info = AlbumInformationLevel.AlbumLinks
+    album_info = InformationLevel.from_string(request.args.get('albums', ''))
+    playlist_info = InformationLevel.from_string(request.args.get('playlists', ''))
     with DatabaseAccess() as db:
         try:
             genre = db.get_genre_by_id(genreid)
         except NotFoundException:
             abort(HTTPStatus.NOT_FOUND, description="Unknown genre id")
-        return gzippable_jsonify(json_genre(genre, include_albums=album_info))
+        return gzippable_jsonify(json_genre(genre, include_albums=album_info, include_playlists=playlist_info))
 
 
 @app.route("/tracks/")
@@ -430,7 +428,7 @@ def playlists():
         with DatabaseAccess() as db:
             rtn = []
             for playlist in db.get_all_playlists():
-                rtn.append(json_playlist(playlist, include_tracks=TrackInformationLevel.NoTracks))
+                rtn.append(json_playlist(playlist, include_tracks=InformationLevel.NoInfo))
             return gzippable_jsonify(rtn)
     elif request.method == 'POST':
         with DatabaseAccess() as db:
@@ -442,7 +440,7 @@ def playlists():
 @app.route("/playlists/<playlistid>", methods=['DELETE', 'GET', 'PUT'])
 def one_playlist(playlistid):
     if request.method == 'GET':
-        track_info = get_requested_track_info_level(request)
+        track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
         with DatabaseAccess() as db:
             try:
                 playlist = db.get_playlist_by_id(playlistid)
