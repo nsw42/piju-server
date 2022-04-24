@@ -430,7 +430,7 @@ def playlists():
             return str(playlist.Id)
 
 
-@app.route("/playlists/<playlistid>", methods=['GET', 'PUT'])
+@app.route("/playlists/<playlistid>", methods=['DELETE', 'GET', 'PUT'])
 def get_playlist(playlistid):
     if request.method == 'GET':
         track_info = get_requested_track_info_level(request)
@@ -445,6 +445,13 @@ def get_playlist(playlistid):
             playlist = build_playlist_from_api_data(db, request, playlistid)
             db.update_playlist(playlist)
             return str(playlist.Id)
+    elif request.method == 'DELETE':
+        with DatabaseAccess() as db:
+            try:
+                db.delete_playlist(playlistid)
+            except NotFoundException:
+                abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
+            return ('', HTTPStatus.NO_CONTENT)
 
 
 @app.route("/scanner/scan", methods=['POST'])
