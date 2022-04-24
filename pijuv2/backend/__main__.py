@@ -12,7 +12,7 @@ from typing import List
 from flask import abort, Flask, make_response, request, Response, url_for
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
-from ..database.schema import Album, Genre, Playlist, Track
+from ..database.schema import Album, Genre, Playlist, PlaylistEntry, Track
 from ..player.mpyg321 import PlayerStatus
 from ..player.player import MusicPlayer
 from .config import Config
@@ -92,16 +92,16 @@ def json_genre(genre: Genre, include_albums: AlbumInformationLevel):
 
 
 def json_playlist(playlist: Playlist, include_tracks: TrackInformationLevel):
-    tracks = list(playlist.Tracks)
+    entries = list(playlist.Entries)
     rtn = {
         'link': url_for('one_playlist', playlistid=playlist.Id),
         'title': playlist.Title,
         'genres': [url_for('get_genre', genreid=genre.Id) for genre in playlist.Genres],
     }
     if include_tracks == TrackInformationLevel.TrackLinks:
-        rtn['tracks'] = [url_for('get_track', trackid=track.Id) for track in tracks]
+        rtn['tracks'] = [url_for('get_track', trackid=entry.TrackId) for entry in entries]
     elif include_tracks == TrackInformationLevel.AllTrackInfo:
-        rtn['tracks'] = [json_track(track) for track in tracks]
+        rtn['tracks'] = [json_track(entry.Track) for entry in entries]
     return rtn
 
 
@@ -145,10 +145,13 @@ def build_playlist_from_api_data(db: Database, request) -> Playlist:
         tracks = [db.get_track_by_id(trackid) for trackid in trackids]
     except NotFoundException:
         abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+    playlist_entries = []
+    for index, track in enumerate(tracks):
+        playlist_entries.append(PlaylistEntry(PlaylistIndex=index, TrackId=track.Id))
     genres = set(track.Genre for track in tracks if track.Genre is not None)
     genres = list(genres)
     genres = [db.get_genre_by_id(genre) for genre in genres]
-    return Playlist(Title=title, Tracks=tracks, Genres=genres)
+    return Playlist(Title=title, Entries=playlist_entries, Genres=genres)
 
 
 def extract_id(uri_or_id):
@@ -361,7 +364,7 @@ def update_player_play():
                 playlist = db.get_playlist_by_id(playlistid)
             except NotFoundException:
                 abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
-            play_track_list(playlist.Tracks, trackid)
+            play_track_list([entry.Track for entry in playlist.Entries], trackid)
 
         elif trackid:
             try:

@@ -75,7 +75,7 @@ class Database():
         if not existing_playlist:
             raise NotFoundException(f"Playlist {playlist.Id} does not exist")
         existing_playlist.Title = playlist.Title
-        existing_playlist.Tracks = playlist.Tracks
+        existing_playlist.Entries = playlist.Entries
         existing_playlist.Genres = playlist.Genres
         self.session.commit()
         return existing_playlist

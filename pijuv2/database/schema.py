@@ -14,9 +14,15 @@ playlist_genre_association_table = Table('playlist_to_genres', Base.metadata,
                                          Column('genre_id', Integer, ForeignKey('Genres.Id')),
                                          Column('playlist_id', Integer, ForeignKey('Playlists.Id')))
 
-playlist_track_association_table = Table('playlist_to_track', Base.metadata,
-                                         Column('playlist_id', Integer, ForeignKey('Playlists.Id')),
-                                         Column('track_id', Integer, ForeignKey('Tracks.Id')))
+
+class PlaylistEntry(Base):
+    __tablename__ = 'playlist_to_track'
+
+    Id = Column(Integer, primary_key=True)
+    PlaylistId = Column(ForeignKey('Playlists.Id'))
+    TrackId = Column(ForeignKey('Tracks.Id'))
+    PlaylistIndex = Column(Integer)
+    Track = relationship("Track")
 
 
 class Genre(Base):
@@ -54,8 +60,7 @@ class Playlist(Base):
 
     Id = Column(Integer, primary_key=True)
     Title = Column(String)
-    Tracks = relationship("Track",
-                          secondary=playlist_track_association_table)
+    Entries = relationship("PlaylistEntry")
     Genres = relationship("Genre",
                           secondary=playlist_genre_association_table,
                           back_populates="Playlists")
