@@ -90,6 +90,19 @@ def json_genre(genre: Genre, include_albums: AlbumInformationLevel):
     return rtn
 
 
+def json_playlist(playlist: Playlist, include_tracks: TrackInformationLevel):
+    tracks = list(playlist.Tracks)
+    rtn = {
+        'link': url_for('get_playlist', playlistid=playlist.Id),
+        'title': playlist.Title,
+    }
+    if include_tracks == TrackInformationLevel.TrackLinks:
+        rtn['tracks'] = [url_for('get_track', trackid=track.Id) for track in tracks]
+    elif include_tracks == TrackInformationLevel.AllTrackInfo:
+        rtn['tracks'] = [json_track(track) for track in tracks]
+    return rtn
+
+
 def json_track(track: Track):
     has_artwork = track.ArtworkPath or track.ArtworkBlob
     rtn = {
@@ -114,6 +127,16 @@ PLAYER_STATUS_REPRESENTATION = {
     PlayerStatus.STOPPING: "stopped",
     PlayerStatus.QUITTED: "stopped"
 }
+
+
+def get_requested_track_info_level(request):
+    track_info = request.args.get('tracks', '').lower()
+    if track_info == 'none':
+        return TrackInformationLevel.NoTracks
+    elif track_info == 'all':
+        return TrackInformationLevel.AllTrackInfo
+    else:
+        return TrackInformationLevel.TrackLinks
 
 
 @app.route("/")
@@ -142,13 +165,7 @@ def get_all_albums():
 
 @app.route("/albums/<albumid>")
 def get_album(albumid):
-    track_info = request.args.get('tracks', '').lower()
-    if track_info == 'none':
-        track_info = TrackInformationLevel.NoTracks
-    elif track_info == 'all':
-        track_info = TrackInformationLevel.AllTrackInfo
-    else:
-        track_info = TrackInformationLevel.TrackLinks
+    track_info = get_requested_track_info_level(request)
     with DatabaseAccess() as db:
         try:
             album = db.get_album_by_id(albumid)
@@ -386,6 +403,17 @@ def playlists():
             playlist = Playlist(Title=title, Tracks=tracks)
             db.create_playlist(playlist)
             return str(playlist.Id)
+
+
+@app.route("/playlists/<playlistid>")
+def get_playlist(playlistid):
+    track_info = get_requested_track_info_level(request)
+    with DatabaseAccess() as db:
+        try:
+            playlist = db.get_playlist_by_id(playlistid)
+        except NotFoundException:
+            abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
+        return gzippable_jsonify(json_playlist(playlist, include_tracks=track_info))
 
 
 @app.route("/scanner/scan", methods=['POST'])

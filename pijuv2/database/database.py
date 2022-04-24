@@ -201,6 +201,19 @@ class Database():
         except Exception as e:
             raise convert_exception_class(e) from e
 
+    def get_playlist_by_id(self, playlistid: int):
+        """
+        Return the Playlist object for a given id.
+        Raises NotFoundException for an unknown id
+        """
+        res = self.session.query(Playlist).filter(
+            Playlist.Id == playlistid
+        )
+        try:
+            return res.one()
+        except Exception as e:
+            raise convert_exception_class(e) from e
+
     def get_track_by_id(self, trackid: int):
         """
         Return the Track object for a given id.
