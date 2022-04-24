@@ -70,12 +70,13 @@ class Database():
         self.session.refresh(playlist)
         return playlist
 
-    def update_playlist(self, playlist: Playlist):
-        existing_playlist = self.get_playlist_by_id(playlist.Id)
+    def update_playlist(self, playlistid: int, playlist: Playlist):
+        existing_playlist = self.get_playlist_by_id(playlistid)
         if not existing_playlist:
             raise NotFoundException(f"Playlist {playlist.Id} does not exist")
         existing_playlist.Title = playlist.Title
         existing_playlist.Tracks = playlist.Tracks
+        existing_playlist.Genres = playlist.Genres
         self.session.commit()
         return existing_playlist
 

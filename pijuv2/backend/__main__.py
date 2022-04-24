@@ -96,6 +96,7 @@ def json_playlist(playlist: Playlist, include_tracks: TrackInformationLevel):
     rtn = {
         'link': url_for('one_playlist', playlistid=playlist.Id),
         'title': playlist.Title,
+        'genres': [url_for('get_genre', genreid=genre.Id) for genre in playlist.Genres],
     }
     if include_tracks == TrackInformationLevel.TrackLinks:
         rtn['tracks'] = [url_for('get_track', trackid=track.Id) for track in tracks]
@@ -130,7 +131,7 @@ PLAYER_STATUS_REPRESENTATION = {
 }
 
 
-def build_playlist_from_api_data(db: Database, request, playlistid: int) -> Playlist:
+def build_playlist_from_api_data(db: Database, request) -> Playlist:
     data = request.get_json()
     title = data.get('title')
     trackids = extract_ids(data.get('tracks'))
@@ -142,7 +143,10 @@ def build_playlist_from_api_data(db: Database, request, playlistid: int) -> Play
         tracks = [db.get_track_by_id(trackid) for trackid in trackids]
     except NotFoundException:
         abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
-    return Playlist(Id=playlistid, Title=title, Tracks=tracks)
+    genres = set(track.Genre for track in tracks if track.Genre is not None)
+    genres = list(genres)
+    genres = [db.get_genre_by_id(genre) for genre in genres]
+    return Playlist(Title=title, Tracks=tracks, Genres=genres)
 
 
 def extract_id(uri_or_id):
@@ -425,7 +429,7 @@ def playlists():
             return gzippable_jsonify(rtn)
     elif request.method == 'POST':
         with DatabaseAccess() as db:
-            playlist = build_playlist_from_api_data(db, request, None)
+            playlist = build_playlist_from_api_data(db, request)
             db.create_playlist(playlist)
             return str(playlist.Id)
 
@@ -442,8 +446,8 @@ def one_playlist(playlistid):
             return gzippable_jsonify(json_playlist(playlist, include_tracks=track_info))
     elif request.method == 'PUT':
         with DatabaseAccess() as db:
-            playlist = build_playlist_from_api_data(db, request, playlistid)
-            db.update_playlist(playlist)
+            playlist = build_playlist_from_api_data(db, request)
+            playlist = db.update_playlist(playlistid, playlist)
             return str(playlist.Id)
     elif request.method == 'DELETE':
         with DatabaseAccess() as db:
