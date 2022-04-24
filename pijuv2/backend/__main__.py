@@ -7,6 +7,7 @@ import os.path
 from pathlib import Path
 import resource
 from queue import Queue
+from typing import List
 
 from flask import abort, Flask, make_response, request, Response, url_for
 
@@ -315,6 +316,19 @@ def get_artwork(trackid):
             abort(HTTPStatus.NOT_FOUND, description="Track has no artwork")
 
 
+def play_track_list(tracks: List[Track], start_at_track_id: int):
+    if start_at_track_id is None:
+        play_from_index = 0
+    else:
+        track_ids = [track.Id for track in tracks]
+        try:
+            play_from_index = track_ids.index(start_at_track_id)
+        except ValueError:
+            abort(HTTPStatus.BAD_REQUEST, "Requested track is not in the specified album")
+    app.player.set_queue(tracks)
+    app.player.play_from_queue_index(play_from_index)
+
+
 @app.route("/player/play", methods=['POST'])
 def update_player_play():
     data = request.get_json()
@@ -322,23 +336,26 @@ def update_player_play():
         abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
     with DatabaseAccess() as db:
         albumid = extract_id(data.get('album'))
+        playlistid = extract_id(data.get('playlist'))
         trackid = extract_id(data.get('track'))
+        if (albumid is not None) and (playlistid is not None):
+            abort(HTTPStatus.BAD_REQUEST, "Album and playlist must not both be specified")
+
         if albumid is not None:
             try:
                 album = db.get_album_by_id(albumid)
             except NotFoundException:
                 abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
-            queue = list(sorted(album.Tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0))
-            app.player.set_queue(queue)
-            if trackid is None:
-                play_from_index = 0
-            else:
-                track_ids = [track.Id for track in queue]
-                try:
-                    play_from_index = track_ids.index(trackid)
-                except ValueError:
-                    abort(HTTPStatus.BAD_REQUEST, "Requested track is not in the specified album")
-            app.player.play_from_queue_index(play_from_index)
+
+            tracks = list(sorted(album.Tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0))
+            play_track_list(tracks, trackid)
+
+        elif playlistid is not None:
+            try:
+                playlist = db.get_playlist_by_id(playlistid)
+            except NotFoundException:
+                abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
+            play_track_list(playlist.Tracks, trackid)
 
         elif trackid:
             try:
@@ -348,7 +365,7 @@ def update_player_play():
             app.player.play_song(track.Filepath)
 
         else:
-            abort(HTTPStatus.BAD_REQUEST, description='Album or track must be specified')
+            abort(HTTPStatus.BAD_REQUEST, description='Album, playlist or track must be specified')
     return ('', HTTPStatus.NO_CONTENT)
 
 
