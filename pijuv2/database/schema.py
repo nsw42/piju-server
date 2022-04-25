@@ -60,7 +60,8 @@ class Playlist(Base):
 
     Id = Column(Integer, primary_key=True)
     Title = Column(String)
-    Entries = relationship("PlaylistEntry")
+    Entries = relationship("PlaylistEntry",
+                           order_by=PlaylistEntry.__table__.c.PlaylistIndex)
     Genres = relationship("Genre",
                           secondary=playlist_genre_association_table,
                           back_populates="Playlists")
