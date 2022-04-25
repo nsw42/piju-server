@@ -146,18 +146,16 @@ def build_playlist_from_api_data(db: Database, request) -> Playlist:
     data = request.get_json()
     title = data.get('title')
     trackids = extract_ids(data.get('tracks', []))
-    m3u = data.get('m3u')
+    files = data.get('files', [])
     if title in (None, ""):
         abort(HTTPStatus.BAD_REQUEST, "Playlist title must be specified")
-    if (not trackids) and (not m3u):
-        abort(HTTPStatus.BAD_REQUEST, "Either a list of tracks or an m3u playlist must be specified")
-    if (trackids) and (m3u):
-        abort(HTTPStatus.BAD_REQUEST, "Only one of a list of tracks and an m3u playlist is permitted")
-    if m3u:
-        m3u = m3u.splitlines()
-        m3u = [line for line in m3u if line and not line.startswith('#')]
+    if (not trackids) and (not files):
+        abort(HTTPStatus.BAD_REQUEST, "Either a list of tracks or a list of files must be specified")
+    if (trackids) and (files):
+        abort(HTTPStatus.BAD_REQUEST, "Only one of a list of tracks and a list of files is permitted")
+    if files:
         tracks = []
-        for filepath in m3u:
+        for filepath in files:
             try:
                 fullpath = app.piju_config.music_dir / filepath
                 track = db.get_track_by_filepath(str(fullpath))
