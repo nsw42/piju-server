@@ -6,7 +6,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.pool import QueuePool
 
-from .schema import Base, Album, Genre, Track
+from .schema import Base, Album, Genre, Playlist, Track
 
 
 FILENAME = 'file.db'
@@ -62,6 +62,27 @@ class Database():
         self.session.commit()
 
     def commit(self):
+        self.session.commit()
+
+    def create_playlist(self, playlist: Playlist):
+        self.session.add(playlist)
+        self.session.commit()
+        self.session.refresh(playlist)
+        return playlist
+
+    def update_playlist(self, playlistid: int, playlist: Playlist):
+        existing_playlist = self.get_playlist_by_id(playlistid)
+        if not existing_playlist:
+            raise NotFoundException(f"Playlist {playlist.Id} does not exist")
+        existing_playlist.Title = playlist.Title
+        existing_playlist.Entries = playlist.Entries
+        existing_playlist.Genres = playlist.Genres
+        self.session.commit()
+        return existing_playlist
+
+    def delete_playlist(self, playlistid: int):
+        playlist = self.get_playlist_by_id(playlistid)  # raises NotFoundException if necessary
+        self.session.delete(playlist)
         self.session.commit()
 
     def ensure_album_exists(self, albumref: Album):
@@ -172,6 +193,13 @@ class Database():
         result = self.session.execute(select(Genre).order_by(Genre.Name))
         return result.scalars().all()
 
+    def get_all_playlists(self):
+        """
+        Primarily for debugging
+        """
+        result = self.session.execute(select(Playlist).order_by(Playlist.Title))
+        return result.scalars().all()
+
     def get_all_tracks(self, limit=None):
         """
         Primarily for debugging
@@ -195,6 +223,19 @@ class Database():
         except Exception as e:
             raise convert_exception_class(e) from e
 
+    def get_playlist_by_id(self, playlistid: int):
+        """
+        Return the Playlist object for a given id.
+        Raises NotFoundException for an unknown id
+        """
+        res = self.session.query(Playlist).filter(
+            Playlist.Id == playlistid
+        )
+        try:
+            return res.one()
+        except Exception as e:
+            raise convert_exception_class(e) from e
+
     def get_track_by_id(self, trackid: int):
         """
         Return the Track object for a given id.
@@ -202,6 +243,19 @@ class Database():
         """
         res = self.session.query(Track).filter(
             Track.Id == trackid
+        )
+        try:
+            return res.one()
+        except Exception as e:
+            raise convert_exception_class(e) from e
+
+    def get_track_by_filepath(self, path: str):
+        """
+        Return the Track object for a given file path.
+        Raises NotFoundException for an unknown path
+        """
+        res = self.session.query(Track).filter(
+            func.lower(Track.Filepath) == func.lower(path)
         )
         try:
             return res.one()

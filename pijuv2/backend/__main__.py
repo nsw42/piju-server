@@ -7,11 +7,12 @@ import os.path
 from pathlib import Path
 import resource
 from queue import Queue
+from typing import List
 
 from flask import abort, Flask, make_response, request, Response, url_for
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
-from ..database.schema import Album, Genre, Track
+from ..database.schema import Album, Genre, Playlist, PlaylistEntry, Track
 from ..player.mpyg321 import PlayerStatus
 from ..player.player import MusicPlayer
 from .config import Config
@@ -19,16 +20,22 @@ from .workqueue import WorkRequests
 from .workthread import WorkerThread
 
 
-class AlbumInformationLevel:
-    NoAlbums = 0
-    AlbumLinks = 1
-    AllAlbumInfo = 2
+class InformationLevel:
+    NoInfo = 0
+    Links = 1
+    AllInfo = 2
 
-
-class TrackInformationLevel:
-    NoTracks = 0
-    TrackLinks = 1
-    AllTrackInfo = 2
+    @staticmethod
+    def from_string(info: str, default: 'InformationLevel' = Links):
+        info = info.lower()
+        if info == 'none':
+            return InformationLevel.NoInfo
+        elif info == 'all':
+            return InformationLevel.AllInfo
+        elif info == 'links':
+            return InformationLevel.Links
+        else:
+            return default
 
 
 app = Flask(__name__)
@@ -46,7 +53,7 @@ def gzippable_jsonify(content):
     return response
 
 
-def json_album(album: Album, include_tracks: TrackInformationLevel):
+def json_album(album: Album, include_tracks: InformationLevel):
     tracks = list(album.Tracks)
     tracks = sorted(tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0)
     for track in tracks:
@@ -71,22 +78,41 @@ def json_album(album: Album, include_tracks: TrackInformationLevel):
         },
         'genres': [url_for('get_genre', genreid=genre.Id) for genre in album.Genres],
     }
-    if include_tracks == TrackInformationLevel.TrackLinks:
+    if include_tracks == InformationLevel.Links:
         rtn['tracks'] = [url_for('get_track', trackid=track.Id) for track in tracks]
-    elif include_tracks == TrackInformationLevel.AllTrackInfo:
+    elif include_tracks == InformationLevel.AllInfo:
         rtn['tracks'] = [json_track(track) for track in tracks]
     return rtn
 
 
-def json_genre(genre: Genre, include_albums: AlbumInformationLevel):
+def json_genre(genre: Genre, include_albums: InformationLevel, include_playlists: InformationLevel):
     rtn = {
         'link': url_for('get_genre', genreid=genre.Id),
         'name': genre.Name,
     }
-    if include_albums == AlbumInformationLevel.AlbumLinks:
+    if include_albums == InformationLevel.Links:
         rtn['albums'] = [url_for('get_album', albumid=album.Id) for album in genre.Albums]
-    elif include_albums == AlbumInformationLevel.AllAlbumInfo:
-        rtn['albums'] = [json_album(album, include_tracks=TrackInformationLevel.AllTrackInfo) for album in genre.Albums]
+    elif include_albums == InformationLevel.AllInfo:
+        rtn['albums'] = [json_album(album, include_tracks=InformationLevel.AllInfo) for album in genre.Albums]
+    if include_playlists == InformationLevel.Links:
+        rtn['playlists'] = [url_for('one_playlist', playlistid=playlist.Id) for playlist in genre.Playlists]
+    elif include_playlists == InformationLevel.AllInfo:
+        rtn['playlists'] = [json_playlist(playlist, include_tracks=InformationLevel.AllInfo)
+                            for playlist in genre.Playlists]
+    return rtn
+
+
+def json_playlist(playlist: Playlist, include_tracks: InformationLevel):
+    entries = list(playlist.Entries)
+    rtn = {
+        'link': url_for('one_playlist', playlistid=playlist.Id),
+        'title': playlist.Title,
+        'genres': [url_for('get_genre', genreid=genre.Id) for genre in playlist.Genres],
+    }
+    if include_tracks == InformationLevel.Links:
+        rtn['tracks'] = [url_for('get_track', trackid=entry.TrackId) for entry in entries]
+    elif include_tracks == InformationLevel.AllInfo:
+        rtn['tracks'] = [json_track(entry.Track) for entry in entries]
     return rtn
 
 
@@ -116,6 +142,71 @@ PLAYER_STATUS_REPRESENTATION = {
 }
 
 
+def build_playlist_from_api_data(db: Database, request) -> Playlist:
+    data = request.get_json()
+    title = data.get('title')
+    trackids = extract_ids(data.get('tracks', []))
+    files = data.get('files', [])
+    if title in (None, ""):
+        abort(HTTPStatus.BAD_REQUEST, "Playlist title must be specified")
+    if (not trackids) and (not files):
+        abort(HTTPStatus.BAD_REQUEST, "Either a list of tracks or a list of files must be specified")
+    if (trackids) and (files):
+        abort(HTTPStatus.BAD_REQUEST, "Only one of a list of tracks and a list of files is permitted")
+    if files:
+        tracks = []
+        for filepath in files:
+            try:
+                fullpath = app.piju_config.music_dir / filepath
+                track = db.get_track_by_filepath(str(fullpath))
+                tracks.append(track)
+            except NotFoundException:
+                print(f"Could not find a track at {filepath} - looked in {fullpath}")
+    else:
+        if None in trackids:
+            abort(HTTPStatus.BAD_REQUEST, "Invalid track reference")
+        try:
+            tracks = [db.get_track_by_id(trackid) for trackid in trackids]
+        except NotFoundException:
+            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+    playlist_entries = []
+    for index, track in enumerate(tracks):
+        playlist_entries.append(PlaylistEntry(PlaylistIndex=index, TrackId=track.Id))
+    genres = set(track.Genre for track in tracks if track.Genre is not None)
+    genres = list(genres)
+    genres = [db.get_genre_by_id(genre) for genre in genres]
+    return Playlist(Title=title, Entries=playlist_entries, Genres=genres)
+
+
+def extract_id(uri_or_id):
+    """
+    >>> extract_id("/albums/85")
+    85
+    >>> extract_id("/tracks/123")
+    123
+    >>> extract_id("/albums/12X")
+    >>> extract_id("123")
+    123
+    >>> extract_id("cat")
+    >>> extract_id(432)
+    432
+    """
+    if uri_or_id and isinstance(uri_or_id, str) and '/' in uri_or_id:
+        # this is a uri, map it to a string representation of an id, then fall-through
+        uri_or_id = uri_or_id.rsplit('/', 1)[1]
+    if uri_or_id and isinstance(uri_or_id, str) and uri_or_id.isdigit():
+        uri_or_id = int(uri_or_id)
+    return uri_or_id if isinstance(uri_or_id, int) else None
+
+
+def extract_ids(uris_or_ids):
+    """
+    >>> extract_ids(["/tracks/123", "456", 789])
+    [123, 456, 789]
+    """
+    return [extract_id(uri_or_id) for uri_or_id in uris_or_ids]
+
+
 @app.route("/")
 def current_status():
     with DatabaseAccess() as db:
@@ -136,19 +227,13 @@ def get_all_albums():
     with DatabaseAccess() as db:
         rtn = []
         for album in db.get_all_albums():
-            rtn.append(json_album(album, include_tracks=TrackInformationLevel.NoTracks))
+            rtn.append(json_album(album, include_tracks=InformationLevel.NoInfo))
         return gzippable_jsonify(rtn)
 
 
 @app.route("/albums/<albumid>")
 def get_album(albumid):
-    track_info = request.args.get('tracks', '').lower()
-    if track_info == 'none':
-        track_info = TrackInformationLevel.NoTracks
-    elif track_info == 'all':
-        track_info = TrackInformationLevel.AllTrackInfo
-    else:
-        track_info = TrackInformationLevel.TrackLinks
+    track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
     with DatabaseAccess() as db:
         try:
             album = db.get_album_by_id(albumid)
@@ -162,25 +247,22 @@ def get_all_genres():
     with DatabaseAccess() as db:
         rtn = []
         for genre in db.get_all_genres():
-            rtn.append(json_genre(genre, include_albums=AlbumInformationLevel.NoAlbums))
+            rtn.append(json_genre(genre,
+                                  include_albums=InformationLevel.NoInfo,
+                                  include_playlists=InformationLevel.NoInfo))
         return gzippable_jsonify(rtn)
 
 
 @app.route("/genres/<genreid>")
 def get_genre(genreid):
-    album_info = request.args.get('albums', '').lower()
-    if album_info == 'none':
-        album_info = AlbumInformationLevel.NoAlbums
-    elif album_info == 'all':
-        album_info = AlbumInformationLevel.AllAlbumInfo
-    else:
-        album_info = AlbumInformationLevel.AlbumLinks
+    album_info = InformationLevel.from_string(request.args.get('albums', ''))
+    playlist_info = InformationLevel.from_string(request.args.get('playlists', ''))
     with DatabaseAccess() as db:
         try:
             genre = db.get_genre_by_id(genreid)
         except NotFoundException:
             abort(HTTPStatus.NOT_FOUND, description="Unknown genre id")
-        return gzippable_jsonify(json_genre(genre, include_albums=album_info))
+        return gzippable_jsonify(json_genre(genre, include_albums=album_info, include_playlists=playlist_info))
 
 
 @app.route("/tracks/")
@@ -254,25 +336,17 @@ def get_artwork(trackid):
             abort(HTTPStatus.NOT_FOUND, description="Track has no artwork")
 
 
-def extract_id(uri_or_id):
-    """
-    >>> extract_id("/albums/85")
-    85
-    >>> extract_id("/tracks/123")
-    123
-    >>> extract_id("/albums/12X")
-    >>> extract_id("123")
-    123
-    >>> extract_id("cat")
-    >>> extract_id(432)
-    432
-    """
-    if uri_or_id and isinstance(uri_or_id, str) and '/' in uri_or_id:
-        # this is a uri, map it to a string representation of an id, then fall-through
-        uri_or_id = uri_or_id.rsplit('/', 1)[1]
-    if uri_or_id and isinstance(uri_or_id, str) and uri_or_id.isdigit():
-        uri_or_id = int(uri_or_id)
-    return uri_or_id if isinstance(uri_or_id, int) else None
+def play_track_list(tracks: List[Track], start_at_track_id: int):
+    if start_at_track_id is None:
+        play_from_index = 0
+    else:
+        track_ids = [track.Id for track in tracks]
+        try:
+            play_from_index = track_ids.index(start_at_track_id)
+        except ValueError:
+            abort(HTTPStatus.BAD_REQUEST, "Requested track is not in the specified album")
+    app.player.set_queue(tracks)
+    app.player.play_from_queue_index(play_from_index)
 
 
 @app.route("/player/play", methods=['POST'])
@@ -282,23 +356,26 @@ def update_player_play():
         abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
     with DatabaseAccess() as db:
         albumid = extract_id(data.get('album'))
+        playlistid = extract_id(data.get('playlist'))
         trackid = extract_id(data.get('track'))
+        if (albumid is not None) and (playlistid is not None):
+            abort(HTTPStatus.BAD_REQUEST, "Album and playlist must not both be specified")
+
         if albumid is not None:
             try:
                 album = db.get_album_by_id(albumid)
             except NotFoundException:
                 abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
-            queue = list(sorted(album.Tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0))
-            app.player.set_queue(queue)
-            if trackid is None:
-                play_from_index = 0
-            else:
-                track_ids = [track.Id for track in queue]
-                try:
-                    play_from_index = track_ids.index(trackid)
-                except ValueError:
-                    abort(HTTPStatus.BAD_REQUEST, "Requested track is not in the specified album")
-            app.player.play_from_queue_index(play_from_index)
+
+            tracks = list(sorted(album.Tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0))
+            play_track_list(tracks, trackid)
+
+        elif playlistid is not None:
+            try:
+                playlist = db.get_playlist_by_id(playlistid)
+            except NotFoundException:
+                abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
+            play_track_list([entry.Track for entry in playlist.Entries], trackid)
 
         elif trackid:
             try:
@@ -308,7 +385,7 @@ def update_player_play():
             app.player.play_song(track.Filepath)
 
         else:
-            abort(HTTPStatus.BAD_REQUEST, description='Album or track must be specified')
+            abort(HTTPStatus.BAD_REQUEST, description='Album, playlist or track must be specified')
     return ('', HTTPStatus.NO_CONTENT)
 
 
@@ -358,6 +435,45 @@ def player_volume():
             abort(HTTPStatus.BAD_REQUEST, description='Volume must be specified and numeric')
 
 
+@app.route("/playlists/", methods=['GET', 'POST'])
+def playlists():
+    if request.method == 'GET':
+        with DatabaseAccess() as db:
+            rtn = []
+            for playlist in db.get_all_playlists():
+                rtn.append(json_playlist(playlist, include_tracks=InformationLevel.NoInfo))
+            return gzippable_jsonify(rtn)
+    elif request.method == 'POST':
+        with DatabaseAccess() as db:
+            playlist = build_playlist_from_api_data(db, request)
+            db.create_playlist(playlist)
+            return str(playlist.Id)
+
+
+@app.route("/playlists/<playlistid>", methods=['DELETE', 'GET', 'PUT'])
+def one_playlist(playlistid):
+    if request.method == 'GET':
+        track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
+        with DatabaseAccess() as db:
+            try:
+                playlist = db.get_playlist_by_id(playlistid)
+            except NotFoundException:
+                abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
+            return gzippable_jsonify(json_playlist(playlist, include_tracks=track_info))
+    elif request.method == 'PUT':
+        with DatabaseAccess() as db:
+            playlist = build_playlist_from_api_data(db, request)
+            playlist = db.update_playlist(playlistid, playlist)
+            return str(playlist.Id)
+    elif request.method == 'DELETE':
+        with DatabaseAccess() as db:
+            try:
+                db.delete_playlist(playlistid)
+            except NotFoundException:
+                abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
+            return ('', HTTPStatus.NO_CONTENT)
+
+
 @app.route("/scanner/scan", methods=['POST'])
 def start_scan():
     data = request.get_json()
@@ -394,6 +510,7 @@ if __name__ == '__main__':
         resource.setrlimit(resource.RLIMIT_NOFILE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
         config = Config(args.config)
         db = Database()  # pre-create tables
+        app.piju_config = config
         app.queue = Queue()
         app.queue.put((WorkRequests.ScanDirectory, config.music_dir))
         app.worker = WorkerThread(app.queue)
