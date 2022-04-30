@@ -30,6 +30,10 @@ class MusicPlayer(MPyg321Player):
         self.current_track_id = self.queued_track_ids[index]
         self.index = index
 
+    def play_track(self, track: Track):
+        self.play_song(track.Filepath)
+        self.current_track_id = track.Id
+
     def next(self):
         # play the next song in the queue
         if self.index + 1 < len(self.queued_files):

@@ -386,6 +386,7 @@ def update_player_play():
             except NotFoundException:
                 abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
             app.player.clear_queue()
+            app.player.play_track(track)
 
         else:
             abort(HTTPStatus.BAD_REQUEST, description='Album, playlist or track must be specified')
