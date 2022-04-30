@@ -215,6 +215,7 @@ def current_status():
             'WorkerStatus': app.worker.current_status,
             'PlayerStatus': PLAYER_STATUS_REPRESENTATION.get(app.player.status, "stopped"),
             'PlayerVolume': app.player.current_volume,
+            'CurrentTracklistUri': app.player.current_tracklist_identifier,
             'CurrentTrack': {} if track is None else json_track(track),
             'NumberAlbums': db.get_nr_albums(),
             'NumberTracks': db.get_nr_tracks(),
@@ -336,7 +337,7 @@ def get_artwork(trackid):
             abort(HTTPStatus.NOT_FOUND, description="Track has no artwork")
 
 
-def play_track_list(tracks: List[Track], start_at_track_id: int):
+def play_track_list(tracks: List[Track], identifier: str, start_at_track_id: int):
     if start_at_track_id is None:
         play_from_index = 0
     else:
@@ -345,7 +346,7 @@ def play_track_list(tracks: List[Track], start_at_track_id: int):
             play_from_index = track_ids.index(start_at_track_id)
         except ValueError:
             abort(HTTPStatus.BAD_REQUEST, "Requested track is not in the specified album")
-    app.player.set_queue(tracks)
+    app.player.set_queue(tracks, identifier)
     app.player.play_from_queue_index(play_from_index)
 
 
@@ -368,21 +369,24 @@ def update_player_play():
                 abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
 
             tracks = list(sorted(album.Tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0))
-            play_track_list(tracks, trackid)
+            play_track_list(tracks, url_for('get_album', albumid=albumid), trackid)
 
         elif playlistid is not None:
             try:
                 playlist = db.get_playlist_by_id(playlistid)
             except NotFoundException:
                 abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
-            play_track_list([entry.Track for entry in playlist.Entries], trackid)
+            play_track_list([entry.Track for entry in playlist.Entries],
+                            url_for('one_playlist', playlistid=playlistid),
+                            trackid)
 
         elif trackid:
             try:
                 track = db.get_track_by_id(trackid)
             except NotFoundException:
                 abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
-            app.player.play_song(track.Filepath)
+            app.player.clear_queue()
+            app.player.play_track(track)
 
         else:
             abort(HTTPStatus.BAD_REQUEST, description='Album, playlist or track must be specified')
