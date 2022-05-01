@@ -515,7 +515,6 @@ if __name__ == '__main__':
         db = Database()  # pre-create tables
         app.piju_config = config
         app.queue = Queue()
-        app.queue.put((WorkRequests.ScanDirectory, config.music_dir))
         app.worker = WorkerThread(app.queue)
         app.worker.start()
         app.player = MusicPlayer()
