@@ -5,7 +5,6 @@ import json
 import mimetypes
 import os.path
 from pathlib import Path
-import resource
 from queue import Queue
 from typing import List
 
