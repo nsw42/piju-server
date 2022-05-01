@@ -19,6 +19,11 @@ from .workqueue import WorkRequests
 from .workthread import WorkerThread
 
 
+app = Flask(__name__)
+
+mimetypes.init()
+
+
 class InformationLevel:
     NoInfo = 0
     Links = 1
@@ -37,9 +42,82 @@ class InformationLevel:
             return default
 
 
-app = Flask(__name__)
+PLAYER_STATUS_REPRESENTATION = {
+    PlayerStatus.INSTANCIATED: "stopped",
+    PlayerStatus.PLAYING: "playing",
+    PlayerStatus.PAUSED: "paused",
+    PlayerStatus.RESUMING: "playing",
+    PlayerStatus.STOPPING: "stopped",
+    PlayerStatus.QUITTED: "stopped"
+}
 
-mimetypes.init()
+
+def build_playlist_from_api_data(db: Database, request) -> Tuple[Playlist, List[str]]:
+    data = request.get_json()
+    title = data.get('title')
+    trackids = extract_ids(data.get('tracks', []))
+    files = data.get('files', [])
+    if title in (None, ""):
+        abort(HTTPStatus.BAD_REQUEST, "Playlist title must be specified")
+    if (not trackids) and (not files):
+        abort(HTTPStatus.BAD_REQUEST, "Either a list of tracks or a list of files must be specified")
+    if (trackids) and (files):
+        abort(HTTPStatus.BAD_REQUEST, "Only one of a list of tracks and a list of files is permitted")
+    if files:
+        tracks = []
+        missing = []
+        for filepath in files:
+            try:
+                fullpath = app.piju_config.music_dir / filepath
+                track = db.get_track_by_filepath(str(fullpath))
+                tracks.append(track)
+            except NotFoundException:
+                print(f"Could not find a track at {filepath} - looked in {fullpath}")
+                missing.append(filepath)
+    else:
+        missing = []
+        if None in trackids:
+            abort(HTTPStatus.BAD_REQUEST, "Invalid track reference")
+        try:
+            tracks = [db.get_track_by_id(trackid) for trackid in trackids]
+        except NotFoundException:
+            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+    playlist_entries = []
+    for index, track in enumerate(tracks):
+        playlist_entries.append(PlaylistEntry(PlaylistIndex=index, TrackId=track.Id))
+    genres = set(track.Genre for track in tracks if track.Genre is not None)
+    genres = list(genres)
+    genres = [db.get_genre_by_id(genre) for genre in genres]
+    return Playlist(Title=title, Entries=playlist_entries, Genres=genres), missing
+
+
+def extract_id(uri_or_id):
+    """
+    >>> extract_id("/albums/85")
+    85
+    >>> extract_id("/tracks/123")
+    123
+    >>> extract_id("/albums/12X")
+    >>> extract_id("123")
+    123
+    >>> extract_id("cat")
+    >>> extract_id(432)
+    432
+    """
+    if uri_or_id and isinstance(uri_or_id, str) and '/' in uri_or_id:
+        # this is a uri, map it to a string representation of an id, then fall-through
+        uri_or_id = uri_or_id.rsplit('/', 1)[1]
+    if uri_or_id and isinstance(uri_or_id, str) and uri_or_id.isdigit():
+        uri_or_id = int(uri_or_id)
+    return uri_or_id if isinstance(uri_or_id, int) else None
+
+
+def extract_ids(uris_or_ids):
+    """
+    >>> extract_ids(["/tracks/123", "456", 789])
+    [123, 456, 789]
+    """
+    return [extract_id(uri_or_id) for uri_or_id in uris_or_ids]
 
 
 def gzippable_jsonify(content):
@@ -131,82 +209,33 @@ def json_track(track: Track):
     return rtn
 
 
-PLAYER_STATUS_REPRESENTATION = {
-    PlayerStatus.INSTANCIATED: "stopped",
-    PlayerStatus.PLAYING: "playing",
-    PlayerStatus.PAUSED: "paused",
-    PlayerStatus.RESUMING: "playing",
-    PlayerStatus.STOPPING: "stopped",
-    PlayerStatus.QUITTED: "stopped"
-}
+def parse_args():
+    parser = ArgumentParser()
+    parser.add_argument('-t', '--doctest', action='store_true',
+                        help="Run self-test and exit")
+    parser.add_argument('-c', '--config', metavar='FILE', type=Path,
+                        help=f"Load configuration from FILE. Default is {str(Config.default_filepath())}")
+    parser.set_defaults(doctest=False,
+                        config=None)
+    args = parser.parse_args()
+    if args.config and not args.config.is_file():
+        parser.error(f"Specified configuration file ({str(args.config)}) could not be found")
+    if (args.config is None) and (Config.default_filepath().is_file()):
+        args.config = Config.default_filepath()
+    return args
 
 
-def build_playlist_from_api_data(db: Database, request) -> Tuple[Playlist, List[str]]:
-    data = request.get_json()
-    title = data.get('title')
-    trackids = extract_ids(data.get('tracks', []))
-    files = data.get('files', [])
-    if title in (None, ""):
-        abort(HTTPStatus.BAD_REQUEST, "Playlist title must be specified")
-    if (not trackids) and (not files):
-        abort(HTTPStatus.BAD_REQUEST, "Either a list of tracks or a list of files must be specified")
-    if (trackids) and (files):
-        abort(HTTPStatus.BAD_REQUEST, "Only one of a list of tracks and a list of files is permitted")
-    if files:
-        tracks = []
-        missing = []
-        for filepath in files:
-            try:
-                fullpath = app.piju_config.music_dir / filepath
-                track = db.get_track_by_filepath(str(fullpath))
-                tracks.append(track)
-            except NotFoundException:
-                print(f"Could not find a track at {filepath} - looked in {fullpath}")
-                missing.append(filepath)
+def play_track_list(tracks: List[Track], identifier: str, start_at_track_id: int):
+    if start_at_track_id is None:
+        play_from_index = 0
     else:
-        missing = []
-        if None in trackids:
-            abort(HTTPStatus.BAD_REQUEST, "Invalid track reference")
+        track_ids = [track.Id for track in tracks]
         try:
-            tracks = [db.get_track_by_id(trackid) for trackid in trackids]
-        except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
-    playlist_entries = []
-    for index, track in enumerate(tracks):
-        playlist_entries.append(PlaylistEntry(PlaylistIndex=index, TrackId=track.Id))
-    genres = set(track.Genre for track in tracks if track.Genre is not None)
-    genres = list(genres)
-    genres = [db.get_genre_by_id(genre) for genre in genres]
-    return Playlist(Title=title, Entries=playlist_entries, Genres=genres), missing
-
-
-def extract_id(uri_or_id):
-    """
-    >>> extract_id("/albums/85")
-    85
-    >>> extract_id("/tracks/123")
-    123
-    >>> extract_id("/albums/12X")
-    >>> extract_id("123")
-    123
-    >>> extract_id("cat")
-    >>> extract_id(432)
-    432
-    """
-    if uri_or_id and isinstance(uri_or_id, str) and '/' in uri_or_id:
-        # this is a uri, map it to a string representation of an id, then fall-through
-        uri_or_id = uri_or_id.rsplit('/', 1)[1]
-    if uri_or_id and isinstance(uri_or_id, str) and uri_or_id.isdigit():
-        uri_or_id = int(uri_or_id)
-    return uri_or_id if isinstance(uri_or_id, int) else None
-
-
-def extract_ids(uris_or_ids):
-    """
-    >>> extract_ids(["/tracks/123", "456", 789])
-    [123, 456, 789]
-    """
-    return [extract_id(uri_or_id) for uri_or_id in uris_or_ids]
+            play_from_index = track_ids.index(start_at_track_id)
+        except ValueError:
+            abort(HTTPStatus.BAD_REQUEST, "Requested track is not in the specified album")
+    app.player.set_queue(tracks, identifier)
+    app.player.play_from_queue_index(play_from_index)
 
 
 def response_for_import_playlist(playlist: Playlist, missing_tracks: List[str]):
@@ -348,19 +377,6 @@ def get_artwork(trackid):
             abort(HTTPStatus.NOT_FOUND, description="Track has no artwork")
 
 
-def play_track_list(tracks: List[Track], identifier: str, start_at_track_id: int):
-    if start_at_track_id is None:
-        play_from_index = 0
-    else:
-        track_ids = [track.Id for track in tracks]
-        try:
-            play_from_index = track_ids.index(start_at_track_id)
-        except ValueError:
-            abort(HTTPStatus.BAD_REQUEST, "Requested track is not in the specified album")
-    app.player.set_queue(tracks, identifier)
-    app.player.play_from_queue_index(play_from_index)
-
-
 @app.route("/player/play", methods=['POST'])
 def update_player_play():
     data = request.get_json()
@@ -497,22 +513,6 @@ def start_scan():
     # TODO: Error checking on scandir
     app.queue.put((WorkRequests.ScanDirectory, scandir))
     return ('', HTTPStatus.NO_CONTENT)
-
-
-def parse_args():
-    parser = ArgumentParser()
-    parser.add_argument('-t', '--doctest', action='store_true',
-                        help="Run self-test and exit")
-    parser.add_argument('-c', '--config', metavar='FILE', type=Path,
-                        help=f"Load configuration from FILE. Default is {str(Config.default_filepath())}")
-    parser.set_defaults(doctest=False,
-                        config=None)
-    args = parser.parse_args()
-    if args.config and not args.config.is_file():
-        parser.error(f"Specified configuration file ({str(args.config)}) could not be found")
-    if (args.config is None) and (Config.default_filepath().is_file()):
-        args.config = Config.default_filepath()
-    return args
 
 
 if __name__ == '__main__':
