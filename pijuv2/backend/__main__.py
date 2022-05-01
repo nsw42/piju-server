@@ -6,7 +6,7 @@ import mimetypes
 import os.path
 from pathlib import Path
 from queue import Queue
-from typing import List
+from typing import List, Tuple
 
 from flask import abort, Flask, make_response, request, Response, url_for
 
@@ -141,7 +141,7 @@ PLAYER_STATUS_REPRESENTATION = {
 }
 
 
-def build_playlist_from_api_data(db: Database, request) -> Playlist:
+def build_playlist_from_api_data(db: Database, request) -> Tuple[Playlist, List[str]]:
     data = request.get_json()
     title = data.get('title')
     trackids = extract_ids(data.get('tracks', []))
@@ -154,6 +154,7 @@ def build_playlist_from_api_data(db: Database, request) -> Playlist:
         abort(HTTPStatus.BAD_REQUEST, "Only one of a list of tracks and a list of files is permitted")
     if files:
         tracks = []
+        missing = []
         for filepath in files:
             try:
                 fullpath = app.piju_config.music_dir / filepath
@@ -161,7 +162,9 @@ def build_playlist_from_api_data(db: Database, request) -> Playlist:
                 tracks.append(track)
             except NotFoundException:
                 print(f"Could not find a track at {filepath} - looked in {fullpath}")
+                missing.append(filepath)
     else:
+        missing = []
         if None in trackids:
             abort(HTTPStatus.BAD_REQUEST, "Invalid track reference")
         try:
@@ -174,7 +177,7 @@ def build_playlist_from_api_data(db: Database, request) -> Playlist:
     genres = set(track.Genre for track in tracks if track.Genre is not None)
     genres = list(genres)
     genres = [db.get_genre_by_id(genre) for genre in genres]
-    return Playlist(Title=title, Entries=playlist_entries, Genres=genres)
+    return Playlist(Title=title, Entries=playlist_entries, Genres=genres), missing
 
 
 def extract_id(uri_or_id):
@@ -204,6 +207,15 @@ def extract_ids(uris_or_ids):
     [123, 456, 789]
     """
     return [extract_id(uri_or_id) for uri_or_id in uris_or_ids]
+
+
+def response_for_import_playlist(playlist: Playlist, missing_tracks: List[str]):
+    response = {
+        'playlistid': playlist.Id,
+        'nrtracks': len(playlist.Entries),
+        'missing': missing_tracks,
+    }
+    return gzippable_jsonify(response)
 
 
 @app.route("/")
@@ -448,9 +460,9 @@ def playlists():
             return gzippable_jsonify(rtn)
     elif request.method == 'POST':
         with DatabaseAccess() as db:
-            playlist = build_playlist_from_api_data(db, request)
+            playlist, missing = build_playlist_from_api_data(db, request)
             db.create_playlist(playlist)
-            return str(playlist.Id)
+            return response_for_import_playlist(playlist, missing)
 
 
 @app.route("/playlists/<playlistid>", methods=['DELETE', 'GET', 'PUT'])
@@ -465,9 +477,9 @@ def one_playlist(playlistid):
             return gzippable_jsonify(json_playlist(playlist, include_tracks=track_info))
     elif request.method == 'PUT':
         with DatabaseAccess() as db:
-            playlist = build_playlist_from_api_data(db, request)
+            playlist, missing = build_playlist_from_api_data(db, request)
             playlist = db.update_playlist(playlistid, playlist)
-            return str(playlist.Id)
+            return response_for_import_playlist(playlist, missing)
     elif request.method == 'DELETE':
         with DatabaseAccess() as db:
             try:
