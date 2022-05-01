@@ -511,7 +511,6 @@ if __name__ == '__main__':
         import doctest
         doctest.testmod()
     else:
-        resource.setrlimit(resource.RLIMIT_NOFILE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
         config = Config(args.config)
         db = Database()  # pre-create tables
         app.piju_config = config
