@@ -283,70 +283,6 @@ def get_album(albumid):
         return gzippable_jsonify(json_album(album, include_tracks=track_info))
 
 
-@app.route("/genres/")
-def get_all_genres():
-    with DatabaseAccess() as db:
-        rtn = []
-        for genre in db.get_all_genres():
-            rtn.append(json_genre(genre,
-                                  include_albums=InformationLevel.NoInfo,
-                                  include_playlists=InformationLevel.NoInfo))
-        return gzippable_jsonify(rtn)
-
-
-@app.route("/genres/<genreid>")
-def get_genre(genreid):
-    album_info = InformationLevel.from_string(request.args.get('albums', ''))
-    playlist_info = InformationLevel.from_string(request.args.get('playlists', ''))
-    with DatabaseAccess() as db:
-        try:
-            genre = db.get_genre_by_id(genreid)
-        except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description="Unknown genre id")
-        return gzippable_jsonify(json_genre(genre, include_albums=album_info, include_playlists=playlist_info))
-
-
-@app.route("/tracks/")
-def get_all_tracks():
-    limit = request.args.get('limit', '')
-    if limit and limit.isdigit():
-        limit = int(limit)
-    else:
-        limit = None
-    with DatabaseAccess() as db:
-        rtn = []
-        for track in db.get_all_tracks(limit):
-            rtn.append(json_track(track))
-        return gzippable_jsonify(rtn)
-
-
-@app.route("/tracks/<trackid>")
-def get_track(trackid):
-    with DatabaseAccess() as db:
-        try:
-            track = db.get_track_by_id(trackid)
-        except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
-        return gzippable_jsonify(json_track(track))
-
-
-@app.route("/artworkinfo/<trackid>")
-def get_artwork_info(trackid):
-    with DatabaseAccess() as db:
-        try:
-            track = db.get_track_by_id(trackid)
-        except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
-
-        has_artwork = (track.ArtworkPath or track.ArtworkBlob)
-        rtn = {
-            "width": track.ArtworkWidth,
-            "height": track.ArtworkHeight,
-            "image": url_for('get_artwork', trackid=trackid) if has_artwork else None,
-        }
-        return gzippable_jsonify(rtn)
-
-
 @app.route("/artwork/<trackid>")
 def get_artwork(trackid):
     with DatabaseAccess() as db:
@@ -375,6 +311,58 @@ def get_artwork(trackid):
 
         else:
             abort(HTTPStatus.NOT_FOUND, description="Track has no artwork")
+
+
+@app.route("/artworkinfo/<trackid>")
+def get_artwork_info(trackid):
+    with DatabaseAccess() as db:
+        try:
+            track = db.get_track_by_id(trackid)
+        except NotFoundException:
+            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+
+        has_artwork = (track.ArtworkPath or track.ArtworkBlob)
+        rtn = {
+            "width": track.ArtworkWidth,
+            "height": track.ArtworkHeight,
+            "image": url_for('get_artwork', trackid=trackid) if has_artwork else None,
+        }
+        return gzippable_jsonify(rtn)
+
+
+@app.route("/genres/")
+def get_all_genres():
+    with DatabaseAccess() as db:
+        rtn = []
+        for genre in db.get_all_genres():
+            rtn.append(json_genre(genre,
+                                  include_albums=InformationLevel.NoInfo,
+                                  include_playlists=InformationLevel.NoInfo))
+        return gzippable_jsonify(rtn)
+
+
+@app.route("/genres/<genreid>")
+def get_genre(genreid):
+    album_info = InformationLevel.from_string(request.args.get('albums', ''))
+    playlist_info = InformationLevel.from_string(request.args.get('playlists', ''))
+    with DatabaseAccess() as db:
+        try:
+            genre = db.get_genre_by_id(genreid)
+        except NotFoundException:
+            abort(HTTPStatus.NOT_FOUND, description="Unknown genre id")
+        return gzippable_jsonify(json_genre(genre, include_albums=album_info, include_playlists=playlist_info))
+
+
+@app.route("/player/next", methods=['POST'])
+def update_player_next():
+    app.player.next()
+    return ('', HTTPStatus.NO_CONTENT)
+
+
+@app.route("/player/pause", methods=['POST'])
+def update_player_pause():
+    app.player.pause()
+    return ('', HTTPStatus.NO_CONTENT)
 
 
 @app.route("/player/play", methods=['POST'])
@@ -420,27 +408,15 @@ def update_player_play():
     return ('', HTTPStatus.NO_CONTENT)
 
 
-@app.route("/player/pause", methods=['POST'])
-def update_player_pause():
-    app.player.pause()
+@app.route("/player/previous", methods=['POST'])
+def update_player_prev():
+    app.player.prev()
     return ('', HTTPStatus.NO_CONTENT)
 
 
 @app.route("/player/resume", methods=['POST'])
 def update_player_resume():
     app.player.resume()
-    return ('', HTTPStatus.NO_CONTENT)
-
-
-@app.route("/player/next", methods=['POST'])
-def update_player_next():
-    app.player.next()
-    return ('', HTTPStatus.NO_CONTENT)
-
-
-@app.route("/player/previous", methods=['POST'])
-def update_player_prev():
-    app.player.prev()
     return ('', HTTPStatus.NO_CONTENT)
 
 
@@ -513,6 +489,30 @@ def start_scan():
     # TODO: Error checking on scandir
     app.queue.put((WorkRequests.ScanDirectory, scandir))
     return ('', HTTPStatus.NO_CONTENT)
+
+
+@app.route("/tracks/")
+def get_all_tracks():
+    limit = request.args.get('limit', '')
+    if limit and limit.isdigit():
+        limit = int(limit)
+    else:
+        limit = None
+    with DatabaseAccess() as db:
+        rtn = []
+        for track in db.get_all_tracks(limit):
+            rtn.append(json_track(track))
+        return gzippable_jsonify(rtn)
+
+
+@app.route("/tracks/<trackid>")
+def get_track(trackid):
+    with DatabaseAccess() as db:
+        try:
+            track = db.get_track_by_id(trackid)
+        except NotFoundException:
+            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+        return gzippable_jsonify(json_track(track))
 
 
 if __name__ == '__main__':
