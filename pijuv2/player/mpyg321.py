@@ -243,7 +243,10 @@ class MPyg321Player:
     def process_output(self):
         """Parses the output"""
         while True:
-            index = self.player.expect(mpg_codes)
+            try:
+                index = self.player.expect(mpg_codes)
+            except pexpect.exceptions.EOF:
+                return  # player has died; probably expected; just suppress exception
             action = mpg_outs[index]["action"]
             if action == MpgOutputAction.MUSIC_STOP:
                 self.on_music_stop_int()

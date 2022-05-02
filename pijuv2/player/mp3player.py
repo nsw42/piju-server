@@ -16,6 +16,9 @@ class MP3MusicPlayer(MPyg321Player):
     def set_volume(self, volume: int):
         self.volume(volume)
 
+    def stop(self):
+        super().quit()
+
     # callbacks
     def on_music_end(self):
         self.parent.on_music_end()
