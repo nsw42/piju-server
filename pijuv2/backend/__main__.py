@@ -71,6 +71,8 @@ def build_playlist_from_api_data(db: Database, request) -> Tuple[Playlist, List[
             tracks = [db.get_track_by_id(trackid) for trackid in trackids]
         except NotFoundException:
             abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+    if not tracks:
+        abort(HTTPStatus.BAD_REQUEST, "No tracks found. Will not create an empty playlist.")
     playlist_entries = []
     for index, track in enumerate(tracks):
         playlist_entries.append(PlaylistEntry(PlaylistIndex=index, TrackId=track.Id))
