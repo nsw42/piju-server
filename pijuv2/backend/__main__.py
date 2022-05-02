@@ -174,18 +174,25 @@ def json_genre(genre: Genre, include_albums: InformationLevel, include_playlists
     if include_playlists == InformationLevel.Links:
         rtn['playlists'] = [url_for('one_playlist', playlistid=playlist.Id) for playlist in genre.Playlists]
     elif include_playlists == InformationLevel.AllInfo:
-        rtn['playlists'] = [json_playlist(playlist, include_tracks=InformationLevel.AllInfo)
+        rtn['playlists'] = [json_playlist(playlist,
+                                          include_genres=InformationLevel.NoInfo,
+                                          include_tracks=InformationLevel.AllInfo)
                             for playlist in genre.Playlists]
     return rtn
 
 
-def json_playlist(playlist: Playlist, include_tracks: InformationLevel):
+def json_playlist(playlist: Playlist, include_genres: InformationLevel, include_tracks: InformationLevel):
     entries = list(playlist.Entries)
     rtn = {
         'link': url_for('one_playlist', playlistid=playlist.Id),
         'title': playlist.Title,
-        'genres': [url_for('get_genre', genreid=genre.Id) for genre in playlist.Genres],
     }
+    if include_genres == InformationLevel.Links:
+        rtn['genres'] = [url_for('get_genre', genreid=genre.Id) for genre in playlist.Genres]
+    elif include_genres == InformationLevel.AllInfo:
+        rtn['genres'] = [json_genre(genre,
+                                    include_albums=InformationLevel.NoInfo,
+                                    include_playlists=InformationLevel.NoInfo) for genre in playlist.Genres]
     if include_tracks == InformationLevel.Links:
         rtn['tracks'] = [url_for('get_track', trackid=entry.TrackId) for entry in entries]
     elif include_tracks == InformationLevel.AllInfo:
@@ -445,10 +452,12 @@ def player_volume():
 @app.route("/playlists/", methods=['GET', 'POST'])
 def playlists():
     if request.method == 'GET':
+        genre_info = InformationLevel.from_string(request.args.get('genres', ''), InformationLevel.NoInfo)
+        tracks_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.NoInfo)
         with DatabaseAccess() as db:
             rtn = []
             for playlist in db.get_all_playlists():
-                rtn.append(json_playlist(playlist, include_tracks=InformationLevel.NoInfo))
+                rtn.append(json_playlist(playlist, include_genres=genre_info, include_tracks=tracks_info))
             return gzippable_jsonify(rtn)
     elif request.method == 'POST':
         with DatabaseAccess() as db:
@@ -460,13 +469,14 @@ def playlists():
 @app.route("/playlists/<playlistid>", methods=['DELETE', 'GET', 'PUT'])
 def one_playlist(playlistid):
     if request.method == 'GET':
+        genre_info = InformationLevel.from_string(request.args.get('genres', ''), InformationLevel.NoInfo)
         track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
         with DatabaseAccess() as db:
             try:
                 playlist = db.get_playlist_by_id(playlistid)
             except NotFoundException:
                 abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
-            return gzippable_jsonify(json_playlist(playlist, include_tracks=track_info))
+            return gzippable_jsonify(json_playlist(playlist, include_genres=genre_info, include_tracks=track_info))
     elif request.method == 'PUT':
         with DatabaseAccess() as db:
             playlist, missing = build_playlist_from_api_data(db, request)
