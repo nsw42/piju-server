@@ -12,7 +12,6 @@ from flask import abort, Flask, make_response, request, Response, url_for
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
 from ..database.schema import Album, Genre, Playlist, PlaylistEntry, Track
-from ..player.mpyg321 import PlayerStatus
 from ..player.player import MusicPlayer
 from .config import Config
 from .workqueue import WorkRequests
@@ -40,16 +39,6 @@ class InformationLevel:
             return InformationLevel.Links
         else:
             return default
-
-
-PLAYER_STATUS_REPRESENTATION = {
-    PlayerStatus.INSTANCIATED: "stopped",
-    PlayerStatus.PLAYING: "playing",
-    PlayerStatus.PAUSED: "paused",
-    PlayerStatus.RESUMING: "playing",
-    PlayerStatus.STOPPING: "stopped",
-    PlayerStatus.QUITTED: "stopped"
-}
 
 
 def build_playlist_from_api_data(db: Database, request) -> Tuple[Playlist, List[str]]:
@@ -260,7 +249,7 @@ def current_status():
         track = db.get_track_by_id(app.player.current_track_id) if app.player.current_track_id else None
         rtn = {
             'WorkerStatus': app.worker.current_status,
-            'PlayerStatus': PLAYER_STATUS_REPRESENTATION.get(app.player.status, "stopped"),
+            'PlayerStatus': app.player.current_status,
             'PlayerVolume': app.player.current_volume,
             'CurrentTracklistUri': app.player.current_tracklist_identifier,
             'CurrentTrack': {} if track is None else json_track(track),
@@ -443,7 +432,7 @@ def player_volume():
         try:
             volume = data.get('volume')
             volume = int(volume)
-            app.player.volume(volume)
+            app.player.set_volume(volume)
             return ('', HTTPStatus.NO_CONTENT)
         except (AttributeError, KeyError, ValueError):
             abort(HTTPStatus.BAD_REQUEST, description='Volume must be specified and numeric')
