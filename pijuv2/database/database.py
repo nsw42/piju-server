@@ -143,28 +143,42 @@ class Database():
         """
         if isinstance(trackref.Genre, str):
             trackref.Genre = self.ensure_genre_exists(trackref.Genre).Id
-        res = self.session.query(Track).filter(
-            Track.Title == trackref.Title,
-            Track.Duration == trackref.Duration,
-            Track.Artist == trackref.Artist,
-            Track.VolumeNumber == trackref.VolumeNumber,
-            Track.TrackNumber == trackref.TrackNumber,
-            Track.ReleaseDate == trackref.ReleaseDate,
-            Track.MusicBrainzTrackId == trackref.MusicBrainzTrackId,
-            Track.MusicBrainzArtistId == trackref.MusicBrainzArtistId
-        )
-        count = res.count()
-        if count == 0:
-            # Track does not exist
-            self.session.add(trackref)
-            self.session.commit()
-            self.session.refresh(trackref)
-            return trackref
-        elif count == 1:
-            return res.first()
+        if trackref.Id is None:
+            # creating track
+            res = self.session.query(Track).filter(
+                Track.Title == trackref.Title,
+                Track.Duration == trackref.Duration,
+                Track.Artist == trackref.Artist,
+                Track.VolumeNumber == trackref.VolumeNumber,
+                Track.TrackNumber == trackref.TrackNumber,
+                Track.ReleaseDate == trackref.ReleaseDate,
+                Track.MusicBrainzTrackId == trackref.MusicBrainzTrackId,
+                Track.MusicBrainzArtistId == trackref.MusicBrainzArtistId
+            )
+            count = res.count()
+            if count == 0:
+                # Track does not exist
+                self.session.add(trackref)
+                self.session.commit()
+                self.session.refresh(trackref)
+                return trackref
+            elif count == 1:
+                return res.first()
+            else:
+                logging.fatal("Multiple results found for a track reference")
+                assert False
         else:
-            logging.fatal("Multiple results found for a track reference")
-            assert False
+            # we know we're updating a track
+            track = self.get_track_by_id(trackref.Id)
+            track.Title = trackref.Title
+            track.Duration = trackref.Duration
+            track.Artist = trackref.Artist
+            track.VolumeNumber = trackref.VolumeNumber
+            track.TrackNumber = trackref.TrackNumber
+            track.ReleaseDate = trackref.ReleaseDate
+            track.MusicBrainzTrackId = trackref.MusicBrainzTrackId
+            track.MusicBrainzArtistId = trackref.MusicBrainzArtistId
+            return track
 
     def get_album_by_id(self, albumid: int) -> Album:
         """
@@ -251,16 +265,13 @@ class Database():
 
     def get_track_by_filepath(self, path: str) -> Track:
         """
-        Return the Track object for a given file path.
-        Raises NotFoundException for an unknown path
+        Return the Track object for a given file path,
+        or None if there is no match in the database.
         """
         res = self.session.query(Track).filter(
             func.lower(Track.Filepath) == func.lower(path)
         )
-        try:
-            return res.one()
-        except Exception as e:
-            raise convert_exception_class(e) from e
+        return res.one_or_none()
 
     def get_nr_albums(self):
         return self.session.query(Album).with_entities(func.count(Album.Id)).scalar()

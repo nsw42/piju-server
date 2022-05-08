@@ -56,11 +56,11 @@ def build_playlist_from_api_data(db: Database, request) -> Tuple[Playlist, List[
         tracks = []
         missing = []
         for filepath in files:
-            try:
-                fullpath = app.piju_config.music_dir / filepath
-                track = db.get_track_by_filepath(str(fullpath))
+            fullpath = app.piju_config.music_dir / filepath
+            track = db.get_track_by_filepath(str(fullpath))
+            if track:
                 tracks.append(track)
-            except NotFoundException:
+            else:
                 print(f"Could not find a track at {filepath} - looked in {fullpath}")
                 missing.append(filepath)
     else:
