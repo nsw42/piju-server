@@ -166,7 +166,7 @@ class Database():
             logging.fatal("Multiple results found for a track reference")
             assert False
 
-    def get_album_by_id(self, albumid: int):
+    def get_album_by_id(self, albumid: int) -> Album:
         """
         Return the Album object for a given id.
         Raises NotFoundException for an unknown id
@@ -186,21 +186,21 @@ class Database():
         result = self.session.execute(select(Album).order_by(Album.Artist, Album.Title))
         return result.scalars().all()
 
-    def get_all_genres(self):
+    def get_all_genres(self) -> List[Genre]:
         """
         Primarily for debugging
         """
         result = self.session.execute(select(Genre).order_by(Genre.Name))
         return result.scalars().all()
 
-    def get_all_playlists(self):
+    def get_all_playlists(self) -> List[Playlist]:
         """
         Primarily for debugging
         """
         result = self.session.execute(select(Playlist).order_by(Playlist.Title))
         return result.scalars().all()
 
-    def get_all_tracks(self, limit=None):
+    def get_all_tracks(self, limit=None) -> List[Track]:
         """
         Primarily for debugging
         """
@@ -210,7 +210,7 @@ class Database():
         result = self.session.execute(query)
         return result.scalars().all()
 
-    def get_genre_by_id(self, genreid: int):
+    def get_genre_by_id(self, genreid: int) -> Genre:
         """
         Return the Genre object for a given id.
         Raises NotFoundException for an unknown id
@@ -223,7 +223,7 @@ class Database():
         except Exception as e:
             raise convert_exception_class(e) from e
 
-    def get_playlist_by_id(self, playlistid: int):
+    def get_playlist_by_id(self, playlistid: int) -> Playlist:
         """
         Return the Playlist object for a given id.
         Raises NotFoundException for an unknown id
@@ -236,7 +236,7 @@ class Database():
         except Exception as e:
             raise convert_exception_class(e) from e
 
-    def get_track_by_id(self, trackid: int):
+    def get_track_by_id(self, trackid: int) -> Track:
         """
         Return the Track object for a given id.
         Raises NotFoundException for an unknown id
@@ -249,7 +249,7 @@ class Database():
         except Exception as e:
             raise convert_exception_class(e) from e
 
-    def get_track_by_filepath(self, path: str):
+    def get_track_by_filepath(self, path: str) -> Track:
         """
         Return the Track object for a given file path.
         Raises NotFoundException for an unknown path
