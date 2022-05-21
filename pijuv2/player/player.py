@@ -1,4 +1,5 @@
 import logging
+import os.path
 from typing import List
 
 from .mp3player import MP3MusicPlayer
@@ -15,8 +16,19 @@ class MusicPlayer:
         self.current_volume = 100
 
     def _play_song(self, filename: str):
-        logging.debug(f"Playing {filename}")
+        """
+        Do the work of launching an appropriate player for the given file,
+        including stopping any current player.
+        Returns True if it started playing successfully.
+        Returns False if the file doesn't exist, and leaves the
+        current status in an indeterminate state. Either call again with a
+        different file, or call stop()
+        """
         self._stop_player()
+        if not os.path.isfile(filename):
+            logging.warning(f"Skipping missing file {filename}")
+            return False
+        logging.debug(f"Playing {filename}")
         if filename.endswith('.mp3'):
             self.current_player = MP3MusicPlayer(self)
             self.current_player.play_song(filename)
@@ -25,6 +37,7 @@ class MusicPlayer:
             self.current_player.play_song(filename)
         self.current_player.set_volume(self.current_volume)
         self.current_status = 'playing'
+        return True
 
     def _stop_player(self):
         """
@@ -49,14 +62,20 @@ class MusicPlayer:
         self.current_tracklist_identifier = identifier
 
     def play_from_queue_index(self, index):
-        assert 0 <= index < len(self.queued_files)
-        self._play_song(self.queued_files[index])
-        self.current_track_id = self.queued_track_ids[index]
-        self.index = index
+        started = False
+        while (index < len(self.queued_files)) and not (started := self._play_song(self.queued_files[index])):
+            index += 1
+        if started:
+            self.current_track_id = self.queued_track_ids[index]
+            self.index = index
+        else:
+            self.stop()
 
     def play_track(self, track: Track):
-        self._play_song(track.Filepath)
-        self.current_track_id = track.Id
+        if self._play_song(track.Filepath):
+            self.current_track_id = track.Id
+        else:
+            self.stop()
 
     def next(self):
         # play the next song in the queue
