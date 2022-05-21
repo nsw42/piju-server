@@ -24,10 +24,11 @@ class MusicPlayer:
         current status in an indeterminate state. Either call again with a
         different file, or call stop()
         """
-        logging.debug(f"Playing {filename}")
         self._stop_player()
         if not os.path.isfile(filename):
+            logging.warning(f"Skipping missing file {filename}")
             return False
+        logging.debug(f"Playing {filename}")
         if filename.endswith('.mp3'):
             self.current_player = MP3MusicPlayer(self)
             self.current_player.play_song(filename)
