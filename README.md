@@ -20,15 +20,14 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 
 ## Backlog
 
-* Detect changes to a file's metadata, and don't create duplicates
 * Detect files being deleted
 * Bug fix: Too many open files under heavy load
-* Bug fix: mpyg321 will sometimes crash with a pexpect EOF - seemingly if calls are made too frequently
 * Bug fix: Scanner is finding a lot of tracks without a title
 * Include album disk number to album json in the API
 * Refactor/code tidy of the backend code
-* Move `set_cross_refs` functionality into `ensure_track_exists` in database layer
-* (Maybe) Add volume support
+* Tech debt: Move `set_cross_refs` functionality into `ensure_track_exists` in database layer
+* Include track length in /tracks/NNN response
+* Add more API endpoints to allow querying the database (e.g. by artist)
 
 ### Done
 
@@ -52,6 +51,10 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 * Player: Add ability to specify start index when starting an album
 * Player: Add ability to play individual tracks
 * Player: Add ability to pause/resume
+* Player: Add ability to control volume
+* Bug fix: mpyg321 will sometimes crash with a pexpect EOF - seemingly if calls are made too frequently. (Fixed as a side effect of adding MP4 support: each new track gets a new player instance)
+* Bug fix: sometimes ending up with multiple Track entries for a single filepath
+* Bug fix: Better error handling if attempting to play a missing file
 
 ## Credits
 
