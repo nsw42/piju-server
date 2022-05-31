@@ -14,6 +14,8 @@ class MusicPlayer:
         self.current_player = None
         self.current_status = 'stopped'
         self.current_volume = 100
+        self.index = None
+        self.maximum_track_index = None
 
     def _play_song(self, filename: str):
         """
@@ -53,6 +55,7 @@ class MusicPlayer:
         self.queued_track_ids = []
         self.index = 0
         self.current_tracklist_identifier = ''
+        self.maximum_track_index = None
 
     def set_queue(self, queue: List[Track], identifier: str):
         self.queued_files = [track.Filepath for track in queue]
@@ -60,6 +63,7 @@ class MusicPlayer:
         self.index = 0  # invariant: the index of the *currently playing* song
         self.current_track_id = self.queued_track_ids[0] if self.queued_track_ids else None
         self.current_tracklist_identifier = identifier
+        self.maximum_track_index = len(queue)
 
     def play_from_queue_index(self, index):
         started = False
@@ -119,6 +123,7 @@ class MusicPlayer:
         self.current_track_id = None
         self.current_tracklist_identifier = ''
         self.current_status = 'stopped'
+        self.index = None
 
     # callbacks
     def on_music_end(self):

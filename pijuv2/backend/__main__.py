@@ -255,6 +255,8 @@ def current_status():
             'PlayerVolume': app.player.current_volume,
             'CurrentTracklistUri': app.player.current_tracklist_identifier,
             'CurrentTrack': {} if track is None else json_track(track),
+            'CurrentTrackIndex': None if (app.player.index is None) else (app.player.index + 1),
+            'MaximumTrackIndex': app.player.maximum_track_index,
             'NumberAlbums': db.get_nr_albums(),
             'NumberTracks': db.get_nr_tracks(),
         }
