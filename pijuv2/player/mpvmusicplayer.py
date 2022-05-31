@@ -17,9 +17,10 @@ class ChildMonitorThread(threading.Thread):
     def run(self):
         while (self.child.poll() is None) and (not self.should_terminate.is_set()):
             time.sleep(1)
-        print("Monitor: end detected (or terminated)")
+        print(f"Monitor: end detected (or terminated). Callback {'enabled' if self.callback else 'suppressed'}")
         if self.child.poll() is not None:
-            self.callback()
+            if self.callback:
+                self.callback()
 
 
 class MPVMusicPlayer:
@@ -92,8 +93,9 @@ class MPVMusicPlayer:
         self._send_command(MPVMusicPlayer.encode_command(['set_property', 'volume', volume]))
 
     def stop(self):
+        if self.monitor:
+            self.monitor.callback = None
+            self.monitor.should_terminate.set()
         if self.child:
             self.child.kill()
             self.child = None
-        if self.monitor:
-            self.monitor.should_terminate.set()
