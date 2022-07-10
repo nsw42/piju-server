@@ -173,6 +173,7 @@ class Database():
             track.Title = trackref.Title
             track.Duration = trackref.Duration
             track.Artist = trackref.Artist
+            track.Genre = trackref.Genre
             track.VolumeNumber = trackref.VolumeNumber
             track.TrackNumber = trackref.TrackNumber
             track.ReleaseDate = trackref.ReleaseDate
