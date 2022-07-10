@@ -139,6 +139,7 @@ def json_album(album: Album, include_tracks: InformationLevel):
         'title': album.Title,
         'releasedate': album.ReleaseYear,
         'iscompilation': album.IsCompilation,
+        'numberdisks': album.VolumeCount,
         'artwork': {
             'link': artwork_uri,
             'width': artwork_width,
