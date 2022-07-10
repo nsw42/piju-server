@@ -198,6 +198,7 @@ def json_track(track: Track):
         'artist': track.Artist,
         'title': track.Title,
         'genre': track.Genre,
+        'disknumber': track.VolumeNumber,
         'tracknumber': track.TrackNumber,
         'trackcount': track.TrackCount,
         'album': url_for('get_album', albumid=track.Album) if track.Album else '',
