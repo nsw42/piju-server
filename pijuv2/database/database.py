@@ -280,6 +280,20 @@ class Database():
     def get_nr_tracks(self):
         return self.session.query(Track).with_entities(func.count(Track.Id)).scalar()
 
+    def search_for_albums(self, search_string, limit=100):
+        return (self.session.query(Album)
+                .filter(Album.Title.ilike('%' + search_string + '%'))
+                .order_by(Album.Title)
+                .limit(limit)
+                .all())
+
+    def search_for_tracks(self, search_string, limit=100):
+        return (self.session.query(Track)
+                .filter(Track.Title.ilike('%' + search_string + '%'))
+                .order_by(Track.Title)
+                .limit(limit)
+                .all())
+
 
 class DatabaseAccess:
     def __init__(self):

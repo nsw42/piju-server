@@ -506,6 +506,18 @@ def start_scan():
     return ('', HTTPStatus.NO_CONTENT)
 
 
+@app.route("/search/<search_string>")
+def search(search_string):
+    with DatabaseAccess() as db:
+        albums = db.search_for_albums(search_string)
+        tracks = db.search_for_tracks(search_string)
+        rtn = {
+            "albums": [json_album(album, include_tracks=InformationLevel.NoInfo) for album in albums],
+            "tracks": [json_track(track) for track in tracks]
+        }
+    return gzippable_jsonify(rtn)
+
+
 @app.route("/tracks/")
 def get_all_tracks():
     limit = request.args.get('limit', '')
