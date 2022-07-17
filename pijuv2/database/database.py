@@ -283,14 +283,14 @@ class Database():
     def search_for_albums(self, search_string, limit=100):
         return (self.session.query(Album)
                 .filter(Album.Title.ilike('%' + search_string + '%'))
-                .order_by(Album.Title)
+                .order_by(Album.Artist)
                 .limit(limit)
                 .all())
 
     def search_for_tracks(self, search_string, limit=100):
         return (self.session.query(Track)
                 .filter(Track.Title.ilike('%' + search_string + '%'))
-                .order_by(Track.Title)
+                .order_by(Track.Artist)
                 .limit(limit)
                 .all())
 
