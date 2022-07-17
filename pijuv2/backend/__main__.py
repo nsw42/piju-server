@@ -247,6 +247,16 @@ def response_for_import_playlist(playlist: Playlist, missing_tracks: List[str]):
     return gzippable_jsonify(response)
 
 
+# RESPONSE HEADERS --------------------------------------------------------------------------------
+
+@app.after_request
+def add_security_headers(resp):
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    return resp
+
+
+# ROUTES ------------------------------------------------------------------------------------------
+
 @app.route("/")
 def current_status():
     with DatabaseAccess() as db:
@@ -519,6 +529,8 @@ def get_track(trackid):
             abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
         return gzippable_jsonify(json_track(track))
 
+
+# MAIN --------------------------------------------------------------------------------------------
 
 if __name__ == '__main__':
     args = parse_args()
