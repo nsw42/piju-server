@@ -395,7 +395,10 @@ def update_player_play():
             except NotFoundException:
                 abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
 
-            tracks = list(sorted(album.Tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0))
+            def track_sort_order(track):
+                return (track.VolumeNumber if track.VolumeNumber else 0,
+                        track.TrackNumber if track.TrackNumber else 0)
+            tracks = list(sorted(album.Tracks, key=track_sort_order))
             play_track_list(tracks, url_for('get_album', albumid=albumid), trackid)
 
         elif playlistid is not None:
