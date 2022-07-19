@@ -287,6 +287,20 @@ class Database():
                 .limit(limit)
                 .all())
 
+    def search_for_artist(self, search_string: str, substring: bool, limit=100) -> List[Album]:
+        """
+        Return a list of Album objects where the artist
+        matches the given name.
+        If substring is True, then searches for
+        """
+        if substring:
+            search_string = '%' + search_string + '%'
+        return (self.session.query(Album)
+                .filter(Album.Artist.ilike(search_string))
+                .order_by(Album.Artist)
+                .limit(limit)
+                .all())
+
     def search_for_tracks(self, search_string, limit=100) -> List[Track]:
         return (self.session.query(Track)
                 .filter(Track.Title.ilike('%' + search_string + '%'))

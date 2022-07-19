@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from collections import defaultdict
 import gzip
 from http import HTTPStatus
 import json
@@ -225,6 +226,26 @@ def parse_args():
     return args
 
 
+def parse_bool(bool_str: str):
+    """
+    >>> parse_bool('yes')
+    True
+    >>> parse_bool('y')
+    True
+    >>> parse_bool('Y')
+    True
+    >>> parse_bool('True')
+    True
+    >>> parse_bool('False')
+    False
+    >>> parse_bool('XYZ')
+    False
+    """
+    if bool_str.lower() in ('y', 'yes', 'true'):
+        return True
+    return False
+
+
 def play_track_list(tracks: List[Track], identifier: str, start_at_track_id: int):
     if start_at_track_id is None:
         play_from_index = 0
@@ -293,6 +314,20 @@ def get_album(albumid):
         except NotFoundException:
             abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
         return gzippable_jsonify(json_album(album, include_tracks=track_info))
+
+
+@app.route("/artists/<artist>")
+def get_artist(artist):
+    track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
+    exact = parse_bool(request.args.get('exact', 'True'))
+    with DatabaseAccess() as db:
+        albums = db.search_for_artist(artist, substring=not exact)
+        if not albums:
+            abort(HTTPStatus.NOT_FOUND, description="No matching artist found")
+        result = defaultdict(list)
+        for album in albums:
+            result[album.Artist].append(json_album(album, include_tracks=track_info))
+        return gzippable_jsonify(result)
 
 
 @app.route("/artwork/<trackid>")
