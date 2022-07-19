@@ -548,9 +548,12 @@ def start_scan():
 def search(search_string):
     with DatabaseAccess() as db:
         albums = db.search_for_albums(search_string)
+        artist_albums = db.search_for_artist(search_string, substring=True)
+        artists = set(album.Artist for album in artist_albums)
         tracks = db.search_for_tracks(search_string)
         rtn = {
             "albums": [json_album(album, include_tracks=InformationLevel.NoInfo) for album in albums],
+            "artists": [{"name": artist, "link": url_for('get_artist', artist=artist)} for artist in artists],
             "tracks": [json_track(track) for track in tracks]
         }
     return gzippable_jsonify(rtn)
