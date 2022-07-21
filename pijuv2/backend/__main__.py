@@ -321,7 +321,7 @@ def get_artist(artist):
     track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
     exact = parse_bool(request.args.get('exact', 'True'))
     with DatabaseAccess() as db:
-        albums = db.search_for_artist(artist, substring=not exact)
+        albums = db.get_artist(artist, substring=not exact)
         if not albums:
             abort(HTTPStatus.NOT_FOUND, description="No matching artist found")
         result = defaultdict(list)
@@ -546,11 +546,12 @@ def start_scan():
 
 @app.route("/search/<search_string>")
 def search(search_string):
+    search_words = search_string.strip().split()
     with DatabaseAccess() as db:
-        albums = db.search_for_albums(search_string)
-        artist_albums = db.search_for_artist(search_string, substring=True)
+        albums = db.search_for_albums(search_words)
+        artist_albums = db.search_for_artist(search_words)
         artists = set(album.Artist for album in artist_albums)
-        tracks = db.search_for_tracks(search_string)
+        tracks = db.search_for_tracks(search_words)
         rtn = {
             "albums": [json_album(album, include_tracks=InformationLevel.NoInfo) for album in albums],
             "artists": [{"name": artist, "link": url_for('get_artist', artist=artist)} for artist in artists],

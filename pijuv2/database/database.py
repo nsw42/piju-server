@@ -1,7 +1,7 @@
 import logging
-from typing import List
+from typing import Iterable, List
 
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, func, select, or_
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.pool import QueuePool
@@ -225,6 +225,20 @@ class Database():
         result = self.session.execute(query)
         return result.scalars().all()
 
+    def get_artist(self, search_string: str, substring: bool, limit=100) -> List[Album]:
+        """
+        Return a list of Album objects where the artist
+        matches the given name.
+        If substring is True, then searches for
+        """
+        if substring:
+            search_string = '%' + search_string + '%'
+        return (self.session.query(Album)
+                .filter(Album.Artist.ilike(search_string))
+                .order_by(Album.Artist)
+                .limit(limit)
+                .all())
+
     def get_genre_by_id(self, genreid: int) -> Genre:
         """
         Return the Genre object for a given id.
@@ -280,33 +294,34 @@ class Database():
     def get_nr_tracks(self):
         return self.session.query(Track).with_entities(func.count(Track.Id)).scalar()
 
-    def search_for_albums(self, search_string: str, limit=100) -> List[Album]:
-        return (self.session.query(Album)
-                .filter(Album.Title.ilike('%' + search_string + '%'))
-                .order_by(Album.Artist)
-                .limit(limit)
-                .all())
+    def search_for_albums(self, search_words: Iterable[str], limit=100) -> List[Album]:
+        q = self.session.query(Album)
+        for word in search_words:
+            pattern = '%' + word + '%'
+            q = q.filter(or_(Album.Title.ilike(pattern), Album.Artist.ilike(pattern)))
+        q = q.order_by(Album.Artist).limit(limit)
+        return q.all()
 
-    def search_for_artist(self, search_string: str, substring: bool, limit=100) -> List[Album]:
+    def search_for_artist(self, search_words: Iterable[str], limit=100) -> List[Album]:
         """
         Return a list of Album objects where the artist
         matches the given name.
         If substring is True, then searches for
         """
-        if substring:
-            search_string = '%' + search_string + '%'
-        return (self.session.query(Album)
-                .filter(Album.Artist.ilike(search_string))
-                .order_by(Album.Artist)
-                .limit(limit)
-                .all())
+        q = self.session.query(Album)
+        for word in search_words:
+            pattern = '%' + word + '%'
+            q = q.filter(Album.Artist.ilike(pattern))
+        q = q.order_by(Album.Artist).limit(limit)
+        return q.all()
 
-    def search_for_tracks(self, search_string, limit=100) -> List[Track]:
-        return (self.session.query(Track)
-                .filter(Track.Title.ilike('%' + search_string + '%'))
-                .order_by(Track.Artist)
-                .limit(limit)
-                .all())
+    def search_for_tracks(self, search_words: Iterable[str], limit=100) -> List[Track]:
+        q = self.session.query(Track).join(Album)
+        for word in search_words:
+            pattern = '%' + word + '%'
+            q = q.filter(or_(Track.Title.ilike(pattern), Album.Title.ilike(pattern), Track.Artist.ilike(pattern)))
+        q = q.order_by(Track.Artist).limit(limit)
+        return q.all()
 
 
 class DatabaseAccess:
