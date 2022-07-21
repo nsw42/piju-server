@@ -315,12 +315,12 @@ class Database():
         q = q.order_by(Album.Artist).limit(limit)
         return q.all()
 
-    def search_for_tracks(self, search_words: Iterable[str], limit=100) -> List[Track]:
+    def search_for_tracks(self, search_words: Iterable[str], query_limit=1000, return_limit=100) -> List[Track]:
         q = self.session.query(Track).join(Album)
         for word in search_words:
             pattern = '%' + word + '%'
             q = q.filter(or_(Track.Title.ilike(pattern), Album.Title.ilike(pattern), Track.Artist.ilike(pattern)))
-        q = q.limit(limit)
+        q = q.limit(query_limit)
         tracks = q.all()
         # sort tracks by quality of match
         lower_case_words = [word.lower() for word in search_words]
@@ -343,7 +343,7 @@ class Database():
             return score
         tracks = [(score_track(track), track) for track in tracks]
         tracks.sort(key=lambda s_t: s_t[0], reverse=True)  # best matches (== biggest score) at the top
-        return [track for (score, track) in tracks]
+        return [track for (score, track) in tracks][:return_limit]
 
 
 class DatabaseAccess:
