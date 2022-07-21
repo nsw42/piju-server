@@ -320,8 +320,30 @@ class Database():
         for word in search_words:
             pattern = '%' + word + '%'
             q = q.filter(or_(Track.Title.ilike(pattern), Album.Title.ilike(pattern), Track.Artist.ilike(pattern)))
-        q = q.order_by(Track.Artist).limit(limit)
-        return q.all()
+        q = q.limit(limit)
+        tracks = q.all()
+        # sort tracks by quality of match
+        lower_case_words = [word.lower() for word in search_words]
+
+        def score_track(track):
+            # print(track.Title)
+            # print('=======================')
+            score = 0
+            for word in lower_case_words:
+                if (word in track.Title.lower()):
+                    # print(word, 3)
+                    score += 3
+                elif (word not in track.Artist.lower()):
+                    # assert word in get_album_by_id(track.Album).Title.lower()
+                    # print(word, 2)
+                    score += 2
+                else:
+                    # print(word, 1)
+                    score += 1
+            return score
+        tracks = [(score_track(track), track) for track in tracks]
+        tracks.sort(key=lambda s_t: s_t[0], reverse=True)  # best matches (== biggest score) at the top
+        return [track for (score, track) in tracks]
 
 
 class DatabaseAccess:
