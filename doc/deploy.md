@@ -147,3 +147,26 @@ Ctrl-C to exit
     sudo chmod 777 /var/log/piju
     sudo rc-update add piju default
     ```
+
+### Set up log rotation
+
+Install logrotate:
+
+```sh
+apk add logrotate
+```
+
+Write a logrotate configuration file (`/etc/logrotate.d/piju`):
+
+```text
+/var/log/piju/piju.* {
+    su piju piju
+    daily
+    missingok
+    notifempty
+    compress
+    copytruncate
+}
+```
+
+Installing logrotate automatically causes it to run daily. Shouldn't be any further configuration needed.
