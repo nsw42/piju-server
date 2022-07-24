@@ -292,6 +292,7 @@ def current_status():
             'MaximumTrackIndex': app.player.maximum_track_index,
             'NumberAlbums': db.get_nr_albums(),
             'NumberTracks': db.get_nr_tracks(),
+            'ApiVersion': app.api_version_string,
         }
     return gzippable_jsonify(rtn)
 
@@ -600,6 +601,7 @@ if __name__ == '__main__':
         app.worker = WorkerThread(app.queue)
         app.worker.start()
         app.player = MusicPlayer()
+        app.api_version_string = '2.0'
         # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
         # see https://developer.apple.com/forums/thread/682332
         app.run(use_reloader=False, host='0.0.0.0')
