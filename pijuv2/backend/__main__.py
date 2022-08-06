@@ -548,16 +548,21 @@ def start_scan():
 @app.route("/search/<search_string>")
 def search(search_string):
     search_words = search_string.strip().split()
+    do_search_albums = parse_bool(request.args.get('albums', 'True'))
+    do_search_artists = parse_bool(request.args.get('artists', 'True'))
+    do_search_tracks = parse_bool(request.args.get('tracks', 'True'))
     with DatabaseAccess() as db:
-        albums = db.search_for_albums(search_words)
-        artist_albums = db.search_for_artist(search_words)
-        artists = set(album.Artist for album in artist_albums)
-        tracks = db.search_for_tracks(search_words)
-        rtn = {
-            "albums": [json_album(album, include_tracks=InformationLevel.NoInfo) for album in albums],
-            "artists": [{"name": artist, "link": url_for('get_artist', artist=artist)} for artist in artists],
-            "tracks": [json_track(track) for track in tracks]
-        }
+        rtn = {}
+        if do_search_albums:
+            albums = db.search_for_albums(search_words)
+            rtn['albums'] = [json_album(album, include_tracks=InformationLevel.NoInfo) for album in albums]
+        if do_search_artists:
+            artist_albums = db.search_for_artist(search_words)
+            artists = set(album.Artist for album in artist_albums)
+            rtn['artists'] = [{"name": artist, "link": url_for('get_artist', artist=artist)} for artist in artists]
+        if do_search_tracks:
+            tracks = db.search_for_tracks(search_words)
+            rtn['tracks'] = [json_track(track) for track in tracks]
     return gzippable_jsonify(rtn)
 
 
