@@ -159,7 +159,9 @@ apk add logrotate
 Write a logrotate configuration file (`/etc/logrotate.d/piju`):
 
 ```text
-/var/log/piju/piju.* {
+/var/log/piju/piju.log
+/var/log/piju/piju.err
+{
     su piju piju
     daily
     missingok
