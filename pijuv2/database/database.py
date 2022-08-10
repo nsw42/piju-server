@@ -170,15 +170,23 @@ class Database():
         else:
             # we know we're updating a track
             track = self.get_track_by_id(trackref.Id)
+            track.Filepath = trackref.Filepath
             track.Title = trackref.Title
             track.Duration = trackref.Duration
+            track.Composer = trackref.Composer
             track.Artist = trackref.Artist
             track.Genre = trackref.Genre
             track.VolumeNumber = trackref.VolumeNumber
+            track.TrackCount = trackref.TrackCount
             track.TrackNumber = trackref.TrackNumber
             track.ReleaseDate = trackref.ReleaseDate
             track.MusicBrainzTrackId = trackref.MusicBrainzTrackId
             track.MusicBrainzArtistId = trackref.MusicBrainzArtistId
+            track.Album = trackref.Album
+            track.ArtworkPath = trackref.ArtworkPath
+            track.ArtworkBlob = trackref.ArtworkBlob
+            track.ArtworkWidth = trackref.ArtworkWidth
+            track.ArtworkHeight = trackref.ArtworkHeight
             return track
 
     def get_album_by_id(self, albumid: int) -> Album:
