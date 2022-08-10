@@ -48,10 +48,10 @@ def convert_exception_class(exc):
 
 
 class Database():
-    def __init__(self, filename=None, path=None):
+    def __init__(self, path=None):
         if path:
             filename = str(path)
-        elif filename is None:
+        else:
             filename = FILENAME
         self.engine = create_engine('sqlite:///' + filename, poolclass=QueuePool)
         self.session = scoped_session(sessionmaker(bind=self.engine))
@@ -158,36 +158,36 @@ class Database():
             count = res.count()
             if count == 0:
                 # Track does not exist
+                logging.debug("New track: %s", trackref.Filepath)
                 self.session.add(trackref)
                 self.session.commit()
                 self.session.refresh(trackref)
                 return trackref
-            elif count == 1:
-                return res.first()
-            else:
+
+            if count > 1:
                 logging.fatal("Multiple results found for a track reference")
                 assert False
+
+            logging.debug("ensure_track_exists: track already existed: " + trackref.Filepath)
+            track = res.first()
         else:
             # we know we're updating a track
             track = self.get_track_by_id(trackref.Id)
-            track.Filepath = trackref.Filepath
-            track.Title = trackref.Title
-            track.Duration = trackref.Duration
-            track.Composer = trackref.Composer
-            track.Artist = trackref.Artist
-            track.Genre = trackref.Genre
-            track.VolumeNumber = trackref.VolumeNumber
-            track.TrackCount = trackref.TrackCount
-            track.TrackNumber = trackref.TrackNumber
-            track.ReleaseDate = trackref.ReleaseDate
-            track.MusicBrainzTrackId = trackref.MusicBrainzTrackId
-            track.MusicBrainzArtistId = trackref.MusicBrainzArtistId
-            track.Album = trackref.Album
-            track.ArtworkPath = trackref.ArtworkPath
-            track.ArtworkBlob = trackref.ArtworkBlob
-            track.ArtworkWidth = trackref.ArtworkWidth
-            track.ArtworkHeight = trackref.ArtworkHeight
-            return track
+
+        # We now know we've found a track in the database
+        # Update it if necessary - except for cross-references (eg Album)
+
+        for attr in ['Filepath', 'Title', 'Duration', 'Composer', 'Artist', 'Genre',
+                     'VolumeNumber', 'TrackCount', 'TrackNumber', 'ReleaseDate',
+                     'MusicBrainzTrackId', 'MusicBrainzArtistId',
+                     'ArtworkPath', 'ArtworkBlob', 'ArtworkWidth', 'ArtworkHeight']:
+            old_val = getattr(track, attr)
+            new_val = getattr(trackref, attr)
+            if old_val != new_val:
+                logging.debug("ensure_track_exists: %s changing %s from %s to %s", trackref.Filepath, attr, old_val, new_val)
+                setattr(track, attr, new_val)
+
+        return track
 
     def get_album_by_id(self, albumid: int) -> Album:
         """
@@ -355,8 +355,8 @@ class Database():
 
 
 class DatabaseAccess:
-    def __init__(self):
-        self.db = Database()
+    def __init__(self, path=None):
+        self.db = Database(path=path)
 
     def __enter__(self):
         return self.db
