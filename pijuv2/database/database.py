@@ -184,7 +184,8 @@ class Database():
             old_val = getattr(track, attr)
             new_val = getattr(trackref, attr)
             if old_val != new_val:
-                logging.debug("ensure_track_exists: %s changing %s from %s to %s", trackref.Filepath, attr, old_val, new_val)
+                logging.debug("ensure_track_exists: %s changing %s from %s to %s",
+                              trackref.Filepath, attr, old_val, new_val)
                 setattr(track, attr, new_val)
 
         return track
