@@ -236,8 +236,7 @@ class Database():
         query = self.session.query(Track).order_by(Track.Artist, Track.Album, Track.TrackNumber)
         if limit:
             query = query.limit(limit)
-        result = self.session.execute(query)
-        return result.scalars().all()
+        return query.all()
 
     def get_artist(self, search_string: str, substring: bool, limit=100) -> List[Album]:
         """
