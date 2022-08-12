@@ -4,7 +4,7 @@ from queue import Queue
 import threading
 
 from ..database.database import DatabaseAccess
-from ..database.tidy import delete_missing_tracks
+from ..database.tidy import delete_missing_tracks, delete_albums_without_tracks
 from ..scan.directory import scan_directory
 from .workqueue import WorkRequests
 
@@ -29,6 +29,9 @@ class WorkerThread(threading.Thread):
 
                 elif request[0] == WorkRequests.DeleteMissingTracks:
                     delete_missing_tracks(db)
+
+                elif request[0] == WorkRequests.DeleteAlbumsWithoutTracks:
+                    delete_albums_without_tracks(db)
 
                 else:
                     logging.error("Unrecognised request: %s" % request[0])

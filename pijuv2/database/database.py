@@ -80,6 +80,11 @@ class Database():
         self.session.commit()
         return existing_playlist
 
+    def delete_album(self, albumid: int):
+        album = self.get_album_by_id(albumid)  # raises NotFoundException if necessary
+        self.session.delete(album)
+        self.session.commit()
+
     def delete_playlist(self, playlistid: int):
         playlist = self.get_playlist_by_id(playlistid)  # raises NotFoundException if necessary
         self.session.delete(playlist)
@@ -207,6 +212,12 @@ class Database():
             return res.one()
         except Exception as e:
             raise convert_exception_class(e) from e
+
+    def get_albums_without_tracks(self) -> List[Album]:
+        """
+        Return a list of Album objects where each album has no
+        """
+        return self.session.query(Album).filter(~Album.Tracks.any()).all()
 
     def get_all_albums(self) -> List[Album]:
         """

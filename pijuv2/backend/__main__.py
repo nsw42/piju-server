@@ -548,6 +548,7 @@ def start_scan():
 @app.route("/scanner/tidy", methods=['POST'])
 def start_tidy():
     app.queue.put((WorkRequests.DeleteMissingTracks, ))
+    app.queue.put((WorkRequests.DeleteAlbumsWithoutTracks, ))
     return ('', HTTPStatus.NO_CONTENT)
 
 
