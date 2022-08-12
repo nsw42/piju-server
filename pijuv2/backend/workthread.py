@@ -4,6 +4,7 @@ from queue import Queue
 import threading
 
 from ..database.database import DatabaseAccess
+from ..database.tidy import delete_missing_tracks
 from ..scan.directory import scan_directory
 from .workqueue import WorkRequests
 
@@ -25,6 +26,9 @@ class WorkerThread(threading.Thread):
                     dir_to_scan = pathlib.Path(request[1])
                     self.current_status = 'Scanning %s' % dir_to_scan
                     scan_directory(dir_to_scan, db)
+
+                elif request[0] == WorkRequests.DeleteMissingTracks:
+                    delete_missing_tracks(db)
 
                 else:
                     logging.error("Unrecognised request: %s" % request[0])

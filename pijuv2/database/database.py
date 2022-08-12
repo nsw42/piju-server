@@ -85,6 +85,11 @@ class Database():
         self.session.delete(playlist)
         self.session.commit()
 
+    def delete_track(self, trackid: int):
+        track = self.get_track_by_id(trackid)  # raises NotFoundException if necessary
+        self.session.delete(track)
+        self.session.commit()
+
     def ensure_album_exists(self, albumref: Album):
         """
         Ensure the given album reference is present in the database,

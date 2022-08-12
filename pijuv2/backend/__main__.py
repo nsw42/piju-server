@@ -545,6 +545,12 @@ def start_scan():
     return ('', HTTPStatus.NO_CONTENT)
 
 
+@app.route("/scanner/tidy", methods=['POST'])
+def start_tidy():
+    app.queue.put((WorkRequests.DeleteMissingTracks, ))
+    return ('', HTTPStatus.NO_CONTENT)
+
+
 @app.route("/search/<search_string>")
 def search(search_string):
     search_words = search_string.strip().split()
