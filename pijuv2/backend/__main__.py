@@ -124,7 +124,7 @@ def gzippable_jsonify(content):
 
 def json_album(album: Album, include_tracks: InformationLevel):
     tracks = list(album.Tracks)
-    tracks = sorted(tracks, key=lambda track: track.TrackNumber if track.TrackNumber else 0)
+    tracks = sorted(tracks, key=lambda track: (track.VolumeNumber or 0, track.TrackNumber or 0))
     for track in tracks:
         if track.ArtworkPath or track.ArtworkBlob:
             artwork_uri = url_for('get_artwork', trackid=track.Id)
