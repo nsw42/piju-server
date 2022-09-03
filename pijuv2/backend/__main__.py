@@ -28,16 +28,19 @@ class InformationLevel:
     NoInfo = 0
     Links = 1
     AllInfo = 2
+    DebugInfo = 3  # All Info plus information that's not normally exposed via the API (eg file paths)
 
     @staticmethod
     def from_string(info: str, default: 'InformationLevel' = Links):
         info = info.lower()
         if info == 'none':
             return InformationLevel.NoInfo
-        elif info == 'all':
-            return InformationLevel.AllInfo
         elif info == 'links':
             return InformationLevel.Links
+        elif info == 'all':
+            return InformationLevel.AllInfo
+        elif info == 'debug':
+            return InformationLevel.DebugInfo
         else:
             return default
 
@@ -150,8 +153,9 @@ def json_album(album: Album, include_tracks: InformationLevel):
     }
     if include_tracks == InformationLevel.Links:
         rtn['tracks'] = [url_for('get_track', trackid=track.Id) for track in tracks]
-    elif include_tracks == InformationLevel.AllInfo:
-        rtn['tracks'] = [json_track(track) for track in tracks]
+    elif include_tracks in (InformationLevel.AllInfo, InformationLevel.DebugInfo):
+        include_debuginfo = (include_tracks == InformationLevel.DebugInfo)
+        rtn['tracks'] = [json_track(track, include_debuginfo=include_debuginfo) for track in tracks]
     return rtn
 
 
@@ -162,14 +166,14 @@ def json_genre(genre: Genre, include_albums: InformationLevel, include_playlists
     }
     if include_albums == InformationLevel.Links:
         rtn['albums'] = [url_for('get_album', albumid=album.Id) for album in genre.Albums]
-    elif include_albums == InformationLevel.AllInfo:
-        rtn['albums'] = [json_album(album, include_tracks=InformationLevel.AllInfo) for album in genre.Albums]
+    elif include_albums in (InformationLevel.AllInfo, InformationLevel.DebugInfo):
+        rtn['albums'] = [json_album(album, include_tracks=include_albums) for album in genre.Albums]
     if include_playlists == InformationLevel.Links:
         rtn['playlists'] = [url_for('one_playlist', playlistid=playlist.Id) for playlist in genre.Playlists]
-    elif include_playlists == InformationLevel.AllInfo:
+    elif include_playlists in (InformationLevel.AllInfo, InformationLevel.DebugInfo):
         rtn['playlists'] = [json_playlist(playlist,
                                           include_genres=InformationLevel.NoInfo,
-                                          include_tracks=InformationLevel.AllInfo)
+                                          include_tracks=include_playlists)
                             for playlist in genre.Playlists]
     return rtn
 
@@ -182,18 +186,19 @@ def json_playlist(playlist: Playlist, include_genres: InformationLevel, include_
     }
     if include_genres == InformationLevel.Links:
         rtn['genres'] = [url_for('get_genre', genreid=genre.Id) for genre in playlist.Genres]
-    elif include_genres == InformationLevel.AllInfo:
+    elif include_genres in (InformationLevel.AllInfo, InformationLevel.DebugInfo):
         rtn['genres'] = [json_genre(genre,
                                     include_albums=InformationLevel.NoInfo,
                                     include_playlists=InformationLevel.NoInfo) for genre in playlist.Genres]
     if include_tracks == InformationLevel.Links:
         rtn['tracks'] = [url_for('get_track', trackid=entry.TrackId) for entry in entries]
-    elif include_tracks == InformationLevel.AllInfo:
-        rtn['tracks'] = [json_track(entry.Track) for entry in entries]
+    elif include_tracks in (InformationLevel.AllInfo, InformationLevel.DebugInfo):
+        include_debuginfo = (include_tracks == InformationLevel.DebugInfo)
+        rtn['tracks'] = [json_track(entry.Track, include_debuginfo=include_debuginfo) for entry in entries]
     return rtn
 
 
-def json_track(track: Track):
+def json_track(track: Track, include_debuginfo: bool = False):
     has_artwork = track.ArtworkPath or track.ArtworkBlob
     rtn = {
         'link': url_for('get_track', trackid=track.Id),
@@ -207,6 +212,8 @@ def json_track(track: Track):
         'artwork': url_for('get_artwork', trackid=track.Id) if has_artwork else None,
         'artworkinfo': url_for('get_artwork_info', trackid=track.Id) if has_artwork else None,
     }
+    if include_debuginfo:
+        rtn['filepath'] = track.Filepath
     return rtn
 
 
@@ -589,12 +596,14 @@ def get_all_tracks():
 
 @app.route("/tracks/<trackid>")
 def get_track(trackid):
+    infolevel = InformationLevel.from_string(request.args.get('infolevel', ''), InformationLevel.AllInfo)
+    include_debuginfo = (infolevel == InformationLevel.DebugInfo)
     with DatabaseAccess() as db:
         try:
             track = db.get_track_by_id(trackid)
         except NotFoundException:
             abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
-        return gzippable_jsonify(json_track(track))
+        return gzippable_jsonify(json_track(track, include_debuginfo=include_debuginfo))
 
 
 # MAIN --------------------------------------------------------------------------------------------
