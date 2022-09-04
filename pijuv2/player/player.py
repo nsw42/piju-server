@@ -83,6 +83,8 @@ class MusicPlayer:
 
     def next(self):
         # play the next song in the queue
+        if self.index is None:
+            return
         if self.index + 1 < len(self.queued_files):
             self.play_from_queue_index(self.index + 1)
         else:
