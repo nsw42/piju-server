@@ -85,6 +85,7 @@ class MusicPlayer:
         # play the next song in the queue
         if self.index is None:
             return
+        logging.debug(f"MusicPlayer.next ({self.current_player})")
         if self.index + 1 < len(self.queued_files):
             self.play_from_queue_index(self.index + 1)
         else:
@@ -130,4 +131,5 @@ class MusicPlayer:
     # callbacks
     def on_music_end(self):
         # maybe flush the queue at the end??
+        logging.debug(f"MusicPlayer.on_music_end ({self.current_player})")
         self.next()

@@ -1,3 +1,5 @@
+import logging
+
 from .mpyg321 import MPyg321Player, PlayerStatus
 
 
@@ -17,8 +19,10 @@ class MP3MusicPlayer(MPyg321Player):
         self.volume(volume)
 
     def stop(self):
+        logging.debug(f"MP3MusicPlayer.stop ({self})")
         super().quit()
 
     # callbacks
     def on_music_end(self):
+        logging.debug(f"MP3MusicPlayer.on_music_end ({self})")
         self.parent.on_music_end()
