@@ -1,5 +1,6 @@
 from enum import Enum
 import pexpect
+import re
 from threading import Thread
 
 
@@ -18,7 +19,7 @@ mpg_outs = [
         "mpg_code": "@P 0",
         "action": MpgOutputAction.MUSIC_STOP,
         "description": """For mpg123, it corresponds to any stop
-                        For mpg312 it corresponds to user stop only"""
+                        For mpg321 it corresponds to user stop only"""
     },
     {
         "mpg_code": "@P 1",
@@ -125,8 +126,6 @@ mpg_errors = [
     },
 ]
 
-suitable_versions = ["mpg123", "mpg321"]
-
 
 # # # Errors # # #
 class MPyg321Error(RuntimeError):
@@ -183,7 +182,7 @@ class PlayerStatus(Enum):
 class MPyg321Player:
     """Main class for mpg321 player management"""
     player = None
-    player_version = "mpg123"
+    player_name = "mpg123"
     status = None
     output_processor = None
     song_path = ""
@@ -214,19 +213,24 @@ class MPyg321Player:
 
         else:
             try:
-                version_process = pexpect.spawn("mpg123 ---version")
+                version_process = pexpect.spawn("mpg123 --version", encoding='utf-8')
                 valid_player = "mpg123"
             except pexpect.exceptions.ExceptionPexpect:
                 try:
-                    version_process = pexpect.spawn("mpg321 --version")
+                    version_process = pexpect.spawn("mpg321 --version", encoding='utf-8')
                     valid_player = "mpg321"
                 except pexpect.exceptions.ExceptionPexpect:
                     raise MPyg321NoPlayerFoundError(
                         """No suitable player found""")
 
+        suitable_versions = [
+            re.compile(r"mpg123 ([0-9.]+)"),
+            re.compile(r"mpg321 version ([0-9.]+)")
+        ]
         index = version_process.expect(suitable_versions)
         try:
-            self.player_version = suitable_versions[index]
+            self.player_name = suitable_versions[index]
+            self.player_version = tuple(map(int, version_process.match.group(1).split('.')))  # e.g. (1, 30, 2)
         except IndexError:
             raise MPyg321NoPlayerFoundError("""No suitable player found""")
         return valid_player
@@ -234,7 +238,7 @@ class MPyg321Player:
     def set_player(self, player, audiodevice):
         """Sets the player"""
         player = self.set_version_and_get_player(player)
-        args = "--remote" if self.player_version == "mpg123" else "-R test"
+        args = "--remote" if self.player_name == "mpg123" else "-R test"
         args += " --audiodevice " + audiodevice if audiodevice else ""
         self.player = pexpect.spawn(str(player) + " " + args)
         self.player.delaybeforesend = None
@@ -293,7 +297,7 @@ class MPyg321Player:
     def stop(self):
         """Stops the player"""
         self.player.sendline("STOP")
-        if self.player_version == "mpg321":
+        if self.player_name == "mpg321":
             self.status = PlayerStatus.STOPPED
         else:
             self.status = PlayerStatus.STOPPING
@@ -309,15 +313,15 @@ class MPyg321Player:
 
     def volume(self, percent):
         """Adjust player's volume"""
-        if self.player_version == "mpg123":
+        if self.player_name == "mpg123":
             self.player.sendline("VOLUME {}".format(percent))
-        if self.player_version == "mpg321":
+        if self.player_name == "mpg321":
             self.player.sendline("GAIN {}".format(percent))
         self.current_volume = percent
 
     def silence_mpyg_output(self):
         """Improves performance by silencing the mpg123 process frame output"""
-        if self.player_version == "mpg123" and not self.performance_mode:
+        if self.player_name == "mpg123" and not self.performance_mode:
             self.player.sendline("SILENCE")
 
     def load_list(self, entry, filepath):
@@ -326,7 +330,7 @@ class MPyg321Player:
         entry (int): index of the song in the list - first is 0
         filepath: URL/Path to the list
         """
-        if self.player_version == "mpg123":
+        if self.player_name == "mpg123":
             self.player.sendline("LOADLIST {} {}".format(entry, filepath))
             self.status = PlayerStatus.PLAYING
 
@@ -365,14 +369,18 @@ class MPyg321Player:
     # # # Internal Callbacks # # #
     def on_music_stop_int(self):
         """Internal callback when user stops the music"""
-        if self.player_version == "mpg123":
+        if self.player_name == "mpg123":
             if self.status == PlayerStatus.STOPPING:
                 self.status = PlayerStatus.STOPPED
                 self.on_user_stop_int()
             else:
                 # If not stopped by the user, it is the end of the song
-                # the on_any_stop function is called inside on_end_of_song_int
-                self.on_end_of_song_int()
+                # the on_any_stop function is called inside on_end_of_song_int.
+                # With mpg123 v1.30, there is now an explicit 'end of song'
+                # notification, so this is only needed for older versions
+                # of mpg123
+                if (self.player_version[0] < 1) or (self.player_version[1] < 30):
+                    self.on_end_of_song_int()
         else:
             self.on_user_stop_int()
 
