@@ -20,7 +20,7 @@ def set_cross_refs(db: Database, track: Track, albumref: Album):
     # changed genre.
     if editing_track:
         genre_ids = set([track.Genre for track in album.Tracks])
-        genres = [db.get_genre_by_id(genreid) for genreid in genre_ids]
+        genres = [db.get_genre_by_id(genreid) for genreid in genre_ids if genreid]
         album.Genres = genres
     else:
         genre = db.get_genre_by_id(track.Genre) if track.Genre else None
