@@ -47,6 +47,8 @@ class InformationLevel:
 
 def build_playlist_from_api_data(db: Database, request) -> Tuple[Playlist, List[str]]:
     data = request.get_json()
+    if not data:
+        abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
     title = data.get('title')
     trackids = extract_ids(data.get('tracks', []))
     files = data.get('files', [])
@@ -491,6 +493,8 @@ def player_volume():
 
     elif request.method == 'POST':
         data = request.get_json()
+        if not data:
+            abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
         try:
             volume = data.get('volume')
             volume = int(volume)
@@ -545,6 +549,8 @@ def one_playlist(playlistid):
 @app.route("/scanner/scan", methods=['POST'])
 def start_scan():
     data = request.get_json()
+    if not data:
+        abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
     subdir = data.get('dir')
     scandir = config.music_dir if (subdir is None) else os.path.join(config.music_dir, subdir)
     # TODO: Error checking on scandir
