@@ -549,7 +549,7 @@ def one_playlist(playlistid):
 @app.route("/scanner/scan", methods=['POST'])
 def start_scan():
     data = request.get_json()
-    if not data:
+    if data is None:
         abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
     subdir = data.get('dir')
     scandir = config.music_dir if (subdir is None) else os.path.join(config.music_dir, subdir)
