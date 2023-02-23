@@ -410,6 +410,22 @@ def get_genre(genreid):
         return gzippable_jsonify(json_genre(genre, include_albums=album_info, include_playlists=playlist_info))
 
 
+@app.route("/mp3/<trackid>")
+def get_mp3(trackid):
+    with DatabaseAccess() as db:
+        try:
+            track = db.get_track_by_id(trackid)
+        except NotFoundException:
+            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+
+        with open(track.Filepath, 'rb') as handle:
+            content = handle.read()
+        response = make_response(content)
+        response.headers['Content-Type'] = 'audio/mpeg'
+        response.headers['Content-Length'] = len(content)
+        return response
+
+
 @app.route("/player/next", methods=['POST'])
 def update_player_next():
     app.player.next()
