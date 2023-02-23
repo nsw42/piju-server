@@ -647,4 +647,4 @@ if __name__ == '__main__':
         app.api_version_string = '2.0'
         # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
         # see https://developer.apple.com/forums/thread/682332
-        app.run(use_reloader=False, host='0.0.0.0')
+        app.run(use_reloader=False, host='0.0.0.0', threaded=True)
