@@ -78,7 +78,7 @@ def update_player_play():
 
     elif trackid:
         track_ids = [trackid]
-        play_track_list(track_ids, 'TBC', trackid)
+        play_track_list(track_ids, None, trackid)  # There is no tracklist URI when we're playing a single track
 
     else:
         abort(HTTPStatus.BAD_REQUEST, description='Album, playlist or track must be specified')
