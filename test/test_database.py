@@ -1,3 +1,4 @@
+from pijuv2.scan.directory import set_cross_refs
 from pijuv2.database.database import Database
 from pijuv2.database.schema import Album, Track
 
@@ -89,3 +90,46 @@ def test_get_all_tracks(tmp_path):
     track = db.get_all_tracks()[0]
 
     assert track.Title == trackref.Title
+
+
+def test_change_compilation_to_single_artist(tmp_path):
+    # There used to be a bug that finding an album (eg as a compilation)
+    # then re-scanning, and the album changing, meant that the first instance
+    # of the album would stay around with no tracks in it.
+    db = Database(path=tmp_path / TEST_DB)
+
+    assert db.get_all_tracks() == []
+    assert db.get_all_albums() == []
+
+    # Simulate the outline of the logic from scan.directory
+    # First pass: as a compilation
+    t1 = Track(Filepath='dummy.mp3',
+               Title='My Track',
+               Artist='Various Artists',
+               TrackNumber=1,
+               TrackCount=1)
+    a1 = Album(Title='My Album',
+               Artist='Various Artists',
+               IsCompilation=True)
+    set_cross_refs(db, t1, a1)
+
+    assert len(db.get_all_tracks()) == 1
+    assert len(db.get_all_albums()) == 1
+
+    assert t1.Id is not None
+    assert len(a1.Tracks) == 1
+
+    # Second pass: as a single artist
+    t2 = Track(Id=t1.Id,
+               Filepath='dummy.mp3',
+               Title='My Track',
+               Artist='Bill and Ben',
+               TrackNumber=1,
+               TrackCount=1)
+    a2 = Album(Title='My Album',
+               Artist='Bill and Ben',
+               IsCompilation=False)
+    set_cross_refs(db, t2, a2)
+
+    assert len(db.get_all_tracks()) == 1
+    assert len(db.get_all_albums()) == 1
