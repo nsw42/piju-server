@@ -210,6 +210,7 @@ def json_track(track: Track, include_debuginfo: bool = False):
         'disknumber': track.VolumeNumber,
         'tracknumber': track.TrackNumber,
         'trackcount': track.TrackCount,
+        'fileformat': os.path.splitext(track.Filepath)[1],
         'album': url_for('get_album', albumid=track.Album) if track.Album else '',
         'artwork': url_for('get_artwork', trackid=track.Id) if has_artwork else None,
         'artworkinfo': url_for('get_artwork_info', trackid=track.Id) if has_artwork else None,
@@ -644,7 +645,7 @@ if __name__ == '__main__':
         app.worker = WorkerThread(app.queue)
         app.worker.start()
         app.player = MusicPlayer()
-        app.api_version_string = '3.0'
+        app.api_version_string = '3.1'
         # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
         # see https://developer.apple.com/forums/thread/682332
         app.run(use_reloader=False, host='0.0.0.0', threaded=True)
