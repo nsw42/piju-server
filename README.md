@@ -52,9 +52,11 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 * Player: Add ability to play individual tracks
 * Player: Add ability to pause/resume
 * Player: Add ability to control volume
+* Replica: First version: provide the same /player/ API as the full backend, but cache audio data from a primary backend
 * Bug fix: mpyg321 will sometimes crash with a pexpect EOF - seemingly if calls are made too frequently. (Fixed as a side effect of adding MP4 support: each new track gets a new player instance)
 * Bug fix: sometimes ending up with multiple Track entries for a single filepath
 * Bug fix: Better error handling if attempting to play a missing file
+* Bug fix: Changing an album's artist (eg from a compilation to a single artist) was leaving an empty album
 
 ## Credits
 
