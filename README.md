@@ -10,6 +10,11 @@ python -m pijuv2.backend
 
 See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 
+### API Versions
+
+* 3.0: Add /mp3/trackid route
+* 3.1: Add fileformat to Track JSON information
+
 ## Dependencies
 
 * [Flask](https://flask.palletsprojects.com)

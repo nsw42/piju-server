@@ -125,9 +125,14 @@ def player_volume():
 # APPLICATION -------------------------------------------------------------------------------------
 
 def cache_path(track_id):
+    info = requests.get(f'{app.primary}/tracks/{track_id}')
+    if not info.ok:
+        abort(HTTPStatus.NOT_FOUND, "Unable to find info for track " + str(track_id))
+    info = info.json()
+    fileformat = info.get('fileformat', '.mp3')  # fileformat added to server API version 3.1
     dir1 = str(track_id // 10000)
     dir2 = str((track_id % 10000) // 1000)
-    leaf = str(track_id) + '.mp3'  # TODO: File extension
+    leaf = str(track_id) + fileformat
     return str(app.cache_path / dir1 / dir2 / leaf)
 
 
