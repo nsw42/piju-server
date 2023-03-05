@@ -4,3 +4,4 @@ SQLAlchemy
 flake8
 mutagen
 pexpect
+requests
