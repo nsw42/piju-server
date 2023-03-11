@@ -34,6 +34,12 @@ def current_status():
     return gzippable_jsonify(rtn)
 
 
+@app.route("/cache/<int:trackid>")
+def cache(trackid):
+    ensure_cached_track_ids_exist([trackid])
+    return ('', HTTPStatus.NO_CONTENT)
+
+
 @app.route("/player/next", methods=['POST'])
 def update_player_next():
     app.player.next()
@@ -148,6 +154,12 @@ def ensure_cache_exists(tracks: List[LocalTrack]):
             handle.write(fetch.content)
 
 
+def ensure_cached_track_ids_exist(track_ids: List[int]) -> List[LocalTrack]:
+    tracks = [LocalTrack(Filepath=cache_path(track_id), Id=track_id) for track_id in track_ids]
+    ensure_cache_exists(tracks)
+    return tracks
+
+
 def play_track_list(track_ids: List[int], identifier: str, start_at_track_id: int):
     if start_at_track_id is None:
         play_from_index = 0
@@ -156,8 +168,7 @@ def play_track_list(track_ids: List[int], identifier: str, start_at_track_id: in
             play_from_index = track_ids.index(start_at_track_id)
         except ValueError:
             abort(HTTPStatus.BAD_REQUEST, "Requested track is not in the specified album")
-    tracks = [LocalTrack(Filepath=cache_path(track_id), Id=track_id) for track_id in track_ids]
-    ensure_cache_exists(tracks)
+    tracks = ensure_cached_track_ids_exist(track_ids)
     app.player.set_queue(tracks, identifier)
     app.player.play_from_queue_index(play_from_index)
 
