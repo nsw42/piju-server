@@ -42,9 +42,9 @@ def scan_directory(basedir: pathlib.Path, db: Database, limit: int = None):
         for path in basedir.rglob(pattern):
             existing_track = db.get_track_by_filepath(str(path))
             track, albumref = scanner(path)
-            if existing_track is not None:
-                track.Id = existing_track.Id
             if track:
+                if existing_track is not None:
+                    track.Id = existing_track.Id
                 set_cross_refs(db, track, albumref)
             i += 1
             if (limit is not None) and (i >= limit):
