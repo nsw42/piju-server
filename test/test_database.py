@@ -132,6 +132,22 @@ def test_get_genre_by_id(tmp_path):
     assert len(found.Albums) == 1
 
 
+def test_get_track_by_id(tmp_path):
+    # Prepare
+    db = Database(path=tmp_path / TEST_DB)
+    t1 = db.ensure_track_exists(Track(Title="Beware of the fish"))
+    t2 = db.ensure_track_exists(Track(Title="Something Something"))
+
+    assert t1.Id != t2.Id
+    assert db.get_nr_tracks() == 2
+
+    # Act
+    found = db.get_track_by_id(t1.Id)
+
+    # Check
+    assert found.Title == "Beware of the fish"
+
+
 def test_change_compilation_to_single_artist(tmp_path):
     # There used to be a bug that finding an album (eg as a compilation)
     # then re-scanning, and the album changing, meant that the first instance
