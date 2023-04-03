@@ -5,8 +5,8 @@ from pijuv2.database.schema import Album, Track
 TEST_DB = 'test.db'
 
 
-def mk_albumref(artist, is_compilation):
-    return Album(Artist=artist, Title="Test Album Title", IsCompilation=is_compilation)
+def mk_albumref(artist, is_compilation, genres=[]):
+    return Album(Artist=artist, Title="Test Album Title", IsCompilation=is_compilation, Genres=genres)
 
 
 def mk_compilation_albumref():
@@ -90,6 +90,28 @@ def test_get_all_tracks(tmp_path):
     track = db.get_all_tracks()[0]
 
     assert track.Title == trackref.Title
+
+
+def test_get_genre_by_id(tmp_path):
+    # Prepare
+    db = Database(path=tmp_path / TEST_DB)
+
+    genre_name = "Technocrat Jazz"
+    genre = db.ensure_genre_exists(genre_name)
+
+    db.ensure_album_exists(mk_albumref(artist="Da Vinci", is_compilation=False, genres=[genre]))
+    db.ensure_album_exists(mk_other_albumref())
+
+    assert db.get_nr_albums() == 2
+    assert db.get_nr_genres() == 1
+
+    # Act
+    found = db.get_genre_by_id(genre.Id)
+
+    # Check
+    assert found.Id == genre.Id
+    assert found.Name == genre_name
+    assert len(found.Albums) == 1
 
 
 def test_change_compilation_to_single_artist(tmp_path):

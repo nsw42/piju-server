@@ -315,6 +315,9 @@ class Database():
     def get_nr_albums(self):
         return self.session.query(Album).with_entities(func.count(Album.Id)).scalar()
 
+    def get_nr_genres(self):
+        return self.session.query(Genre).with_entities(func.count(Genre.Id)).scalar()
+
     def get_nr_tracks(self):
         return self.session.query(Track).with_entities(func.count(Track.Id)).scalar()
 
