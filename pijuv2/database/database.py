@@ -345,10 +345,16 @@ class Database():
             # print(track.Title)
             # print('=======================')
             score = 0
+            track_lower = track.Title.lower()
+            track_title_words = track_lower.split()
             for word in lower_case_words:
-                if (word in track.Title.lower()):
+                if (word in track_lower):
                     # print(word, 3)
-                    score += 3
+                    # Prioritise exact word matches over substring matches
+                    if word in track_title_words:
+                        score += 4
+                    else:
+                        score += 3
                 elif (word not in track.Artist.lower()):
                     # assert word in get_album_by_id(track.Album).Title.lower()
                     # print(word, 2)
