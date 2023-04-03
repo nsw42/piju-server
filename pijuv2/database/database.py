@@ -1,5 +1,5 @@
 import logging
-from typing import Iterable, List
+from typing import Any, Iterable, List
 
 from sqlalchemy import create_engine, func, select, or_
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -95,7 +95,7 @@ class Database():
         self.session.delete(track)
         self.session.commit()
 
-    def ensure_album_exists(self, albumref: Album):
+    def ensure_album_exists(self, albumref: Album) -> Album:
         """
         Ensure the given album reference is present in the database,
         and return a fully populated object.
@@ -205,13 +205,7 @@ class Database():
         Return the Album object for a given id.
         Raises NotFoundException for an unknown id
         """
-        res = self.session.query(Album).filter(
-            Album.Id == albumid
-        )
-        try:
-            return res.one()
-        except Exception as e:
-            raise convert_exception_class(e) from e
+        return self.get_X_by_id(Album, albumid)
 
     def get_albums_without_tracks(self) -> List[Album]:
         """
@@ -263,44 +257,39 @@ class Database():
                 .limit(limit)
                 .all())
 
-    def get_genre_by_id(self, genreid: int) -> Genre:
+    def get_X_by_id(self, x_type: Any, x_id: int) -> Any:
         """
-        Return the Genre object for a given id.
+        Return the X object for a given id, where X is indicated by x_type (Genre, Playlist, Track, etc)
         Raises NotFoundException for an unknown id
         """
-        res = self.session.query(Genre).filter(
-            Genre.Id == genreid
+        res = self.session.query(x_type).filter(
+            x_type.Id == x_id
         )
         try:
             return res.one()
         except Exception as e:
             raise convert_exception_class(e) from e
+
+    def get_genre_by_id(self, genreid: int) -> Genre:
+        """
+        Return the Genre object for a given id.
+        Raises NotFoundException for an unknown id
+        """
+        return self.get_X_by_id(Genre, genreid)
 
     def get_playlist_by_id(self, playlistid: int) -> Playlist:
         """
         Return the Playlist object for a given id.
         Raises NotFoundException for an unknown id
         """
-        res = self.session.query(Playlist).filter(
-            Playlist.Id == playlistid
-        )
-        try:
-            return res.one()
-        except Exception as e:
-            raise convert_exception_class(e) from e
+        return self.get_X_by_id(Playlist, playlistid)
 
     def get_track_by_id(self, trackid: int) -> Track:
         """
         Return the Track object for a given id.
         Raises NotFoundException for an unknown id
         """
-        res = self.session.query(Track).filter(
-            Track.Id == trackid
-        )
-        try:
-            return res.one()
-        except Exception as e:
-            raise convert_exception_class(e) from e
+        return self.get_X_by_id(Track, trackid)
 
     def get_track_by_filepath(self, path: str) -> Track:
         """
