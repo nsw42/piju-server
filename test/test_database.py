@@ -92,6 +92,24 @@ def test_get_all_tracks(tmp_path):
     assert track.Title == trackref.Title
 
 
+def test_get_album_by_id(tmp_path):
+    # Prepare
+    db = Database(path=tmp_path / TEST_DB)
+    a1 = mk_other_albumref()
+    db.ensure_album_exists(a1)
+    a2 = mk_compilation_albumref()
+    db.ensure_album_exists(a2)
+    assert a1.Id != a2.Id
+    assert a1.Artist != a2.Artist
+    assert db.get_nr_albums() == 2
+
+    # Act
+    found = db.get_album_by_id(a1.Id)
+
+    # Check
+    assert found.Artist == a1.Artist
+
+
 def test_get_genre_by_id(tmp_path):
     # Prepare
     db = Database(path=tmp_path / TEST_DB)
