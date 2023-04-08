@@ -90,6 +90,7 @@ def build_playlist_from_api_data(db: Database, request) -> Tuple[Playlist, List[
 
 def extract_id(uri_or_id):
     """
+    >>> extract_id("")
     >>> extract_id("/albums/85")
     85
     >>> extract_id("/tracks/123")
@@ -563,6 +564,36 @@ def one_playlist(playlistid):
             return ('', HTTPStatus.NO_CONTENT)
 
 
+@app.route("/queue/", methods=['GET', 'OPTIONS', 'PUT'])
+def queue():
+    if request.method == 'GET':
+        return gzippable_jsonify(app.player.queued_track_ids[app.player.index:])
+
+    elif request.method == 'OPTIONS':
+        # the request to add to queue looks like a cross-domain request to Chrome,
+        # so it sends OPTIONS before the PUT. Hence we need to support this.
+        response = make_response('', HTTPStatus.NO_CONTENT)
+        response.headers['Access-Control-Allow-Headers'] = '*'  # Maybe tighten this up?
+        response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS, PUT'
+        return response
+
+    elif request.method == 'PUT':
+        print(request.data)
+        data = request.get_json()
+        if not data:
+            abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
+        with DatabaseAccess() as db:
+            trackid = extract_id(data.get('track', ''))
+            if trackid is None:
+                abort(HTTPStatus.BAD_REQUEST, description="Invalid or missing track id")
+            try:
+                track = db.get_track_by_id(trackid)
+            except NotFoundException:
+                abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+            app.player.add_to_queue(track)
+        return ('', HTTPStatus.NO_CONTENT)
+
+
 @app.route("/scanner/scan", methods=['POST'])
 def start_scan():
     data = request.get_json()
@@ -571,14 +602,14 @@ def start_scan():
     subdir = data.get('dir')
     scandir = config.music_dir if (subdir is None) else os.path.join(config.music_dir, subdir)
     # TODO: Error checking on scandir
-    app.queue.put((WorkRequests.ScanDirectory, scandir))
+    app.work_queue.put((WorkRequests.ScanDirectory, scandir))
     return ('', HTTPStatus.NO_CONTENT)
 
 
 @app.route("/scanner/tidy", methods=['POST'])
 def start_tidy():
-    app.queue.put((WorkRequests.DeleteMissingTracks, ))
-    app.queue.put((WorkRequests.DeleteAlbumsWithoutTracks, ))
+    app.work_queue.put((WorkRequests.DeleteMissingTracks, ))
+    app.work_queue.put((WorkRequests.DeleteAlbumsWithoutTracks, ))
     return ('', HTTPStatus.NO_CONTENT)
 
 
@@ -641,11 +672,11 @@ if __name__ == '__main__':
         config = Config(args.config)
         db = Database()  # pre-create tables
         app.piju_config = config
-        app.queue = Queue()
-        app.worker = WorkerThread(app.queue)
+        app.work_queue = Queue()
+        app.worker = WorkerThread(app.work_queue)
         app.worker.start()
         app.player = MusicPlayer()
-        app.api_version_string = '3.1'
+        app.api_version_string = '4.0'
         # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
         # see https://developer.apple.com/forums/thread/682332
         app.run(use_reloader=False, host='0.0.0.0', threaded=True)
