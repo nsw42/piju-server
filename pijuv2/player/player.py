@@ -53,7 +53,7 @@ class MusicPlayer:
     def clear_queue(self):
         self.queued_files = []
         self.queued_track_ids = []
-        self.index = 0
+        self.index = None
         self.current_tracklist_identifier = ''
         self.maximum_track_index = None
 
@@ -64,6 +64,15 @@ class MusicPlayer:
         self.current_track_id = self.queued_track_ids[0] if self.queued_track_ids else None
         self.current_tracklist_identifier = identifier
         self.maximum_track_index = len(queue)
+
+    def add_to_queue(self, track: Track):
+        self.queued_files.append(track.Filepath)
+        self.queued_track_ids.append(track.Id)
+        self.maximum_track_index = len(self.queued_files)
+        self.current_tracklist_identifier = "/queue/"
+        # If this is the first item in the queue, start playing
+        if self.index is None:
+            self.play_from_queue_index(0)
 
     def play_from_queue_index(self, index):
         started = False
@@ -90,6 +99,7 @@ class MusicPlayer:
             self.play_from_queue_index(self.index + 1)
         else:
             self.stop()
+            self.clear_queue()
 
     def prev(self):
         if True:
