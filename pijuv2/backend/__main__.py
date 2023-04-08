@@ -567,7 +567,9 @@ def one_playlist(playlistid):
 @app.route("/queue/", methods=['GET', 'OPTIONS', 'PUT'])
 def queue():
     if request.method == 'GET':
-        return gzippable_jsonify(app.player.queued_track_ids[app.player.index:])
+        with DatabaseAccess() as db:
+            queue = [json_track(db.get_track_by_id(track_id)) for track_id in app.player.queued_track_ids[app.player.index:]]
+        return gzippable_jsonify(queue)
 
     elif request.method == 'OPTIONS':
         # the request to add to queue looks like a cross-domain request to Chrome,
@@ -578,7 +580,6 @@ def queue():
         return response
 
     elif request.method == 'PUT':
-        print(request.data)
         data = request.get_json()
         if not data:
             abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
