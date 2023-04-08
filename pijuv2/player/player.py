@@ -69,6 +69,7 @@ class MusicPlayer:
         self.queued_files.append(track.Filepath)
         self.queued_track_ids.append(track.Id)
         self.maximum_track_index = len(self.queued_files)
+        self.current_tracklist_identifier = "/queue/"
         # If this is the first item in the queue, start playing
         if self.index is None:
             self.play_from_queue_index(0)
