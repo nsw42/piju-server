@@ -65,6 +65,9 @@ class MusicPlayer:
         self.current_tracklist_identifier = identifier
         self.maximum_track_index = len(queue)
 
+    def get_queued_track_ids(self):
+        return self.queued_track_ids[self.index:]
+
     def add_to_queue(self, track: Track):
         self.queued_files.append(track.Filepath)
         self.queued_track_ids.append(track.Id)
@@ -73,6 +76,30 @@ class MusicPlayer:
         # If this is the first item in the queue, start playing
         if self.index is None:
             self.play_from_queue_index(0)
+
+    def remove_from_queue(self, index: int, trackid: int):
+        """
+        Remove the element from the player queue if it matches both index and trackid
+        (avoiding the problem of the player moving onto the next track between getting the
+        queue and issuing the request to delete from the queue)
+        index is 0-based, representing the index into the remaining part of the queue
+        trackid is the numeric track id
+        """
+        if self.index is None:
+            return False
+        index += self.index
+        if index < len(self.queued_track_ids) and self.queued_track_ids[index] == trackid:
+            self.queued_files.pop(index)
+            self.queued_track_ids.pop(index)
+            self.maximum_track_index = len(self.queued_files)
+            # If this is the currently playing track, jump to the next track
+            # (which might result in us stopping playing completely).
+            # But, the next track is at the same index we're already at -
+            # we've just deleted from the list
+            if index == self.index:
+                self.play_from_queue_index(self.index)
+            return True
+        return False
 
     def play_from_queue_index(self, index):
         started = False
