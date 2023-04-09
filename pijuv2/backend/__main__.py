@@ -10,6 +10,7 @@ from queue import Queue
 from typing import List, Tuple
 
 from flask import abort, Flask, make_response, request, Response, url_for
+from werkzeug.exceptions import BadRequest, BadRequestKeyError
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
 from ..database.schema import Album, Genre, Playlist, PlaylistEntry, Track
@@ -564,11 +565,27 @@ def one_playlist(playlistid):
             return ('', HTTPStatus.NO_CONTENT)
 
 
-@app.route("/queue/", methods=['GET', 'OPTIONS', 'PUT'])
+@app.route("/queue/", methods=['GET', 'DELETE', 'OPTIONS', 'PUT'])
 def queue():
-    if request.method == 'GET':
+    if request.method == 'DELETE':
+        data = request.get_json()
+        if not data:
+            raise BadRequest()
+        try:
+            index = int(data['index'])
+            trackid = int(data['track'])
+        except KeyError:
+            raise BadRequestKeyError()
+        except ValueError:
+            raise BadRequest()
+        if not app.player.remove_from_queue(index, trackid):
+            # index or trackid mismatch
+            raise BadRequest('Track id did not match at given index')
+        return ('', HTTPStatus.NO_CONTENT)
+
+    elif request.method == 'GET':
         with DatabaseAccess() as db:
-            queue = [json_track(db.get_track_by_id(track_id)) for track_id in app.player.queued_track_ids[app.player.index:]]
+            queue = [json_track(db.get_track_by_id(track_id)) for track_id in app.player.get_queued_track_ids()]
         return gzippable_jsonify(queue)
 
     elif request.method == 'OPTIONS':
@@ -576,7 +593,7 @@ def queue():
         # so it sends OPTIONS before the PUT. Hence we need to support this.
         response = make_response('', HTTPStatus.NO_CONTENT)
         response.headers['Access-Control-Allow-Headers'] = '*'  # Maybe tighten this up?
-        response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS, PUT'
+        response.headers['Access-Control-Allow-Methods'] = ', '.join(request.url_rule.methods)
         return response
 
     elif request.method == 'PUT':
@@ -677,7 +694,7 @@ if __name__ == '__main__':
         app.worker = WorkerThread(app.work_queue)
         app.worker.start()
         app.player = MusicPlayer()
-        app.api_version_string = '4.0'
+        app.api_version_string = '4.1'
         # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
         # see https://developer.apple.com/forums/thread/682332
         app.run(use_reloader=False, host='0.0.0.0', threaded=True)
