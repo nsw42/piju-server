@@ -4,15 +4,15 @@ from pijuv2.database.schema import Track
 import pijuv2.player.player as player
 
 
-def test_play_from_queue_index_empty_queue():
+def test_play_from_real_queue_index_empty_queue():
     mp = player.MusicPlayer()
-    mp.play_from_queue_index(0)
+    mp.play_from_real_queue_index(0)
     assert mp.current_status == 'stopped'
     assert mp.current_track_id is None
 
 
 @patch('pijuv2.player.player.os.path.isfile')
-def test_play_from_queue_index__file_does_not_exist(mock_isfile):
+def test_play_from_real_queue_index__file_does_not_exist(mock_isfile):
     # Arrange
     mock_isfile.return_value = False
     track = Track()
@@ -20,7 +20,7 @@ def test_play_from_queue_index__file_does_not_exist(mock_isfile):
 
     # Act
     mp = player.MusicPlayer(queue=[track])
-    mp.play_from_queue_index(0)
+    mp.play_from_real_queue_index(0)
 
     # Assert
     assert mp.current_status == 'stopped'
@@ -29,7 +29,7 @@ def test_play_from_queue_index__file_does_not_exist(mock_isfile):
 
 @patch('pijuv2.player.player.os.path.isfile')
 @patch('pijuv2.player.player.MP3MusicPlayer')
-def test_play_from_queue_index__file_exists(mock_mp3player, mock_isfile):
+def test_play_from_real_queue_index__file_exists(mock_mp3player, mock_isfile):
     # Arrange
     mock_isfile.return_value = True
     track = Track()
@@ -38,7 +38,7 @@ def test_play_from_queue_index__file_exists(mock_mp3player, mock_isfile):
 
     # Act
     mp = player.MusicPlayer(queue=[track])
-    mp.play_from_queue_index(0)
+    mp.play_from_real_queue_index(0)
 
     # Assert
     assert mp.current_status == 'playing'
@@ -48,7 +48,7 @@ def test_play_from_queue_index__file_exists(mock_mp3player, mock_isfile):
 
 @patch('pijuv2.player.player.os.path.isfile')
 @patch('pijuv2.player.player.MP3MusicPlayer')
-def test_play_from_queue_index__two_files_in_queue(mock_mp3player, mock_isfile):
+def test_play_from_real_queue_index__two_files_in_queue(mock_mp3player, mock_isfile):
     # Arrange
     mock_isfile.side_effect = [False, True]
     t1 = Track()
@@ -60,7 +60,7 @@ def test_play_from_queue_index__two_files_in_queue(mock_mp3player, mock_isfile):
 
     # Act
     mp = player.MusicPlayer(queue=[t1, t2])
-    mp.play_from_queue_index(0)
+    mp.play_from_real_queue_index(0)
 
     # Assert
     assert mp.current_status == 'playing'

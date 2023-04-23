@@ -30,6 +30,7 @@ def current_status():
         'CurrentTrackId': app.player.current_track_id,
         'CurrentTrackIndex': None if (app.player.index is None) else (app.player.index + 1),
         'MaximumTrackIndex': app.player.maximum_track_index,
+        'ApiVersion': app.api_version_string,
     }
     return gzippable_jsonify(rtn)
 
@@ -60,10 +61,11 @@ def update_player_play():
 
     albumid = extract_id(data.get('album'))
     playlistid = extract_id(data.get('playlist'))
+    queue_pos = extract_id(data.get('queuepos'))
     trackid = extract_id(data.get('track'))
 
-    if (albumid is not None) and (playlistid is not None):
-        abort(HTTPStatus.BAD_REQUEST, "Album and playlist must not both be specified")
+    if sum(x is not None for x in [albumid, playlistid, queue_pos]) > 1:
+        abort(HTTPStatus.BAD_REQUEST, "At most one of album, playlist and queuepos may be specified")
 
     if albumid is not None:
         album = requests.get(f'{app.primary}/albums/{albumid}')
@@ -81,6 +83,11 @@ def update_player_play():
         track_uris = playlist.json()['tracks']
         track_ids = [extract_id(uri) for uri in track_uris]
         play_track_list(track_ids, app.primary + '/playlists/' + str(playlistid), trackid)
+
+    elif queue_pos is not None:
+        # We're moving withing the queue: the cached versions should already exist
+        if not app.player.play_from_apparent_queue_index(queue_pos, trackid=trackid):
+            abort(409, "Track index not found")
 
     elif trackid:
         track_ids = [trackid]
@@ -170,7 +177,7 @@ def play_track_list(track_ids: List[int], identifier: str, start_at_track_id: in
             abort(HTTPStatus.BAD_REQUEST, "Requested track is not in the specified album")
     tracks = ensure_cached_track_ids_exist(track_ids)
     app.player.set_queue(tracks, identifier)
-    app.player.play_from_queue_index(play_from_index)
+    app.player.play_from_real_queue_index(play_from_index)
 
 
 def parse_args():
@@ -197,6 +204,7 @@ def main():
     app.cache_path = args.cache_path
     app.primary = args.primary
     app.player = MusicPlayer()
+    app.api_version_string = '4.2'
     app.run(use_reloader=False, host='0.0.0.0', threaded=True)
 
 

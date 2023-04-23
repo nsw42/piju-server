@@ -268,7 +268,7 @@ def play_track_list(tracks: List[Track], identifier: str, start_at_track_id: int
         except ValueError:
             abort(HTTPStatus.BAD_REQUEST, "Requested track is not in the specified album")
     app.player.set_queue(tracks, identifier)
-    app.player.play_from_queue_index(play_from_index)
+    app.player.play_from_real_queue_index(play_from_index)
 
 
 def response_for_import_playlist(playlist: Playlist, missing_tracks: List[str]):
@@ -449,9 +449,11 @@ def update_player_play():
     with DatabaseAccess() as db:
         albumid = extract_id(data.get('album'))
         playlistid = extract_id(data.get('playlist'))
+        queue_pos = extract_id(data.get('queuepos'))
         trackid = extract_id(data.get('track'))
-        if (albumid is not None) and (playlistid is not None):
-            abort(HTTPStatus.BAD_REQUEST, "Album and playlist must not both be specified")
+
+        if sum(x is not None for x in [albumid, playlistid, queue_pos]) > 1:
+            abort(HTTPStatus.BAD_REQUEST, "At most one of album, playlist and queuepos may be specified")
 
         if albumid is not None:
             try:
@@ -473,6 +475,10 @@ def update_player_play():
             play_track_list([entry.Track for entry in playlist.Entries],
                             url_for('one_playlist', playlistid=playlistid),
                             trackid)
+
+        elif queue_pos is not None:
+            if not app.player.play_from_apparent_queue_index(queue_pos, trackid=trackid):
+                abort(409, "Track index not found")
 
         elif trackid:
             try:
@@ -694,7 +700,7 @@ if __name__ == '__main__':
         app.worker = WorkerThread(app.work_queue)
         app.worker.start()
         app.player = MusicPlayer()
-        app.api_version_string = '4.1'
+        app.api_version_string = '4.2'
         # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
         # see https://developer.apple.com/forums/thread/682332
         app.run(use_reloader=False, host='0.0.0.0', threaded=True)

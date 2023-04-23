@@ -51,8 +51,8 @@ class MusicPlayer:
         self.current_player = None
 
     def clear_queue(self):
-        self.queued_files = []
-        self.queued_track_ids = []
+        self.queued_files = []  # list of file paths
+        self.queued_track_ids = []  # list of ints (track ids)
         self.index = None
         self.current_tracklist_identifier = ''
         self.maximum_track_index = None
@@ -75,7 +75,7 @@ class MusicPlayer:
         self.current_tracklist_identifier = "/queue/"
         # If this is the first item in the queue, start playing
         if self.index is None:
-            self.play_from_queue_index(0)
+            self.play_from_real_queue_index(0)
 
     def remove_from_queue(self, index: int, trackid: int):
         """
@@ -85,10 +85,9 @@ class MusicPlayer:
         index is 0-based, representing the index into the remaining part of the queue
         trackid is the numeric track id
         """
-        if self.index is None:
-            return False
-        index += self.index
-        if index < len(self.queued_track_ids) and self.queued_track_ids[index] == trackid:
+        if self.index is not None:
+            index += self.index
+        if 0 <= index < len(self.queued_track_ids) and self.queued_track_ids[index] == trackid:
             self.queued_files.pop(index)
             self.queued_track_ids.pop(index)
             self.maximum_track_index = len(self.queued_files)
@@ -97,19 +96,50 @@ class MusicPlayer:
             # But, the next track is at the same index we're already at -
             # we've just deleted from the list
             if index == self.index:
-                self.play_from_queue_index(self.index)
+                self.play_from_real_queue_index(self.index)
             return True
         return False
 
-    def play_from_queue_index(self, index):
+    def play_from_apparent_queue_index(self, index, trackid: int = None):
+        """
+        Play from the *apparent* queue index, which is not necessarily the same as the real
+        queue index. The real queue index is the list of files, eg tracks of an album.
+        Items get removed from the apparent queue, as the index moves through the queue.
+        """
+        if self.index is not None:
+            index += self.index
+        return self.play_from_real_queue_index(index, trackid)
+
+    def play_from_real_queue_index(self, index, trackid: int = None):
+        """
+        Play from the given index
+        trackid, if given, acts as a sanity check that the desired track is going to be played.
+        If the queue at index doesn't match the given trackid, the queue is checked +/- 1,
+        to allow for concurrent actions, the request coinciding with the end of a track, etc.
+        If the given file cannot be played, automatically moves to the next in
+        Returns False if the sanity checks fail
+        Returns True if it started playing a track
+        """
+        if trackid is not None:
+            # pre-flight sanity check: inc/dec index to find the desired track
+            if not ((0 <= index < len(self.queued_track_ids)) and (self.queued_track_ids[index] == trackid)):
+                if (index > 0) and (self.queued_track_ids[index - 1] == trackid):
+                    index -= 1
+                elif (index < len(self.queued_files) - 1) and (self.queued_track_ids[index + 1] == trackid):
+                    index += 1
+                else:
+                    # We failed the sanity check - couldn't find the requested track
+                    return False
         started = False
-        while (index < len(self.queued_files)) and not (started := self._play_song(self.queued_files[index])):
+        while (0 <= index < len(self.queued_files)) and not (started := self._play_song(self.queued_files[index])):
             index += 1
         if started:
             self.current_track_id = self.queued_track_ids[index]
             self.index = index
+            return True
         else:
             self.stop()
+            return False
 
     def play_track(self, track: Track):
         if self._play_song(track.Filepath):
@@ -123,19 +153,13 @@ class MusicPlayer:
             return
         logging.debug(f"MusicPlayer.next ({self.current_player})")
         if self.index + 1 < len(self.queued_files):
-            self.play_from_queue_index(self.index + 1)
+            self.play_from_real_queue_index(self.index + 1)
         else:
             self.stop()
             self.clear_queue()
 
     def prev(self):
-        if True:
-            self.play_from_queue_index(max(0, self.index - 1))
-        else:
-            if 0 < self.index:
-                self.play_from_queue_index(self.index - 1)
-            else:
-                self.stop()
+        self.play_from_real_queue_index(max(0, self.index - 1))
 
     # Wrapper over the lower-layer interface
 
