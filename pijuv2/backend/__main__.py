@@ -637,9 +637,16 @@ def start_tidy():
     return ('', HTTPStatus.NO_CONTENT)
 
 
+def normalize_punctuation(search_string):
+    return search_string.replace(chr(0x2018), "'")\
+                        .replace(chr(0x2019), "'")\
+                        .replace(chr(0x201c), '"')\
+                        .replace(chr(0x201d), '"')
+
+
 @app.route("/search/<search_string>")
 def search(search_string):
-    search_words = search_string.strip().split()
+    search_words = normalize_punctuation(search_string).strip().split()
     do_search_albums = parse_bool(request.args.get('albums', 'True'))
     do_search_artists = parse_bool(request.args.get('artists', 'True'))
     do_search_tracks = parse_bool(request.args.get('tracks', 'True'))
