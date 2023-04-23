@@ -222,6 +222,13 @@ def json_track(track: Track, include_debuginfo: bool = False):
     return rtn
 
 
+def normalize_punctuation(search_string):
+    return search_string.replace(chr(0x2018), "'")\
+                        .replace(chr(0x2019), "'")\
+                        .replace(chr(0x201c), '"')\
+                        .replace(chr(0x201d), '"')
+
+
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument('-t', '--doctest', action='store_true',
@@ -635,13 +642,6 @@ def start_tidy():
     app.work_queue.put((WorkRequests.DeleteMissingTracks, ))
     app.work_queue.put((WorkRequests.DeleteAlbumsWithoutTracks, ))
     return ('', HTTPStatus.NO_CONTENT)
-
-
-def normalize_punctuation(search_string):
-    return search_string.replace(chr(0x2018), "'")\
-                        .replace(chr(0x2019), "'")\
-                        .replace(chr(0x201c), '"')\
-                        .replace(chr(0x201d), '"')
 
 
 @app.route("/search/<search_string>")
