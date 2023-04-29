@@ -222,6 +222,29 @@ def json_track(track: Track, include_debuginfo: bool = False):
     return rtn
 
 
+def json_track_or_file(db, trackid: int, filepath: str, include_debuginfo: bool = False):
+    if trackid is not None:
+        track = db.get_track_by_id(trackid)
+        return json_track(track, include_debuginfo)
+    else:
+        rtn = {
+            'link': None,
+            'artist': None,
+            'title': None,  # TODO
+            'genre': None,
+            'disknumber': None,
+            'tracknumber': None,
+            'trackcount': None,
+            'fileformat': os.path.splitext(filepath)[1],
+            'album': None,
+            'artwork': None,
+            'artworkinfo': None
+        }
+        if include_debuginfo:
+            rtn['filepath'] = filepath
+        return rtn
+
+
 def normalize_punctuation(search_string):
     return search_string.replace(chr(0x2018), "'")\
                         .replace(chr(0x2019), "'")\
@@ -634,7 +657,8 @@ def queue():
 
     elif request.method == 'GET':
         with DatabaseAccess() as db:
-            queue = [json_track(db.get_track_by_id(track_id)) for track_id in app.player.get_queued_track_ids()]
+            queue = [json_track_or_file(db, queued_track.trackid, queued_track.filepath)
+                     for queued_track in app.player.queue]
         return gzippable_jsonify(queue)
 
     elif request.method == 'OPTIONS':
