@@ -141,6 +141,13 @@ class MusicPlayer:
             self.stop()
             return False
 
+    def play_file(self, path: str):
+        if self._play_song(path):
+            # TODO: Save more information about what's being played
+            self.current_track_id = None
+        else:
+            self.stop()
+
     def play_track(self, track: Track):
         if self._play_song(track.Filepath):
             self.current_track_id = track.Id

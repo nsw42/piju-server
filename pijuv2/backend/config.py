@@ -18,9 +18,12 @@ class Config:
             self._init_from_file(config_filepath)
         else:
             self.music_dir = Path.home() / 'Music'
+            self.download_dir = Path('/tmp')
 
         if not self.music_dir or not self.music_dir.is_dir():
             raise ConfigException(f"Music directory {self.music_dir} not found")
+        if not self.download_dir.is_dir():
+            raise ConfigException(f"Download directory {self.download_dir} not found")
 
     def _init_from_file(self, filepath):
         with filepath.open('r') as handle:
@@ -29,3 +32,7 @@ class Config:
             if not self.music_dir:
                 raise ConfigException(f"Config file {filepath} does not specify a value for music_dir")
             self.music_dir = Path(self.music_dir)
+
+            default_download_dir = '/tmp'
+            self.download_dir = data.get('download_dir', default_download_dir)
+            self.download_dir = Path(self.download_dir)
