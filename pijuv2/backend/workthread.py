@@ -35,10 +35,10 @@ class WorkerThread(threading.Thread):
                     delete_albums_without_tracks(db)
 
                 elif request[0] == WorkRequests.FetchFromYouTube:
-                    local_file = fetch_audio(url=request[1], download_dir=request[2])
+                    local_files = fetch_audio(url=request[1], download_dir=request[2])
                     callback = request[3]
                     if callback:
-                        callback(local_file)
+                        callback(local_files)
 
                 else:
                     logging.error("Unrecognised request: %s" % request[0])

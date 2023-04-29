@@ -10,10 +10,6 @@ def fetch_audio(url, download_dir):
            url,
            '-o', '%(id)s.%(ext)s',
            '--print', 'after_move:filepath']
-    try:
-        result = subprocess.run(cmd, check=True, capture_output=True, text=True,
-                                cwd=download_dir)
-    except subprocess.CalledProcessError:
-        return
-    local_file = result.stdout.strip()
-    return local_file
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=download_dir)
+    local_files = result.stdout.splitlines()
+    return local_files

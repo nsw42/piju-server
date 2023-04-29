@@ -508,12 +508,13 @@ def update_player_play_from_youtube(url):
     app.work_queue.put((WorkRequests.FetchFromYouTube, url, app.piju_config.download_dir, play_downloaded_file))
 
 
-def play_downloaded_file(path):
+def play_downloaded_file(paths):
     """
     A callback after an audio URL has been downloaded
     """
     app.player.clear_queue()
-    app.player.play_file(path)
+    for path in paths:
+        app.player.add_to_queue(filepath=path)
 
 
 def update_player_play_playlist(db, playlistid, trackid):
@@ -656,7 +657,7 @@ def queue():
                 track = db.get_track_by_id(trackid)
             except NotFoundException:
                 abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
-            app.player.add_to_queue(track)
+            app.player.add_to_queue(track=track)
         return ('', HTTPStatus.NO_CONTENT)
 
 
@@ -742,7 +743,7 @@ if __name__ == '__main__':
         app.worker = WorkerThread(app.work_queue)
         app.worker.start()
         app.player = MusicPlayer()
-        app.api_version_string = '4.2'
+        app.api_version_string = '5.0'
         # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
         # see https://developer.apple.com/forums/thread/682332
         app.run(use_reloader=False, host='0.0.0.0', threaded=True)
