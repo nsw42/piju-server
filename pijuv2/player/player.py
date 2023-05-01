@@ -26,11 +26,11 @@ class MusicPlayer:
         self.index = None
 
     @property
-    def current_track(self):
+    def current_track(self) -> QueuedTrack:
         return None if self.index is None else self.queue[self.index]
 
     @property
-    def maximum_track_index(self):
+    def maximum_track_index(self) -> int:
         return len(self.queue) if self.queue else None
 
     @property
