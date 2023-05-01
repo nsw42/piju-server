@@ -147,14 +147,6 @@ class MusicPlayer:
             self.stop()
             return False
 
-    def play_file(self, path: str):
-        if not self._play_song(path):
-            self.stop()
-
-    def play_track(self, track: Track):
-        if not self._play_song(track.Filepath):
-            self.stop()
-
     def next(self):
         # play the next song in the queue
         if self.index is None:
