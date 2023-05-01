@@ -8,7 +8,7 @@ def test_play_from_real_queue_index_empty_queue():
     mp = player.MusicPlayer()
     mp.play_from_real_queue_index(0)
     assert mp.current_status == 'stopped'
-    assert mp.current_track_id is None
+    assert mp.current_track is None
 
 
 @patch('pijuv2.player.player.os.path.isfile')
@@ -24,7 +24,7 @@ def test_play_from_real_queue_index__file_does_not_exist(mock_isfile):
 
     # Assert
     assert mp.current_status == 'stopped'
-    assert mp.current_track_id is None
+    assert mp.current_track is None
 
 
 @patch('pijuv2.player.player.os.path.isfile')
@@ -42,7 +42,7 @@ def test_play_from_real_queue_index__file_exists(mock_mp3player, mock_isfile):
 
     # Assert
     assert mp.current_status == 'playing'
-    assert mp.current_track_id == 12345
+    assert mp.current_track.trackid == 12345
     mp.current_player.play_song.assert_called_once_with('fileexists.mp3')
 
 
@@ -64,5 +64,5 @@ def test_play_from_real_queue_index__two_files_in_queue(mock_mp3player, mock_isf
 
     # Assert
     assert mp.current_status == 'playing'
-    assert mp.current_track_id == 456
+    assert mp.current_track.trackid == 456
     mp.current_player.play_song.assert_called_once_with('exists.mp3')
