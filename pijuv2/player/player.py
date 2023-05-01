@@ -71,9 +71,8 @@ class MusicPlayer:
         self.current_player = None
 
     def clear_queue(self):
+        self.stop()
         self.queue = []  # list of QueuedTrack
-        self.index = None
-        self.current_tracklist_identifier = ''
 
     def set_queue(self, queue: List[Track], identifier: str):
         self.queue = [QueuedTrack(track.Filepath, track.Id, track.Artist, track.Title, None) for track in queue]

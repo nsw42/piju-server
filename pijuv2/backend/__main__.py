@@ -560,7 +560,7 @@ def update_player_play_track(db, trackid):
     except NotFoundException:
         abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
     app.player.clear_queue()
-    app.player.play_track(track)
+    add_track_to_queue(track)
 
 
 @app.route("/player/previous", methods=['POST'])
@@ -686,13 +686,16 @@ def queue():
                 if trackid is None:
                     abort(HTTPStatus.BAD_REQUEST, description="Invalid or missing track id")
                 try:
-                    track = db.get_track_by_id(trackid)
+                    add_track_to_queue(db.get_track_by_id(trackid))
                 except NotFoundException:
                     abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
-                has_artwork = (track.ArtworkPath or track.ArtworkBlob)
-                artwork_uri = url_for('get_artwork', trackid=track.Id) if has_artwork else None
-                app.player.add_to_queue(track.Filepath, track.Id, track.Artist, track.Title, artwork_uri)
         return ('', HTTPStatus.NO_CONTENT)
+
+
+def add_track_to_queue(track: Track):
+    has_artwork = (track.ArtworkPath or track.ArtworkBlob)
+    artwork_uri = url_for('get_artwork', trackid=track.Id) if has_artwork else None
+    app.player.add_to_queue(track.Filepath, track.Id, track.Artist, track.Title, artwork_uri)
 
 
 @app.route("/scanner/scan", methods=['POST'])
