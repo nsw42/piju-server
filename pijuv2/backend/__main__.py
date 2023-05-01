@@ -222,26 +222,26 @@ def json_track(track: Track, include_debuginfo: bool = False):
     return rtn
 
 
-def json_track_or_file(db, trackid: int, filepath: str, include_debuginfo: bool = False):
-    if trackid is not None:
-        track = db.get_track_by_id(trackid)
+def json_track_or_file(db, queued_track, include_debuginfo: bool = False):
+    if queued_track.trackid is not None:
+        track = db.get_track_by_id(queued_track.trackid)
         return json_track(track, include_debuginfo)
     else:
         rtn = {
             'link': None,
-            'artist': None,
-            'title': None,  # TODO
+            'artist': queued_track.artist,
+            'title': queued_track.title,
             'genre': None,
             'disknumber': None,
             'tracknumber': None,
             'trackcount': None,
-            'fileformat': os.path.splitext(filepath)[1],
+            'fileformat': os.path.splitext(queued_track.filepath)[1],
             'album': None,
             'artwork': None,
             'artworkinfo': None
         }
         if include_debuginfo:
-            rtn['filepath'] = filepath
+            rtn['filepath'] = queued_track.filepath
         return rtn
 
 
@@ -323,13 +323,12 @@ def add_security_headers(resp):
 @app.route("/")
 def current_status():
     with DatabaseAccess() as db:
-        track = db.get_track_by_id(app.player.current_track_id) if app.player.current_track_id else None
         rtn = {
             'WorkerStatus': app.worker.current_status,
             'PlayerStatus': app.player.current_status,
             'PlayerVolume': app.player.current_volume,
             'CurrentTracklistUri': app.player.current_tracklist_identifier,
-            'CurrentTrack': {} if track is None else json_track(track),
+            'CurrentTrack': json_track_or_file(db, app.player.current_track) if app.player.current_track else {},
             'CurrentTrackIndex': None if (app.player.index is None) else (app.player.index + 1),
             'MaximumTrackIndex': app.player.maximum_track_index,
             'NumberAlbums': db.get_nr_albums(),
@@ -531,17 +530,17 @@ def update_player_play_from_youtube(url):
     app.work_queue.put((WorkRequests.FetchFromYouTube, url, app.piju_config.download_dir, play_downloaded_files))
 
 
-def play_downloaded_files(paths):
+def play_downloaded_files(download_info):
     """
     A callback after an audio URL has been downloaded
     """
     app.player.clear_queue()
-    queue_downloaded_files(paths)
+    queue_downloaded_files(download_info)
 
 
-def queue_downloaded_files(paths):
-    for path in paths:
-        app.player.add_to_queue(filepath=path)
+def queue_downloaded_files(download_info):
+    for one_download in download_info:
+        app.player.add_to_queue(filepath=one_download.filepath, artist=one_download.artist, title=one_download.title)
 
 
 def update_player_play_playlist(db, playlistid, trackid):
@@ -661,8 +660,7 @@ def queue():
 
     elif request.method == 'GET':
         with DatabaseAccess() as db:
-            queue = [json_track_or_file(db, queued_track.trackid, queued_track.filepath)
-                     for queued_track in app.player.visible_queue]
+            queue = [json_track_or_file(db, queued_track) for queued_track in app.player.visible_queue]
         return gzippable_jsonify(queue)
 
     elif request.method == 'OPTIONS':

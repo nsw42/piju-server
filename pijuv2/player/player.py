@@ -9,7 +9,11 @@ from .mpvmusicplayer import MPVMusicPlayer
 from ..database.schema import Track
 
 
-QueuedTrack = namedtuple('QueuedTrack', 'filepath, trackid')
+QueuedTrack = namedtuple('QueuedTrack', 'filepath, trackid, artist, title')
+# filepath: str
+# trackid: int
+# artist: str
+# title: str
 
 
 class MusicPlayer:
@@ -19,6 +23,10 @@ class MusicPlayer:
         self.current_status = 'stopped'
         self.current_volume = 100
         self.index = None
+
+    @property
+    def current_track(self):
+        return None if self.index is None else self.queue[self.index]
 
     @property
     def maximum_track_index(self):
@@ -67,16 +75,15 @@ class MusicPlayer:
         self.current_tracklist_identifier = ''
 
     def set_queue(self, queue: List[Track], identifier: str):
-        self.queue = [QueuedTrack(track.Filepath, track.id) for track in queue]
+        self.queue = [QueuedTrack(track.Filepath, track.id, track.Artist, track.Title) for track in queue]
         self.index = 0  # invariant: the index of the *currently playing* song
-        self.current_track_id = self.queue[0].trackid if self.queue else None
         self.current_tracklist_identifier = identifier
 
     def add_to_queue(self, **kwargs):
         if track := kwargs.get('track'):
-            self.queue.append(QueuedTrack(track.Filepath, track.Id))
+            self.queue.append(QueuedTrack(track.Filepath, track.Id, track.Artist, track.Title))
         elif filepath := kwargs.get('filepath'):
-            self.queue.append(QueuedTrack(filepath, None))
+            self.queue.append(QueuedTrack(str(filepath), None, kwargs['artist'], kwargs['title']))
         else:
             raise Exception("keyword arguments track or filepath are mandatory")
         self.current_tracklist_identifier = "/queue/"
@@ -139,7 +146,6 @@ class MusicPlayer:
         while (0 <= index < len(self.queue)) and not (started := self._play_song(self.queue[index].filepath)):
             index += 1
         if started:
-            self.current_track_id = self.queue[index].trackid
             self.index = index
             return True
         else:
@@ -147,16 +153,11 @@ class MusicPlayer:
             return False
 
     def play_file(self, path: str):
-        if self._play_song(path):
-            # TODO: Save more information about what's being played
-            self.current_track_id = None
-        else:
+        if not self._play_song(path):
             self.stop()
 
     def play_track(self, track: Track):
-        if self._play_song(track.Filepath):
-            self.current_track_id = track.Id
-        else:
+        if not self._play_song(track.Filepath):
             self.stop()
 
     def next(self):
@@ -196,7 +197,6 @@ class MusicPlayer:
     def stop(self):
         logging.debug(f"MusicPlayer.stop ({self.current_player})")
         self._stop_player()
-        self.current_track_id = None
         self.current_tracklist_identifier = ''
         self.current_status = 'stopped'
         self.index = None
