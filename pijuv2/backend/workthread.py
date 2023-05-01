@@ -7,6 +7,7 @@ from ..database.database import DatabaseAccess
 from ..database.tidy import delete_missing_tracks, delete_albums_without_tracks
 from ..scan.directory import scan_directory
 from .workqueue import WorkRequests
+from .ytdlp import fetch_audio
 
 
 class WorkerThread(threading.Thread):
@@ -32,6 +33,12 @@ class WorkerThread(threading.Thread):
 
                 elif request[0] == WorkRequests.DeleteAlbumsWithoutTracks:
                     delete_albums_without_tracks(db)
+
+                elif request[0] == WorkRequests.FetchFromYouTube:
+                    local_files = fetch_audio(url=request[1], download_dir=request[2])
+                    callback = request[3]
+                    if callback:
+                        callback(local_files)
 
                 else:
                     logging.error("Unrecognised request: %s" % request[0])

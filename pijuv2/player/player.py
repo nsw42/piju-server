@@ -1,3 +1,4 @@
+from collections import namedtuple
 import logging
 import os.path
 from typing import List
@@ -8,6 +9,14 @@ from .mpvmusicplayer import MPVMusicPlayer
 from ..database.schema import Track
 
 
+QueuedTrack = namedtuple('QueuedTrack', 'filepath, trackid, artist, title, artwork')
+# filepath: str
+# trackid: int
+# artist: str
+# title: str
+# artwork: str
+
+
 class MusicPlayer:
     def __init__(self, queue: List[Track] = [], identifier: str = ''):
         self.set_queue(queue, identifier)
@@ -15,7 +24,18 @@ class MusicPlayer:
         self.current_status = 'stopped'
         self.current_volume = 100
         self.index = None
-        self.maximum_track_index = None
+
+    @property
+    def current_track(self) -> QueuedTrack:
+        return None if self.index is None else self.queue[self.index]
+
+    @property
+    def maximum_track_index(self) -> int:
+        return len(self.queue) if self.queue else None
+
+    @property
+    def visible_queue(self):
+        return [] if self.index is None else self.queue[self.index:]
 
     def _play_song(self, filename: str):
         """
@@ -51,27 +71,16 @@ class MusicPlayer:
         self.current_player = None
 
     def clear_queue(self):
-        self.queued_files = []  # list of file paths
-        self.queued_track_ids = []  # list of ints (track ids)
-        self.index = None
-        self.current_tracklist_identifier = ''
-        self.maximum_track_index = None
+        self.stop()
+        self.queue = []  # list of QueuedTrack
 
     def set_queue(self, queue: List[Track], identifier: str):
-        self.queued_files = [track.Filepath for track in queue]
-        self.queued_track_ids = [track.Id for track in queue]
+        self.queue = [QueuedTrack(track.Filepath, track.Id, track.Artist, track.Title, None) for track in queue]
         self.index = 0  # invariant: the index of the *currently playing* song
-        self.current_track_id = self.queued_track_ids[0] if self.queued_track_ids else None
         self.current_tracklist_identifier = identifier
-        self.maximum_track_index = len(queue)
 
-    def get_queued_track_ids(self):
-        return self.queued_track_ids[self.index:]
-
-    def add_to_queue(self, track: Track):
-        self.queued_files.append(track.Filepath)
-        self.queued_track_ids.append(track.Id)
-        self.maximum_track_index = len(self.queued_files)
+    def add_to_queue(self, filepath: str, track_id: int, artist: str, title: str, artwork_uri: str):
+        self.queue.append(QueuedTrack(filepath, track_id, artist, title, artwork_uri))
         self.current_tracklist_identifier = "/queue/"
         # If this is the first item in the queue, start playing
         if self.index is None:
@@ -87,10 +96,8 @@ class MusicPlayer:
         """
         if self.index is not None:
             index += self.index
-        if 0 <= index < len(self.queued_track_ids) and self.queued_track_ids[index] == trackid:
-            self.queued_files.pop(index)
-            self.queued_track_ids.pop(index)
-            self.maximum_track_index = len(self.queued_files)
+        if 0 <= index < len(self.queue) and self.queue[index].trackid == trackid:
+            self.queue.pop(index)
             # If this is the currently playing track, jump to the next track
             # (which might result in us stopping playing completely).
             # But, the next track is at the same index we're already at -
@@ -122,37 +129,30 @@ class MusicPlayer:
         """
         if trackid is not None:
             # pre-flight sanity check: inc/dec index to find the desired track
-            if not ((0 <= index < len(self.queued_track_ids)) and (self.queued_track_ids[index] == trackid)):
-                if (index > 0) and (self.queued_track_ids[index - 1] == trackid):
+            if not ((0 <= index < len(self.queue)) and (self.queue[index].trackid == trackid)):
+                if (index > 0) and (self.queue[index - 1].trackid == trackid):
                     index -= 1
-                elif (index < len(self.queued_files) - 1) and (self.queued_track_ids[index + 1] == trackid):
+                elif (index < len(self.queue) - 1) and (self.queue[index + 1].trackid == trackid):
                     index += 1
                 else:
                     # We failed the sanity check - couldn't find the requested track
                     return False
         started = False
-        while (0 <= index < len(self.queued_files)) and not (started := self._play_song(self.queued_files[index])):
+        while (0 <= index < len(self.queue)) and not (started := self._play_song(self.queue[index].filepath)):
             index += 1
         if started:
-            self.current_track_id = self.queued_track_ids[index]
             self.index = index
             return True
         else:
             self.stop()
             return False
 
-    def play_track(self, track: Track):
-        if self._play_song(track.Filepath):
-            self.current_track_id = track.Id
-        else:
-            self.stop()
-
     def next(self):
         # play the next song in the queue
         if self.index is None:
             return
         logging.debug(f"MusicPlayer.next ({self.current_player})")
-        if self.index + 1 < len(self.queued_files):
+        if self.index + 1 < len(self.queue):
             self.play_from_real_queue_index(self.index + 1)
         else:
             self.stop()
@@ -184,7 +184,6 @@ class MusicPlayer:
     def stop(self):
         logging.debug(f"MusicPlayer.stop ({self.current_player})")
         self._stop_player()
-        self.current_track_id = None
         self.current_tracklist_identifier = ''
         self.current_status = 'stopped'
         self.index = None

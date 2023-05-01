@@ -222,6 +222,29 @@ def json_track(track: Track, include_debuginfo: bool = False):
     return rtn
 
 
+def json_track_or_file(db, queued_track, include_debuginfo: bool = False):
+    if queued_track.trackid is not None:
+        track = db.get_track_by_id(queued_track.trackid)
+        return json_track(track, include_debuginfo)
+    else:
+        rtn = {
+            'link': None,
+            'artist': queued_track.artist,
+            'title': queued_track.title,
+            'genre': None,
+            'disknumber': None,
+            'tracknumber': None,
+            'trackcount': None,
+            'fileformat': os.path.splitext(queued_track.filepath)[1],
+            'album': None,
+            'artwork': queued_track.artwork,
+            'artworkinfo': None
+        }
+        if include_debuginfo:
+            rtn['filepath'] = queued_track.filepath
+        return rtn
+
+
 def normalize_punctuation(search_string):
     return search_string.replace(chr(0x2018), "'")\
                         .replace(chr(0x2019), "'")\
@@ -300,13 +323,12 @@ def add_security_headers(resp):
 @app.route("/")
 def current_status():
     with DatabaseAccess() as db:
-        track = db.get_track_by_id(app.player.current_track_id) if app.player.current_track_id else None
         rtn = {
             'WorkerStatus': app.worker.current_status,
             'PlayerStatus': app.player.current_status,
             'PlayerVolume': app.player.current_volume,
             'CurrentTracklistUri': app.player.current_tracklist_identifier,
-            'CurrentTrack': {} if track is None else json_track(track),
+            'CurrentTrack': json_track_or_file(db, app.player.current_track) if app.player.current_track else {},
             'CurrentTrackIndex': None if (app.player.index is None) else (app.player.index + 1),
             'MaximumTrackIndex': app.player.maximum_track_index,
             'NumberAlbums': db.get_nr_albums(),
@@ -458,46 +480,87 @@ def update_player_play():
         playlistid = extract_id(data.get('playlist'))
         queue_pos = extract_id(data.get('queuepos'))
         trackid = extract_id(data.get('track'))
+        youtubeurl = data.get('url')
 
         if sum(x is not None for x in [albumid, playlistid, queue_pos]) > 1:
             abort(HTTPStatus.BAD_REQUEST, "At most one of album, playlist and queuepos may be specified")
 
-        if albumid is not None:
-            try:
-                album = db.get_album_by_id(albumid)
-            except NotFoundException:
-                abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
+        if youtubeurl and any([albumid, playlistid, queue_pos, trackid]):
+            abort(HTTPStatus.BAD_REQUEST, "A URL may not be specified with any other track selection")
 
-            def track_sort_order(track):
-                return (track.VolumeNumber if track.VolumeNumber else 0,
-                        track.TrackNumber if track.TrackNumber else 0)
-            tracks = list(sorted(album.Tracks, key=track_sort_order))
-            play_track_list(tracks, url_for('get_album', albumid=albumid), trackid)
+        if youtubeurl:
+            update_player_play_from_youtube(youtubeurl)
+
+        elif albumid is not None:
+            update_player_play_album(db, albumid, trackid)
 
         elif playlistid is not None:
-            try:
-                playlist = db.get_playlist_by_id(playlistid)
-            except NotFoundException:
-                abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
-            play_track_list([entry.Track for entry in playlist.Entries],
-                            url_for('one_playlist', playlistid=playlistid),
-                            trackid)
+            update_player_play_playlist(db, playlistid, trackid)
 
         elif queue_pos is not None:
-            if not app.player.play_from_apparent_queue_index(queue_pos, trackid=trackid):
-                abort(409, "Track index not found")
+            update_player_play_from_queue(queue_pos, trackid)
 
         elif trackid:
-            try:
-                track = db.get_track_by_id(trackid)
-            except NotFoundException:
-                abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
-            app.player.clear_queue()
-            app.player.play_track(track)
+            update_player_play_track(db, trackid)
 
         else:
             abort(HTTPStatus.BAD_REQUEST, description='Album, playlist or track must be specified')
     return ('', HTTPStatus.NO_CONTENT)
+
+
+def update_player_play_album(db, albumid, trackid):
+    try:
+        album = db.get_album_by_id(albumid)
+    except NotFoundException:
+        abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
+
+    def track_sort_order(track):
+        return (track.VolumeNumber if track.VolumeNumber else 0,
+                track.TrackNumber if track.TrackNumber else 0)
+    tracks = list(sorted(album.Tracks, key=track_sort_order))
+    play_track_list(tracks, url_for('get_album', albumid=albumid), trackid)
+
+
+def update_player_play_from_queue(queue_pos, trackid):
+    if not app.player.play_from_apparent_queue_index(queue_pos, trackid=trackid):
+        abort(409, "Track index not found")
+
+
+def update_player_play_from_youtube(url):
+    app.work_queue.put((WorkRequests.FetchFromYouTube, url, app.piju_config.download_dir, play_downloaded_files))
+
+
+def play_downloaded_files(download_info):
+    """
+    A callback after an audio URL has been downloaded
+    """
+    app.player.clear_queue()
+    queue_downloaded_files(download_info)
+
+
+def queue_downloaded_files(download_info):
+    for one_download in download_info:
+        app.player.add_to_queue(str(one_download.filepath), None, one_download.artist, one_download.title,
+                                one_download.artwork)
+
+
+def update_player_play_playlist(db, playlistid, trackid):
+    try:
+        playlist = db.get_playlist_by_id(playlistid)
+    except NotFoundException:
+        abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
+    play_track_list([entry.Track for entry in playlist.Entries],
+                    url_for('one_playlist', playlistid=playlistid),
+                    trackid)
+
+
+def update_player_play_track(db, trackid):
+    try:
+        track = db.get_track_by_id(trackid)
+    except NotFoundException:
+        abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+    app.player.clear_queue()
+    add_track_to_queue(track)
 
 
 @app.route("/player/previous", methods=['POST'])
@@ -598,7 +661,7 @@ def queue():
 
     elif request.method == 'GET':
         with DatabaseAccess() as db:
-            queue = [json_track(db.get_track_by_id(track_id)) for track_id in app.player.get_queued_track_ids()]
+            queue = [json_track_or_file(db, queued_track) for queued_track in app.player.visible_queue]
         return gzippable_jsonify(queue)
 
     elif request.method == 'OPTIONS':
@@ -613,16 +676,26 @@ def queue():
         data = request.get_json()
         if not data:
             abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
-        with DatabaseAccess() as db:
-            trackid = extract_id(data.get('track', ''))
-            if trackid is None:
-                abort(HTTPStatus.BAD_REQUEST, description="Invalid or missing track id")
-            try:
-                track = db.get_track_by_id(trackid)
-            except NotFoundException:
-                abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
-            app.player.add_to_queue(track)
+        trackid = extract_id(data.get('track', ''))
+        youtubeurl = data.get('url')
+        if youtubeurl:
+            app.work_queue.put((WorkRequests.FetchFromYouTube, youtubeurl, app.piju_config.download_dir,
+                                queue_downloaded_files))
+        else:
+            with DatabaseAccess() as db:
+                if trackid is None:
+                    abort(HTTPStatus.BAD_REQUEST, description="Invalid or missing track id")
+                try:
+                    add_track_to_queue(db.get_track_by_id(trackid))
+                except NotFoundException:
+                    abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
         return ('', HTTPStatus.NO_CONTENT)
+
+
+def add_track_to_queue(track: Track):
+    has_artwork = (track.ArtworkPath or track.ArtworkBlob)
+    artwork_uri = url_for('get_artwork', trackid=track.Id) if has_artwork else None
+    app.player.add_to_queue(track.Filepath, track.Id, track.Artist, track.Title, artwork_uri)
 
 
 @app.route("/scanner/scan", methods=['POST'])
@@ -707,7 +780,7 @@ if __name__ == '__main__':
         app.worker = WorkerThread(app.work_queue)
         app.worker.start()
         app.player = MusicPlayer()
-        app.api_version_string = '4.2'
+        app.api_version_string = '5.0'
         # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
         # see https://developer.apple.com/forums/thread/682332
         app.run(use_reloader=False, host='0.0.0.0', threaded=True)
