@@ -4,10 +4,19 @@ from pathlib import Path
 import subprocess
 
 
-DownloadInfo = namedtuple('DownloadInfo', 'filepath, artist, title')
+DownloadInfo = namedtuple('DownloadInfo', 'filepath, artist, title, artwork')
 # filepath: Path
 # artist: str
 # title: str
+
+
+def select_thumbnail(thumbnails):
+    best_thumbnail = None
+    for thumbnail in thumbnails:
+        if thumbnail.get('url', '').endswith('.jpg') \
+                and (best_thumbnail is None or thumbnail.get('preference') > best_thumbnail.get('preference')):
+            best_thumbnail = thumbnail
+    return best_thumbnail['url'] if best_thumbnail else None
 
 
 def fetch_audio(url, download_dir):
@@ -30,5 +39,6 @@ def fetch_audio(url, download_dir):
             metadata = json.load(handle)
             artist = metadata.get('artist')
             title = metadata.get('title')
-        download_info.append(DownloadInfo(filepath, artist, title))
+            artwork = select_thumbnail(metadata.get('thumbnails'))
+        download_info.append(DownloadInfo(filepath, artist, title, artwork))
     return download_info

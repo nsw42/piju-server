@@ -237,7 +237,7 @@ def json_track_or_file(db, queued_track, include_debuginfo: bool = False):
             'trackcount': None,
             'fileformat': os.path.splitext(queued_track.filepath)[1],
             'album': None,
-            'artwork': None,
+            'artwork': queued_track.artwork,
             'artworkinfo': None
         }
         if include_debuginfo:
@@ -540,7 +540,8 @@ def play_downloaded_files(download_info):
 
 def queue_downloaded_files(download_info):
     for one_download in download_info:
-        app.player.add_to_queue(filepath=one_download.filepath, artist=one_download.artist, title=one_download.title)
+        app.player.add_to_queue(str(one_download.filepath), None, one_download.artist, one_download.title,
+                                one_download.artwork)
 
 
 def update_player_play_playlist(db, playlistid, trackid):
@@ -688,7 +689,9 @@ def queue():
                     track = db.get_track_by_id(trackid)
                 except NotFoundException:
                     abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
-                app.player.add_to_queue(track=track)
+                has_artwork = (track.ArtworkPath or track.ArtworkBlob)
+                artwork_uri = url_for('get_artwork', trackid=track.Id) if has_artwork else None
+                app.player.add_to_queue(track.Filepath, track.Id, track.Artist, track.Title, artwork_uri)
         return ('', HTTPStatus.NO_CONTENT)
 
 

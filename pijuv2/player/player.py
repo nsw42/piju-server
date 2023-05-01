@@ -9,11 +9,12 @@ from .mpvmusicplayer import MPVMusicPlayer
 from ..database.schema import Track
 
 
-QueuedTrack = namedtuple('QueuedTrack', 'filepath, trackid, artist, title')
+QueuedTrack = namedtuple('QueuedTrack', 'filepath, trackid, artist, title, artwork')
 # filepath: str
 # trackid: int
 # artist: str
 # title: str
+# artwork: str
 
 
 class MusicPlayer:
@@ -75,17 +76,12 @@ class MusicPlayer:
         self.current_tracklist_identifier = ''
 
     def set_queue(self, queue: List[Track], identifier: str):
-        self.queue = [QueuedTrack(track.Filepath, track.id, track.Artist, track.Title) for track in queue]
+        self.queue = [QueuedTrack(track.Filepath, track.Id, track.Artist, track.Title, None) for track in queue]
         self.index = 0  # invariant: the index of the *currently playing* song
         self.current_tracklist_identifier = identifier
 
-    def add_to_queue(self, **kwargs):
-        if track := kwargs.get('track'):
-            self.queue.append(QueuedTrack(track.Filepath, track.Id, track.Artist, track.Title))
-        elif filepath := kwargs.get('filepath'):
-            self.queue.append(QueuedTrack(str(filepath), None, kwargs['artist'], kwargs['title']))
-        else:
-            raise Exception("keyword arguments track or filepath are mandatory")
+    def add_to_queue(self, filepath: str, track_id: int, artist: str, title: str, artwork_uri: str):
+        self.queue.append(QueuedTrack(filepath, track_id, artist, title, artwork_uri))
         self.current_tracklist_identifier = "/queue/"
         # If this is the first item in the queue, start playing
         if self.index is None:
