@@ -528,14 +528,18 @@ def update_player_play_from_queue(queue_pos, trackid):
 
 
 def update_player_play_from_youtube(url):
-    app.work_queue.put((WorkRequests.FetchFromYouTube, url, app.piju_config.download_dir, play_downloaded_file))
+    app.work_queue.put((WorkRequests.FetchFromYouTube, url, app.piju_config.download_dir, play_downloaded_files))
 
 
-def play_downloaded_file(paths):
+def play_downloaded_files(paths):
     """
     A callback after an audio URL has been downloaded
     """
     app.player.clear_queue()
+    queue_downloaded_files(paths)
+
+
+def queue_downloaded_files(paths):
     for path in paths:
         app.player.add_to_queue(filepath=path)
 
@@ -673,15 +677,20 @@ def queue():
         data = request.get_json()
         if not data:
             abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
-        with DatabaseAccess() as db:
-            trackid = extract_id(data.get('track', ''))
-            if trackid is None:
-                abort(HTTPStatus.BAD_REQUEST, description="Invalid or missing track id")
-            try:
-                track = db.get_track_by_id(trackid)
-            except NotFoundException:
-                abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
-            app.player.add_to_queue(track=track)
+        trackid = extract_id(data.get('track', ''))
+        youtubeurl = data.get('url')
+        if youtubeurl:
+            app.work_queue.put((WorkRequests.FetchFromYouTube, youtubeurl, app.piju_config.download_dir,
+                                queue_downloaded_files))
+        else:
+            with DatabaseAccess() as db:
+                if trackid is None:
+                    abort(HTTPStatus.BAD_REQUEST, description="Invalid or missing track id")
+                try:
+                    track = db.get_track_by_id(trackid)
+                except NotFoundException:
+                    abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+                app.player.add_to_queue(track=track)
         return ('', HTTPStatus.NO_CONTENT)
 
 
