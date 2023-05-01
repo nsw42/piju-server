@@ -658,7 +658,7 @@ def queue():
     elif request.method == 'GET':
         with DatabaseAccess() as db:
             queue = [json_track_or_file(db, queued_track.trackid, queued_track.filepath)
-                     for queued_track in app.player.queue]
+                     for queued_track in app.player.visible_queue]
         return gzippable_jsonify(queue)
 
     elif request.method == 'OPTIONS':

@@ -24,6 +24,10 @@ class MusicPlayer:
     def maximum_track_index(self):
         return len(self.queue) if self.queue else None
 
+    @property
+    def visible_queue(self):
+        return [] if self.index is None else self.queue[self.index:]
+
     def _play_song(self, filename: str):
         """
         Do the work of launching an appropriate player for the given file,
@@ -67,9 +71,6 @@ class MusicPlayer:
         self.index = 0  # invariant: the index of the *currently playing* song
         self.current_track_id = self.queue[0].trackid if self.queue else None
         self.current_tracklist_identifier = identifier
-
-    def get_queued_track_ids(self):
-        return [qe.trackid for qe in self.queue[self.index:]]
 
     def add_to_queue(self, **kwargs):
         if track := kwargs.get('track'):
