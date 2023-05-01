@@ -66,3 +66,49 @@ def test_play_from_real_queue_index__two_files_in_queue(mock_mp3player, mock_isf
     assert mp.current_status == 'playing'
     assert mp.current_track.trackid == 456
     mp.current_player.play_song.assert_called_once_with('exists.mp3')
+
+
+@patch('pijuv2.player.player.os.path.isfile')
+@patch('pijuv2.player.player.MP3MusicPlayer')
+def test_play_from_real_queue_index__off_by_one(mock_mp3player, mock_isfile):
+    # Arrange
+    mock_isfile.return_value = True
+    t1 = Track()
+    t1.Id = 123
+    t1.Filepath = '1.mp3'
+    t2 = Track()
+    t2.Id = 234
+    t2.Filepath = '2.mp3'
+
+    # Act
+    mp = player.MusicPlayer(queue=[t1, t2])
+    mp.play_from_real_queue_index(0, 234)
+
+    # Assert
+    assert mp.current_status == 'playing'
+    assert mp.index == 1
+    assert mp.current_track.trackid == 234
+    mp.current_player.play_song.assert_called_once_with('2.mp3')
+
+
+@patch('pijuv2.player.player.os.path.isfile')
+@patch('pijuv2.player.player.MP3MusicPlayer')
+def test_play_from_real_queue_index__off_by_one_the_other_way(mock_mp3player, mock_isfile):
+    # Arrange
+    mock_isfile.return_value = True
+    t1 = Track()
+    t1.Id = 123
+    t1.Filepath = '1.mp3'
+    t2 = Track()
+    t2.Id = 234
+    t2.Filepath = '2.mp3'
+
+    # Act
+    mp = player.MusicPlayer(queue=[t1, t2])
+    mp.play_from_real_queue_index(1, 123)
+
+    # Assert
+    assert mp.current_status == 'playing'
+    assert mp.index == 0
+    assert mp.current_track.trackid == 123
+    mp.current_player.play_song.assert_called_once_with('1.mp3')
