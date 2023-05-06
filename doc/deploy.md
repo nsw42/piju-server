@@ -31,7 +31,7 @@
     * Then do the various faff to get 'sys' mode working, which avoids the need to `lbu commit -d` all the time
 * Check for OS updates: `apk update; apk  upgrade`
 
-### Installing pre-requisites for the music player
+### Installing prerequisites for the music player
 
 Logged in as root:
 
@@ -50,7 +50,7 @@ apk add rsync
 
 (Attempts to `pip install` Pillow results in it trying to build from source)
 
-### Installing pre-requisites for the touchscreen UI
+### Installing prerequisites for the touchscreen UI
 
 Logged in as root:
 
@@ -75,6 +75,16 @@ Logged in as root:
       Driver "fbdev"
     EndSection
     ```
+
+### Installing prerequisites for playing tracks from YouTube
+
+Logged in as root:
+
+```
+wget https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O /usr/local/bin/yt-dlp
+chmod a+rx /usr/local/bin/yt-dlp
+apk add ffmpeg
+```
 
 ### Create a user to run the software
 
