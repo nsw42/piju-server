@@ -29,13 +29,18 @@ class WorkerThread(threading.Thread):
                     scan_directory(dir_to_scan, db)
 
                 elif request[0] == WorkRequests.DeleteMissingTracks:
+                    self.current_status = 'Deleting missing tracks'
                     delete_missing_tracks(db)
 
                 elif request[0] == WorkRequests.DeleteAlbumsWithoutTracks:
+                    self.current_status = 'Deleting albums without tracks'
                     delete_albums_without_tracks(db)
 
                 elif request[0] == WorkRequests.FetchFromYouTube:
-                    local_files = fetch_audio(url=request[1], download_dir=request[2])
+                    url = request[1]
+                    download_dir = request[2]
+                    self.current_status = 'Fetching %s to %s' % (url, download_dir) 
+                    local_files = fetch_audio(url=url, download_dir=download_dir)
                     callback = request[3]
                     if callback:
                         callback(local_files)
