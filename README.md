@@ -12,8 +12,13 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 
 ### API Versions
 
+* 2.0: First version of the API that includes a version identifier in the / response
 * 3.0: Add /mp3/trackid route
 * 3.1: Add fileformat to Track JSON information
+* 4.0: Add /queue/, allowing tracks to be queued
+* 4.1: Support DELETE method on /queue/
+* 4.2: Add the ability to play from a given index in the queue
+* 5.0: Add support for playing tracks from YouTube
 
 ## Dependencies
 
