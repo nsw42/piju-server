@@ -18,12 +18,13 @@ QueuedTrack = namedtuple('QueuedTrack', 'filepath, trackid, artist, title, artwo
 
 
 class MusicPlayer:
-    def __init__(self, queue: List[Track] = [], identifier: str = ''):
+    def __init__(self, queue: List[Track] = [], identifier: str = '', mp3audiodevice=None):
         self.set_queue(queue, identifier)
         self.current_player = None
         self.current_status = 'stopped'
         self.current_volume = 100
         self.index = None
+        self.mp3audiodevice = mp3audiodevice
 
     @property
     def current_track(self) -> QueuedTrack:
@@ -52,7 +53,7 @@ class MusicPlayer:
             return False
         logging.debug(f"Playing {filename}")
         if filename.endswith('.mp3'):
-            self.current_player = MP3MusicPlayer(self)
+            self.current_player = MP3MusicPlayer(self, audiodevice=self.mp3audiodevice)
             self.current_player.play_song(filename)
         else:
             self.current_player = MPVMusicPlayer(self)
