@@ -3,6 +3,7 @@ from collections import defaultdict
 import gzip
 from http import HTTPStatus
 import json
+import logging
 import mimetypes
 import os.path
 from pathlib import Path
@@ -798,6 +799,7 @@ if __name__ == '__main__':
         import doctest
         doctest.testmod()
     else:
+        logging.basicConfig(level=logging.DEBUG)
         config = Config(args.config)
         db = Database()  # pre-create tables
         app.piju_config = config
