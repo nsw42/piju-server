@@ -16,6 +16,7 @@ from ..database.database import Database, DatabaseAccess, NotFoundException
 from ..database.schema import Album, Genre, Playlist, PlaylistEntry, Track
 from ..player.player import MusicPlayer
 from .config import Config
+from .downloadhistory import DownloadHistory
 from .workqueue import WorkRequests
 from .workthread import WorkerThread
 
@@ -419,6 +420,25 @@ def get_artwork_info(trackid):
         return gzippable_jsonify(rtn)
 
 
+@app.route("/downloadhistory")
+def get_download_history():
+    rtn = []
+    for url in app.download_history.entries:
+        files = app.download_history.get_info(url)
+        if files:
+            # reverse the playlist so most recent is first in the list
+            for download_info in reversed(files):
+                rtn.append({
+                    'url': download_info.url,  # not necessarily the same as url - eg playlist
+                    'artist': download_info.artist,
+                    'title': download_info.title,
+                    'artwork': download_info.artwork
+                })
+        else:
+            rtn.append({'url': url})
+    return gzippable_jsonify(rtn)
+
+
 @app.route("/genres/")
 def get_all_genres():
     with DatabaseAccess() as db:
@@ -527,18 +547,20 @@ def update_player_play_from_queue(queue_pos, trackid):
 
 
 def update_player_play_from_youtube(url):
+    app.download_history.add(url)
     app.work_queue.put((WorkRequests.FetchFromYouTube, url, app.piju_config.download_dir, play_downloaded_files))
 
 
-def play_downloaded_files(download_info):
+def play_downloaded_files(url, download_info):
     """
     A callback after an audio URL has been downloaded
     """
     app.player.clear_queue()
-    queue_downloaded_files(download_info)
+    queue_downloaded_files(url, download_info)
 
 
-def queue_downloaded_files(download_info):
+def queue_downloaded_files(url, download_info):
+    app.download_history.set_info(url, download_info)
     for one_download in download_info:
         app.player.add_to_queue(str(one_download.filepath), None, one_download.artist, one_download.title,
                                 one_download.artwork)
@@ -679,6 +701,7 @@ def queue():
         trackid = extract_id(data.get('track', ''))
         youtubeurl = data.get('url')
         if youtubeurl:
+            app.download_history.add(youtubeurl)
             app.work_queue.put((WorkRequests.FetchFromYouTube, youtubeurl, app.piju_config.download_dir,
                                 queue_downloaded_files))
         else:
@@ -780,7 +803,8 @@ if __name__ == '__main__':
         app.worker = WorkerThread(app.work_queue)
         app.worker.start()
         app.player = MusicPlayer()
-        app.api_version_string = '5.0'
+        app.api_version_string = '5.1'
+        app.download_history = DownloadHistory()
         # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
         # see https://developer.apple.com/forums/thread/682332
         app.run(use_reloader=False, host='0.0.0.0', threaded=True)

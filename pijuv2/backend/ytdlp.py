@@ -1,13 +1,9 @@
-from collections import namedtuple
 import json
 from pathlib import Path
+from typing import Iterable
 import subprocess
 
-
-DownloadInfo = namedtuple('DownloadInfo', 'filepath, artist, title, artwork')
-# filepath: Path
-# artist: str
-# title: str
+from .downloadinfo import DownloadInfo
 
 
 def select_thumbnail(thumbnails):
@@ -19,7 +15,7 @@ def select_thumbnail(thumbnails):
     return best_thumbnail['url'] if best_thumbnail else None
 
 
-def fetch_audio(url, download_dir):
+def fetch_audio(url, download_dir) -> Iterable[DownloadInfo]:
     cmd = ['yt-dlp',
            '-x',
            '--audio-format', 'mp3',
@@ -40,5 +36,6 @@ def fetch_audio(url, download_dir):
             artist = metadata.get('artist')
             title = metadata.get('title')
             artwork = select_thumbnail(metadata.get('thumbnails'))
-        download_info.append(DownloadInfo(filepath, artist, title, artwork))
+            url = metadata.get('webpage_url')
+        download_info.append(DownloadInfo(filepath, artist, title, artwork, url))
     return download_info
