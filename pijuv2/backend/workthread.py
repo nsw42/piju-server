@@ -39,11 +39,11 @@ class WorkerThread(threading.Thread):
                 elif request[0] == WorkRequests.FetchFromYouTube:
                     url = request[1]
                     download_dir = request[2]
-                    self.current_status = 'Fetching %s to %s' % (url, download_dir) 
+                    self.current_status = 'Fetching %s to %s' % (url, download_dir)
                     local_files = fetch_audio(url=url, download_dir=download_dir)
                     callback = request[3]
                     if callback:
-                        callback(local_files)
+                        callback(url, local_files)
 
                 else:
                     logging.error("Unrecognised request: %s" % request[0])
