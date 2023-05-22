@@ -1,4 +1,5 @@
 from enum import Enum
+import logging
 import pexpect
 import re
 from threading import Thread
@@ -240,6 +241,7 @@ class MPyg321Player:
         player = self.set_version_and_get_player(player)
         args = "--remote" if self.player_name == "mpg123" else "-R test"
         args += " --audiodevice " + audiodevice if audiodevice else ""
+        logging.debug('mpyg321 player %s args %s', player, args)
         self.player = pexpect.spawn(str(player) + " " + args)
         self.player.delaybeforesend = None
         self.status = PlayerStatus.INSTANCIATED
