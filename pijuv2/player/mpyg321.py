@@ -229,7 +229,7 @@ class MPyg321Player:
         ]
         index = version_process.expect(suitable_versions)
         try:
-            self.player_name = suitable_versions[index]
+            self.player_name = valid_player
             self.player_version = tuple(map(int, version_process.match.group(1).split('.')))  # e.g. (1, 30, 2)
         except IndexError:
             raise MPyg321NoPlayerFoundError("""No suitable player found""")
