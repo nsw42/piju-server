@@ -204,6 +204,8 @@ def json_playlist(playlist: Playlist, include_genres: InformationLevel, include_
 
 
 def json_track(track: Track, include_debuginfo: bool = False):
+    if not track:
+        return {}
     has_artwork = track.ArtworkPath or track.ArtworkBlob
     rtn = {
         'link': url_for('get_track', trackid=track.Id),
