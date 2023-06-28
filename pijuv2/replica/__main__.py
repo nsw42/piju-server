@@ -14,6 +14,7 @@ from ..player.player import MusicPlayer
 
 app = Flask(__name__)
 
+REQUEST_TIMEOUT = 300  # timeout, in seconds, for requests.get()
 
 # duck-typing: a LocalTrack is like a database.schema.Track - for the bits we need, at least
 LocalTrack = namedtuple('LocalTrack', 'Filepath, Id')
@@ -68,7 +69,7 @@ def update_player_play():
         abort(HTTPStatus.BAD_REQUEST, "At most one of album, playlist and queuepos may be specified")
 
     if albumid is not None:
-        album = requests.get(f'{app.primary}/albums/{albumid}')
+        album = requests.get(f'{app.primary}/albums/{albumid}', timeout=REQUEST_TIMEOUT)
         if not album.ok:
             abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
 
@@ -77,7 +78,7 @@ def update_player_play():
         play_track_list(track_ids, app.primary + '/albums/' + str(albumid), trackid)
 
     elif playlistid is not None:
-        playlist = requests.get(f'{app.primary}/playlists/{playlistid}')
+        playlist = requests.get(f'{app.primary}/playlists/{playlistid}', timeout=REQUEST_TIMEOUT)
         if not playlist.ok:
             abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
         track_uris = playlist.json()['tracks']
@@ -138,7 +139,7 @@ def player_volume():
 # APPLICATION -------------------------------------------------------------------------------------
 
 def cache_path(track_id):
-    info = requests.get(f'{app.primary}/tracks/{track_id}')
+    info = requests.get(f'{app.primary}/tracks/{track_id}', timeout=REQUEST_TIMEOUT)
     if not info.ok:
         abort(HTTPStatus.NOT_FOUND, "Unable to find info for track " + str(track_id))
     info = info.json()
@@ -153,7 +154,7 @@ def ensure_cache_exists(tracks: List[LocalTrack]):
     for track in tracks:
         if os.path.isfile(track.Filepath):
             continue
-        fetch = requests.get(f'{app.primary}/mp3/{track.Id}')
+        fetch = requests.get(f'{app.primary}/mp3/{track.Id}', timeout=REQUEST_TIMEOUT)
         if not fetch.ok:
             abort(HTTPStatus.NOT_FOUND, "Unable to find audio data for track " + str(track.Id))
         os.makedirs(os.path.dirname(track.Filepath), exist_ok=True)

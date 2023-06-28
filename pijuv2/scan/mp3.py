@@ -42,6 +42,7 @@ def scan_mp3(absolute_path: Path):
             return None, None
         m_of_n = val.text[0]
         try:
+            # pylint: disable=C0103  # ignore 'm' and 'n' as bad variable names
             if '/' in m_of_n:
                 m, n = m_of_n.split('/', 1)
                 m = int(m)
@@ -50,6 +51,7 @@ def scan_mp3(absolute_path: Path):
             else:
                 m = int(m_of_n)
                 return m, None
+            # pylint: enable=C0103
         except ValueError:
             return None, None
 

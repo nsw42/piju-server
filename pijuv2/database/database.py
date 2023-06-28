@@ -178,7 +178,7 @@ class Database():
                 logging.fatal("Multiple results found for a track reference")
                 assert False
 
-            logging.debug("ensure_track_exists: track already existed: " + trackref.Filepath)
+            logging.debug(f"ensure_track_exists: track already existed: {trackref.Filepath}")
             track = res.first()
         else:
             # we know we're updating a track
@@ -205,7 +205,7 @@ class Database():
         Return the Album object for a given id.
         Raises NotFoundException for an unknown id
         """
-        return self.get_X_by_id(Album, albumid)
+        return self.get_x_by_id(Album, albumid)
 
     def get_albums_without_tracks(self) -> List[Album]:
         """
@@ -257,7 +257,7 @@ class Database():
                 .limit(limit)
                 .all())
 
-    def get_X_by_id(self, x_type: Any, x_id: int) -> Any:
+    def get_x_by_id(self, x_type: Any, x_id: int) -> Any:
         """
         Return the X object for a given id, where X is indicated by x_type (Genre, Playlist, Track, etc)
         Raises NotFoundException for an unknown id
@@ -267,29 +267,29 @@ class Database():
         )
         try:
             return res.one()
-        except Exception as e:
-            raise convert_exception_class(e) from e
+        except Exception as exc:
+            raise convert_exception_class(exc) from exc
 
     def get_genre_by_id(self, genreid: int) -> Genre:
         """
         Return the Genre object for a given id.
         Raises NotFoundException for an unknown id
         """
-        return self.get_X_by_id(Genre, genreid)
+        return self.get_x_by_id(Genre, genreid)
 
     def get_playlist_by_id(self, playlistid: int) -> Playlist:
         """
         Return the Playlist object for a given id.
         Raises NotFoundException for an unknown id
         """
-        return self.get_X_by_id(Playlist, playlistid)
+        return self.get_x_by_id(Playlist, playlistid)
 
     def get_track_by_id(self, trackid: int) -> Track:
         """
         Return the Track object for a given id.
         Raises NotFoundException for an unknown id
         """
-        return self.get_X_by_id(Track, trackid)
+        return self.get_x_by_id(Track, trackid)
 
     def get_track_by_filepath(self, path: str) -> Track:
         """
@@ -311,12 +311,12 @@ class Database():
         return self.session.query(Track).with_entities(func.count(Track.Id)).scalar()
 
     def search_for_albums(self, search_words: Iterable[str], limit=100) -> List[Album]:
-        q = self.session.query(Album)
+        query = self.session.query(Album)
         for word in search_words:
             pattern = '%' + word + '%'
-            q = q.filter(or_(Album.Title.ilike(pattern), Album.Artist.ilike(pattern)))
-        q = q.order_by(Album.Artist).limit(limit)
-        return q.all()
+            query = query.filter(or_(Album.Title.ilike(pattern), Album.Artist.ilike(pattern)))
+        query = query.order_by(Album.Artist).limit(limit)
+        return query.all()
 
     def search_for_artist(self, search_words: Iterable[str], limit=100) -> List[Album]:
         """
@@ -324,20 +324,22 @@ class Database():
         matches the given name.
         If substring is True, then searches for
         """
-        q = self.session.query(Album)
+        query = self.session.query(Album)
         for word in search_words:
             pattern = '%' + word + '%'
-            q = q.filter(Album.Artist.ilike(pattern))
-        q = q.order_by(Album.Artist).limit(limit)
-        return q.all()
+            query = query.filter(Album.Artist.ilike(pattern))
+        query = query.order_by(Album.Artist).limit(limit)
+        return query.all()
 
     def search_for_tracks(self, search_words: Iterable[str], query_limit=1000, return_limit=100) -> List[Track]:
-        q = self.session.query(Track).join(Album)
+        query = self.session.query(Track).join(Album)
         for word in search_words:
             pattern = '%' + word + '%'
-            q = q.filter(or_(Track.Title.ilike(pattern), Album.Title.ilike(pattern), Track.Artist.ilike(pattern)))
-        q = q.limit(query_limit)
-        tracks = q.all()
+            query = query.filter(or_(Track.Title.ilike(pattern),
+                                     Album.Title.ilike(pattern),
+                                     Track.Artist.ilike(pattern)))
+        query = query.limit(query_limit)
+        tracks = query.all()
         # sort tracks by quality of match
         lower_case_words = [word.lower() for word in search_words]
 
@@ -375,6 +377,6 @@ class DatabaseAccess:
     def __enter__(self):
         return self.db
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, typ, value, traceback):
         self.db.commit()
         del self.db

@@ -25,7 +25,10 @@ def fetch_audio(url, download_dir) -> Iterable[DownloadInfo]:
            '-o', '%(id)s.%(ext)s',
            '--print', 'after_move:filepath',
            '--write-info-json']
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=download_dir)
+    try:
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True, cwd=download_dir)
+    except subprocess.CalledProcessError:
+        return []
     local_files = result.stdout.splitlines()
     download_info = []
     for local_file in local_files:

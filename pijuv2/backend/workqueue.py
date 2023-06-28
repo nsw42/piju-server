@@ -2,7 +2,7 @@ from enum import Enum
 
 
 class WorkRequests(Enum):
-    ScanDirectory = 1
-    DeleteMissingTracks = 2
-    DeleteAlbumsWithoutTracks = 3
-    FetchFromYouTube = 4
+    SCAN_DIRECTORY = 1
+    DELETE_MISSING_TRACKS = 2
+    DELETE_ALBUMS_WITHOUT_TRACKS = 3
+    FETCH_FROM_YOUTUBE = 4
