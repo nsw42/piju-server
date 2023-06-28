@@ -56,9 +56,9 @@ def parse_datetime_str(datestr: str):
     while len(yyyymmdd) < 3:
         yyyymmdd.append('')
     if len(yyyymmdd) > 3:
-        raise ValueError('malformed date: %s' % datestr)
+        raise ValueError(f'malformed date: {datestr}')
     if not all(field == '' or field.isdigit() for field in yyyymmdd):
-        raise ValueError('malformed date: %s' % datestr)
+        raise ValueError(f'malformed date: {datestr}')
     yyyymmdd = [1 if (field == '') else int(field) for field in yyyymmdd]
     # step 3: parse hh:mm:ss[TZ]
     if '+' in hhmmss:
@@ -74,9 +74,9 @@ def parse_datetime_str(datestr: str):
     while len(hhmmss) < 3:
         hhmmss.append('')
     if len(hhmmss) > 3:
-        raise ValueError('malformed date: %s' % datestr)
+        raise ValueError(f'malformed date: {datestr}')
     if not all(field == '' or field.isdigit() for field in hhmmss):
-        raise ValueError('malformed date: %s' % datestr)
+        raise ValueError(f'malformed date: {datestr}')
     hhmmss = [0 if (field == '') else int(field) for field in hhmmss]
     # recombine and construct a datetime
     dtvalues = yyyymmdd + hhmmss
@@ -84,9 +84,9 @@ def parse_datetime_str(datestr: str):
 
 
 def find_coverart_file(music_absolutepath: pathlib.Path):
-    dir = music_absolutepath.parent
+    directory = music_absolutepath.parent
     for leaf in 'cover.jpg', 'cover.png':
-        artwork_path = dir / leaf
+        artwork_path = directory / leaf
         if artwork_path.is_file():
             return str(artwork_path)
     return None
@@ -94,13 +94,13 @@ def find_coverart_file(music_absolutepath: pathlib.Path):
 
 def get_artwork_size(artwork_path: pathlib.Path, artwork_blob: bytes) -> Optional[ArtworkSize]:
     if artwork_path:
-        im = Image.open(artwork_path)
+        img = Image.open(artwork_path)
     elif artwork_blob:
-        im = Image.open(io.BytesIO(artwork_blob))
+        img = Image.open(io.BytesIO(artwork_blob))
     else:
         return None
 
-    return ArtworkSize(im.width, im.height)
+    return ArtworkSize(img.width, img.height)
 
 
 if __name__ == '__main__':

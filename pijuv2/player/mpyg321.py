@@ -1,7 +1,8 @@
 from enum import Enum
-import pexpect
 import re
 from threading import Thread
+
+import pexpect
 
 
 class MpgOutputAction(Enum):
@@ -130,43 +131,35 @@ mpg_errors = [
 # # # Errors # # #
 class MPyg321Error(RuntimeError):
     """Base class for any errors encountered by the player during runtime"""
-    pass
 
 
 class MPyg321FileError(MPyg321Error):
     """Errors encountered by the player related to files"""
-    pass
 
 
 class MPyg321CommandError(MPyg321Error):
     """Errors encountered by the player related to player commands"""
-    pass
 
 
 class MPyg321ArgumentError(MPyg321Error):
     """Errors encountered by the player related to arguments for commands"""
-    pass
 
 
 class MPyg321EQError(MPyg321Error):
     """Errors encountered by the player related to the equalizer"""
-    pass
 
 
 class MPyg321SeekError(MPyg321Error):
     """Errors encountered by the player related to the seek"""
-    pass
 
 
 class MPyg321WrongPlayerPathError(MPyg321Error):
     """Errors encountered when a wrong player path is provided in the
     constructor"""
-    pass
 
 
 class MPyg321NoPlayerFoundError(MPyg321Error):
     """Errors encountered when no suitable player is found"""
-    pass
 
 
 class PlayerStatus(Enum):
@@ -208,8 +201,7 @@ class MPyg321Player:
                 version_process = pexpect.spawn(str(player) + " --version")
                 valid_player = str(player)
             except pexpect.exceptions.ExceptionPexpect:
-                raise MPyg321WrongPlayerPathError(
-                    """Invalid file path provided""")
+                raise MPyg321WrongPlayerPathError("Invalid file path provided")
 
         else:
             try:
@@ -314,9 +306,9 @@ class MPyg321Player:
     def volume(self, percent):
         """Adjust player's volume"""
         if self.player_name == "mpg123":
-            self.player.sendline("VOLUME {}".format(percent))
+            self.player.sendline(f"VOLUME {percent}")
         if self.player_name == "mpg321":
-            self.player.sendline("GAIN {}".format(percent))
+            self.player.sendline(f"GAIN {percent}")
         self.current_volume = percent
 
     def silence_mpyg_output(self):
@@ -331,7 +323,7 @@ class MPyg321Player:
         filepath: URL/Path to the list
         """
         if self.player_name == "mpg123":
-            self.player.sendline("LOADLIST {} {}".format(entry, filepath))
+            self.player.sendline(f"LOADLIST {entry} {filepath}")
             self.status = PlayerStatus.PLAYING
 
     def on_error(self):
@@ -400,7 +392,7 @@ class MPyg321Player:
 
     def on_end_of_song_int(self):
         """Internal callback when the song ends"""
-        if(self.loop):
+        if self.loop:
             self.play()
         else:
             # The music doesn't stop if it is looped
@@ -414,20 +406,15 @@ class MPyg321Player:
     # # # Public Callbacks # # #
     def on_any_stop(self):
         """Callback when the music stops for any reason"""
-        pass
 
     def on_user_pause(self):
         """Callback when user pauses the music"""
-        pass
 
     def on_user_resume(self):
         """Callback when user resumes the music"""
-        pass
 
     def on_user_stop(self):
         """Callback when user stops music"""
-        pass
 
     def on_music_end(self):
         """Callback when music ends"""
-        pass

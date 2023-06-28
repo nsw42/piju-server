@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 from collections import defaultdict
+import doctest
 import gzip
 from http import HTTPStatus
 import json
@@ -47,7 +48,7 @@ class InformationLevel:
             return default
 
 
-def build_playlist_from_api_data(db: Database, request) -> Tuple[Playlist, List[str]]:
+def build_playlist_from_api_data(db: Database) -> Tuple[Playlist, List[str]]:
     data = request.get_json()
     if not data:
         abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
@@ -59,7 +60,8 @@ def build_playlist_from_api_data(db: Database, request) -> Tuple[Playlist, List[
     if (not trackids) and (not files):
         abort(HTTPStatus.BAD_REQUEST, "Either a list of tracks or a list of files must be specified")
     if (trackids) and (files):
-        abort(HTTPStatus.BAD_REQUEST, "Only one of a list of tracks and a list of files is permitted")
+        abort(HTTPStatus.BAD_REQUEST,
+              "Only one of a list of tracks and a list of files is permitted")
     if files:
         tracks = []
         missing = []
@@ -550,7 +552,7 @@ def update_player_play_from_queue(queue_pos, trackid):
 
 def update_player_play_from_youtube(url):
     app.download_history.add(url)
-    app.work_queue.put((WorkRequests.FetchFromYouTube, url, app.piju_config.download_dir, play_downloaded_files))
+    app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE, url, app.piju_config.download_dir, play_downloaded_files))
 
 
 def play_downloaded_files(url, download_info):
@@ -635,7 +637,7 @@ def playlists():
             return gzippable_jsonify(rtn)
     elif request.method == 'POST':
         with DatabaseAccess() as db:
-            playlist, missing = build_playlist_from_api_data(db, request)
+            playlist, missing = build_playlist_from_api_data(db)
             db.create_playlist(playlist)
             return response_for_import_playlist(playlist, missing)
 
@@ -653,7 +655,7 @@ def one_playlist(playlistid):
             return gzippable_jsonify(json_playlist(playlist, include_genres=genre_info, include_tracks=track_info))
     elif request.method == 'PUT':
         with DatabaseAccess() as db:
-            playlist, missing = build_playlist_from_api_data(db, request)
+            playlist, missing = build_playlist_from_api_data(db)
             playlist = db.update_playlist(playlistid, playlist)
             return response_for_import_playlist(playlist, missing)
     elif request.method == 'DELETE':
@@ -674,10 +676,10 @@ def queue():
         try:
             index = int(data['index'])
             trackid = int(data['track'])
-        except KeyError:
-            raise BadRequestKeyError()
-        except ValueError:
-            raise BadRequest()
+        except KeyError as exc:
+            raise BadRequestKeyError() from exc
+        except ValueError as exc:
+            raise BadRequest() from exc
         if not app.player.remove_from_queue(index, trackid):
             # index or trackid mismatch
             raise BadRequest('Track id did not match at given index')
@@ -685,8 +687,8 @@ def queue():
 
     elif request.method == 'GET':
         with DatabaseAccess() as db:
-            queue = [json_track_or_file(db, queued_track) for queued_track in app.player.visible_queue]
-        return gzippable_jsonify(queue)
+            queue_data = [json_track_or_file(db, queued_track) for queued_track in app.player.visible_queue]
+        return gzippable_jsonify(queue_data)
 
     elif request.method == 'OPTIONS':
         # the request to add to queue looks like a cross-domain request to Chrome,
@@ -704,7 +706,7 @@ def queue():
         youtubeurl = data.get('url')
         if youtubeurl:
             app.download_history.add(youtubeurl)
-            app.work_queue.put((WorkRequests.FetchFromYouTube, youtubeurl, app.piju_config.download_dir,
+            app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE, youtubeurl, app.piju_config.download_dir,
                                 queue_downloaded_files))
         else:
             with DatabaseAccess() as db:
@@ -729,16 +731,16 @@ def start_scan():
     if data is None:
         abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
     subdir = data.get('dir')
-    scandir = config.music_dir if (subdir is None) else os.path.join(config.music_dir, subdir)
+    scandir = app.piju_config.music_dir if (subdir is None) else os.path.join(app.piju_config.music_dir, subdir)
     # TODO: Error checking on scandir
-    app.work_queue.put((WorkRequests.ScanDirectory, scandir))
+    app.work_queue.put((WorkRequests.SCAN_DIRECTORY, scandir))
     return ('', HTTPStatus.NO_CONTENT)
 
 
 @app.route("/scanner/tidy", methods=['POST'])
 def start_tidy():
-    app.work_queue.put((WorkRequests.DeleteMissingTracks, ))
-    app.work_queue.put((WorkRequests.DeleteAlbumsWithoutTracks, ))
+    app.work_queue.put((WorkRequests.DELETE_MISSING_TRACKS, ))
+    app.work_queue.put((WorkRequests.DELETE_ALBUMS_WITHOUT_TRACKS, ))
     return ('', HTTPStatus.NO_CONTENT)
 
 
@@ -791,15 +793,14 @@ def get_track(trackid):
 
 # MAIN --------------------------------------------------------------------------------------------
 
-if __name__ == '__main__':
+def main():
     args = parse_args()
 
     if args.doctest:
-        import doctest
         doctest.testmod()
     else:
         config = Config(args.config)
-        db = Database()  # pre-create tables
+        _ = Database()  # pre-create tables
         app.piju_config = config
         app.work_queue = Queue()
         app.worker = WorkerThread(app.work_queue)
@@ -810,3 +811,7 @@ if __name__ == '__main__':
         # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
         # see https://developer.apple.com/forums/thread/682332
         app.run(use_reloader=False, host='0.0.0.0', threaded=True)
+
+
+if __name__ == '__main__':
+    main()

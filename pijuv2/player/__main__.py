@@ -15,7 +15,7 @@ def parse_args():
     return args
 
 
-if __name__ == '__main__':
+def main():
     args = parse_args()
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
@@ -25,3 +25,7 @@ if __name__ == '__main__':
     player.play_from_real_queue_index(0)
     while player.current_status != 'stopped':
         time.sleep(1)
+
+
+if __name__ == '__main__':
+    main()

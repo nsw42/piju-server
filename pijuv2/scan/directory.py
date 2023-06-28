@@ -36,7 +36,7 @@ def set_cross_refs(db: Database, track: Track, albumref: Album):
 
 
 def scan_directory(basedir: pathlib.Path, db: Database, limit: int = None):
-    i = 0
+    count = 0
     for (pattern, scanner) in [('*.mp3', scan_mp3),
                                ('*.m4a', scan_m4a)]:
         for path in basedir.rglob(pattern):
@@ -46,6 +46,6 @@ def scan_directory(basedir: pathlib.Path, db: Database, limit: int = None):
                 if existing_track is not None:
                     track.Id = existing_track.Id
                 set_cross_refs(db, track, albumref)
-            i += 1
-            if (limit is not None) and (i >= limit):
+            count += 1
+            if (limit is not None) and (count >= limit):
                 return

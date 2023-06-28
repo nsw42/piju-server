@@ -1,7 +1,7 @@
 from collections import namedtuple
 import logging
 import os.path
-from typing import List
+from typing import List, Optional
 
 from .mp3player import MP3MusicPlayer
 from .mpvmusicplayer import MPVMusicPlayer
@@ -18,7 +18,9 @@ QueuedTrack = namedtuple('QueuedTrack', 'filepath, trackid, artist, title, artwo
 
 
 class MusicPlayer:
-    def __init__(self, queue: List[Track] = [], identifier: str = ''):
+    def __init__(self, queue: List[Track] = None, identifier: str = ''):
+        self.queue = []
+        self.current_tracklist_identifier = identifier
         self.set_queue(queue, identifier)
         self.current_player = None
         self.current_status = 'stopped'
@@ -74,8 +76,11 @@ class MusicPlayer:
         self.stop()
         self.queue = []  # list of QueuedTrack
 
-    def set_queue(self, queue: List[Track], identifier: str):
-        self.queue = [QueuedTrack(track.Filepath, track.Id, track.Artist, track.Title, None) for track in queue]
+    def set_queue(self, queue: Optional[List[Track]], identifier: str):
+        if queue:
+            self.queue = [QueuedTrack(track.Filepath, track.Id, track.Artist, track.Title, None) for track in queue]
+        else:
+            self.queue = []
         self.index = 0  # invariant: the index of the *currently playing* song
         self.current_tracklist_identifier = identifier
 
