@@ -18,7 +18,7 @@ from ..database.schema import Album, Genre, Playlist, PlaylistEntry, Track
 from ..player.player import MusicPlayer
 from .config import Config
 from .downloadhistory import DownloadHistory
-from .workqueue import WorkRequests
+from .workrequests import WorkRequests
 from .workthread import WorkerThread
 
 

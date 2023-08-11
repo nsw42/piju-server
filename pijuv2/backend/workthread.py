@@ -6,7 +6,7 @@ import threading
 from ..database.database import DatabaseAccess
 from ..database.tidy import delete_missing_tracks, delete_albums_without_tracks
 from ..scan.directory import scan_directory
-from .workqueue import WorkRequests
+from .workrequests import WorkRequests
 from .ytdlp import fetch_audio
 
 
