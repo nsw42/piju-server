@@ -72,9 +72,9 @@ Ctrl-C to exit
 
 * Start the service:
 
-   ```sh
-   sudo /etc/init.d/piju start
-   ```
+    ```sh
+    sudo /etc/init.d/piju start
+    ```
 
 ### Set up log rotation
 
