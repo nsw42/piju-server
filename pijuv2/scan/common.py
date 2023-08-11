@@ -1,10 +1,11 @@
 from collections import namedtuple
 from datetime import datetime
 import io
+import logging
 import pathlib
 from typing import Optional
 
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 ArtworkSize = namedtuple('ArtworkSize', 'width height')
 
@@ -93,11 +94,15 @@ def find_coverart_file(music_absolutepath: pathlib.Path):
 
 
 def get_artwork_size(artwork_path: pathlib.Path, artwork_blob: bytes) -> Optional[ArtworkSize]:
-    if artwork_path:
-        img = Image.open(artwork_path)
-    elif artwork_blob:
-        img = Image.open(io.BytesIO(artwork_blob))
-    else:
+    try:
+        if artwork_path:
+            img = Image.open(artwork_path)
+        elif artwork_blob:
+            img = Image.open(io.BytesIO(artwork_blob))
+        else:
+            return None
+    except UnidentifiedImageError as exc:
+        logging.error(f"Error scanning {artwork_path}: {exc}")
         return None
 
     return ArtworkSize(img.width, img.height)
