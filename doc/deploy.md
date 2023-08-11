@@ -70,6 +70,12 @@ Ctrl-C to exit
     sudo rc-update add piju default
     ```
 
+* Start the service:
+
+   ```sh
+   sudo /etc/init.d/piju start
+   ```
+
 ### Set up log rotation
 
 Install logrotate:
@@ -95,3 +101,9 @@ Write a logrotate configuration file (`/etc/logrotate.d/piju`):
 
 Installing logrotate automatically causes it to run daily. It shouldn't be
 necessary to perform any further configuration.
+
+### Update the database
+
+Before using the service for the first time, and any time that music is added
+to the system, it's necessary to update the piju database.  See
+<update_database.md>
