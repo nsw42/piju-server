@@ -1,6 +1,7 @@
 from collections import namedtuple
 import logging
 import os.path
+import time
 from typing import List
 
 from .mp3player import MP3MusicPlayer
@@ -47,10 +48,12 @@ class MusicPlayer:
         current status in an indeterminate state. Either call again with a
         different file, or call stop()
         """
-        self._stop_player()
+        was_playing = self._stop_player()
         if not os.path.isfile(filename):
             logging.warning(f"Skipping missing file {filename}")
             return False
+        if was_playing:
+            time.sleep(1)
         logging.debug(f"Playing {filename}")
         if filename.endswith('.mp3'):
             self.current_player = MP3MusicPlayer(self, audiodevice=self.mp3audiodevice)
@@ -65,11 +68,16 @@ class MusicPlayer:
     def _stop_player(self):
         """
         Stop the music player only - i.e. don't do the rest of the actions normally associated with
-        stopping, such as setting state variables
+        stopping, such as setting state variables.
+        Returns whether it was previous playing
         """
         if self.current_player:
             self.current_player.stop()
+            rtn = True
+        else:
+            rtn = False
         self.current_player = None
+        return rtn
 
     def clear_queue(self):
         self.stop()
