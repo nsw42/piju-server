@@ -1,6 +1,7 @@
 from collections import namedtuple
 import logging
 import os.path
+import time
 from typing import List, Optional
 
 from .mp3player import MP3MusicPlayer
@@ -18,7 +19,7 @@ QueuedTrack = namedtuple('QueuedTrack', 'filepath, trackid, artist, title, artwo
 
 
 class MusicPlayer:
-    def __init__(self, queue: List[Track] = None, identifier: str = ''):
+    def __init__(self, queue: List[Track] = None, identifier: str = '', mp3audiodevice=None):
         self.queue = []
         self.current_tracklist_identifier = identifier
         self.set_queue(queue, identifier)
@@ -26,6 +27,7 @@ class MusicPlayer:
         self.current_status = 'stopped'
         self.current_volume = 100
         self.index = None
+        self.mp3audiodevice = mp3audiodevice
 
     @property
     def current_track(self) -> QueuedTrack:
@@ -48,13 +50,15 @@ class MusicPlayer:
         current status in an indeterminate state. Either call again with a
         different file, or call stop()
         """
-        self._stop_player()
+        was_playing = self._stop_player()
         if not os.path.isfile(filename):
             logging.warning(f"Skipping missing file {filename}")
             return False
+        if was_playing:
+            time.sleep(1)
         logging.debug(f"Playing {filename}")
         if filename.endswith('.mp3'):
-            self.current_player = MP3MusicPlayer(self)
+            self.current_player = MP3MusicPlayer(self, audiodevice=self.mp3audiodevice)
             self.current_player.play_song(filename)
         else:
             self.current_player = MPVMusicPlayer(self)
@@ -66,11 +70,16 @@ class MusicPlayer:
     def _stop_player(self):
         """
         Stop the music player only - i.e. don't do the rest of the actions normally associated with
-        stopping, such as setting state variables
+        stopping, such as setting state variables.
+        Returns whether it was previous playing
         """
         if self.current_player:
             self.current_player.stop()
+            rtn = True
+        else:
+            rtn = False
         self.current_player = None
+        return rtn
 
     def clear_queue(self):
         self.stop()

@@ -4,6 +4,7 @@ import doctest
 import gzip
 from http import HTTPStatus
 import json
+import logging
 import mimetypes
 import os.path
 from pathlib import Path
@@ -259,6 +260,8 @@ def normalize_punctuation(search_string):
 
 def parse_args():
     parser = ArgumentParser()
+    parser.add_argument('-a', '--mp3audiodevice', action='store',
+                        help='Set audio device for mpg123')
     parser.add_argument('-t', '--doctest', action='store_true',
                         help="Run self-test and exit")
     parser.add_argument('-c', '--config', metavar='FILE', type=Path,
@@ -799,13 +802,14 @@ def main():
     if args.doctest:
         doctest.testmod()
     else:
+        logging.basicConfig(level=logging.DEBUG)
         config = Config(args.config)
         _ = Database()  # pre-create tables
         app.piju_config = config
         app.work_queue = Queue()
         app.worker = WorkerThread(app.work_queue)
         app.worker.start()
-        app.player = MusicPlayer()
+        app.player = MusicPlayer(mp3audiodevice=args.mp3audiodevice)
         app.api_version_string = '5.1'
         app.download_history = DownloadHistory()
         # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
