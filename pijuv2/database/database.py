@@ -83,7 +83,7 @@ class Database():
     def update_playlist(self, playlistid: int, playlist: Playlist):
         existing_playlist = self.get_playlist_by_id(playlistid)
         if not existing_playlist:
-            raise NotFoundException(f"Playlist {playlist.Id} does not exist")
+            raise NotFoundException(f"Playlist {playlistid} does not exist")
         existing_playlist.Title = playlist.Title
         existing_playlist.Entries = playlist.Entries
         existing_playlist.Genres = playlist.Genres
