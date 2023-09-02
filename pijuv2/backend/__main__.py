@@ -15,7 +15,7 @@ from flask import abort, Flask, make_response, request, Response, url_for
 from werkzeug.exceptions import BadRequest, BadRequestKeyError
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
-from ..database.schema import Album, Genre, Playlist, PlaylistEntry, Track
+from ..database.schema import Album, Genre, Playlist, PlaylistEntry, RadioStation, Track
 from ..player.player import MusicPlayer
 from .config import Config
 from .downloadhistory import DownloadHistory
@@ -726,6 +726,22 @@ def add_track_to_queue(track: Track):
     has_artwork = (track.ArtworkPath or track.ArtworkBlob)
     artwork_uri = url_for('get_artwork', trackid=track.Id) if has_artwork else None
     app.player.add_to_queue(track.Filepath, track.Id, track.Artist, track.Title, artwork_uri)
+
+
+@app.route("/radio/", methods=['POST'])
+def add_radio_station():
+    data = request.get_json()
+    if data is None:
+        abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
+    station_name = data.get('name')
+    url = data.get('url')
+    station = RadioStation(Name=station_name, Url=url)
+    with DatabaseAccess() as db:
+        db.add_radio_station(station)
+        response = {
+            'id': station.Id
+        }
+        return gzippable_jsonify(response)
 
 
 @app.route("/scanner/scan", methods=['POST'])

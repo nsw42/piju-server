@@ -6,7 +6,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.pool import QueuePool
 
-from .schema import Base, Album, Genre, Playlist, Track
+from .schema import Base, Album, Genre, Playlist, RadioStation, Track
 
 
 FILENAME = 'file.db'
@@ -63,6 +63,12 @@ class Database():
 
     def commit(self):
         self.session.commit()
+
+    def add_radio_station(self, station: RadioStation):
+        self.session.add(station)
+        self.session.commit()
+        self.session.refresh(station)
+        return station
 
     def create_playlist(self, playlist: Playlist):
         self.session.add(playlist)
