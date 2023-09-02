@@ -3,7 +3,7 @@ import logging
 import time
 
 from ..database.database import DatabaseAccess
-from .player import MusicPlayer
+from .fileplayer import FilePlayer
 
 
 def parse_args():
@@ -21,7 +21,7 @@ def main():
         logging.basicConfig(level=logging.DEBUG)
     with DatabaseAccess() as db:
         tracks = [db.get_track_by_id(tid) for tid in args.tracks]
-    player = MusicPlayer(tracks)
+    player = FilePlayer(tracks)
     player.play_from_real_queue_index(0)
     while player.current_status != 'stopped':
         time.sleep(1)

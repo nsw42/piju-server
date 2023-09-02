@@ -10,7 +10,7 @@ from flask import abort, Flask, request
 import requests
 
 from ..backend.__main__ import extract_id, gzippable_jsonify
-from ..player.player import MusicPlayer
+from ..player.fileplayer import MusicPlayer
 
 app = Flask(__name__)
 
