@@ -70,6 +70,10 @@ class Database():
         self.session.refresh(station)
         return station
 
+    def get_all_radio_stations(self) -> List[RadioStation]:
+        result = self.session.execute(select(RadioStation).order_by(RadioStation.Id))
+        return result.scalars().all()
+
     def create_playlist(self, playlist: Playlist):
         self.session.add(playlist)
         self.session.commit()
@@ -289,6 +293,9 @@ class Database():
         Raises NotFoundException for an unknown id
         """
         return self.get_x_by_id(Playlist, playlistid)
+
+    def get_radio_station_by_id(self, stationid: int):
+        return self.get_x_by_id(RadioStation, stationid)
 
     def get_track_by_id(self, trackid: int) -> Track:
         """

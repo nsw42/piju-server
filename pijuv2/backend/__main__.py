@@ -206,6 +206,14 @@ def json_playlist(playlist: Playlist, include_genres: InformationLevel, include_
     return rtn
 
 
+def json_radio_station(station: RadioStation):
+    rtn = {
+        'link': url_for('one_radio_station', stationid=station.Id),
+        'name': station.Name
+    }
+    return rtn
+
+
 def json_track(track: Track, include_debuginfo: bool = False):
     if not track:
         return {}
@@ -728,20 +736,38 @@ def add_track_to_queue(track: Track):
     app.player.add_to_queue(track.Filepath, track.Id, track.Artist, track.Title, artwork_uri)
 
 
-@app.route("/radio/", methods=['POST'])
-def add_radio_station():
-    data = request.get_json()
-    if data is None:
-        abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
-    station_name = data.get('name')
-    url = data.get('url')
-    station = RadioStation(Name=station_name, Url=url)
+@app.route("/radio/", methods=['GET', 'POST'])
+def radio_stations():
+    if request.method == 'GET':
+        with DatabaseAccess() as db:
+            rtn = []
+            for station in db.get_all_radio_stations():
+                rtn.append(json_radio_station(station))
+            return gzippable_jsonify(rtn)
+
+    elif request.method == 'POST':
+        data = request.get_json()
+        if data is None:
+            abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
+        station_name = data.get('name')
+        url = data.get('url')
+        station = RadioStation(Name=station_name, Url=url)
+        with DatabaseAccess() as db:
+            db.add_radio_station(station)
+            response = {
+                'id': station.Id
+            }
+            return gzippable_jsonify(response)
+
+
+@app.route("/radio/<stationid>", methods=['GET'])
+def one_radio_station(stationid):
     with DatabaseAccess() as db:
-        db.add_radio_station(station)
-        response = {
-            'id': station.Id
-        }
-        return gzippable_jsonify(response)
+        try:
+            station = db.get_radio_station_by_id(stationid)
+        except NotFoundException:
+            abort(HTTPStatus.NOT_FOUND, description="Unknown radio station id")
+        return gzippable_jsonify(json_radio_station(station))
 
 
 @app.route("/scanner/scan", methods=['POST'])
