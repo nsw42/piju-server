@@ -93,6 +93,15 @@ def build_playlist_from_api_data(db: Database) -> Tuple[Playlist, List[str]]:
     return Playlist(Title=title, Entries=playlist_entries, Genres=genres), missing
 
 
+def build_radio_station_from_api_data() -> RadioStation:
+    data = request.get_json()
+    if data is None:
+        abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
+    station_name = data.get('name')
+    url = data.get('url')
+    return RadioStation(Name=station_name, Url=url)
+
+
 def extract_id(uri_or_id):
     """
     >>> extract_id("")
@@ -748,12 +757,7 @@ def radio_stations():
             return gzippable_jsonify(rtn)
 
     elif request.method == 'POST':
-        data = request.get_json()
-        if data is None:
-            abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
-        station_name = data.get('name')
-        url = data.get('url')
-        station = RadioStation(Name=station_name, Url=url)
+        station = build_radio_station_from_api_data()
         with DatabaseAccess() as db:
             db.add_radio_station(station)
             response = {
@@ -762,16 +766,22 @@ def radio_stations():
             return gzippable_jsonify(response)
 
 
-@app.route("/radio/<stationid>", methods=['GET'])
+@app.route("/radio/<stationid>", methods=['GET', 'PUT'])
 def one_radio_station(stationid):
-    infolevel = InformationLevel.from_string(request.args.get('urls', ''), InformationLevel.Links)
-    include_urls = (infolevel in (InformationLevel.AllInfo, InformationLevel.DebugInfo))
-    with DatabaseAccess() as db:
-        try:
-            station = db.get_radio_station_by_id(stationid)
-        except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description="Unknown radio station id")
-        return gzippable_jsonify(json_radio_station(station, include_urls=include_urls))
+    if request.method == 'GET':
+        infolevel = InformationLevel.from_string(request.args.get('urls', ''), InformationLevel.Links)
+        include_urls = (infolevel in (InformationLevel.AllInfo, InformationLevel.DebugInfo))
+        with DatabaseAccess() as db:
+            try:
+                station = db.get_radio_station_by_id(stationid)
+            except NotFoundException:
+                abort(HTTPStatus.NOT_FOUND, description="Unknown radio station id")
+            return gzippable_jsonify(json_radio_station(station, include_urls=include_urls))
+    elif request.method == 'PUT':
+        station = build_radio_station_from_api_data()
+        with DatabaseAccess() as db:
+            existing_station = db.update_radio_station(stationid, station)
+            return gzippable_jsonify(json_radio_station(existing_station))
 
 
 @app.route("/scanner/scan", methods=['POST'])

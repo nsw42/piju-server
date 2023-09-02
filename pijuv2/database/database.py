@@ -90,6 +90,15 @@ class Database():
         self.session.commit()
         return existing_playlist
 
+    def update_radio_station(self, stationid: int, station: RadioStation):
+        existing_station = self.get_radio_station_by_id(stationid)
+        if not existing_station:
+            raise NotFoundException(f"Radio {stationid} does not exist")
+        existing_station.Name = station.Name
+        existing_station.Url = station.Url
+        self.session.commit()
+        return existing_station
+
     def delete_album(self, albumid: int):
         album = self.get_album_by_id(albumid)  # raises NotFoundException if necessary
         self.session.delete(album)
