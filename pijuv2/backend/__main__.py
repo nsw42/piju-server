@@ -206,11 +206,13 @@ def json_playlist(playlist: Playlist, include_genres: InformationLevel, include_
     return rtn
 
 
-def json_radio_station(station: RadioStation):
+def json_radio_station(station: RadioStation, include_urls: bool = False):
     rtn = {
         'link': url_for('one_radio_station', stationid=station.Id),
         'name': station.Name
     }
+    if include_urls:
+        rtn['url'] = station.Url
     return rtn
 
 
@@ -762,12 +764,14 @@ def radio_stations():
 
 @app.route("/radio/<stationid>", methods=['GET'])
 def one_radio_station(stationid):
+    infolevel = InformationLevel.from_string(request.args.get('urls', ''), InformationLevel.Links)
+    include_urls = (infolevel in (InformationLevel.AllInfo, InformationLevel.DebugInfo))
     with DatabaseAccess() as db:
         try:
             station = db.get_radio_station_by_id(stationid)
         except NotFoundException:
             abort(HTTPStatus.NOT_FOUND, description="Unknown radio station id")
-        return gzippable_jsonify(json_radio_station(station))
+        return gzippable_jsonify(json_radio_station(station, include_urls=include_urls))
 
 
 @app.route("/scanner/scan", methods=['POST'])
