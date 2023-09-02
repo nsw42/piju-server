@@ -99,7 +99,11 @@ def build_radio_station_from_api_data() -> RadioStation:
     if data is None:
         abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
     station_name = data.get('name')
+    if not station_name:
+        abort(HTTPStatus.BAD_REQUEST, description='Missing station name')
     url = data.get('url')
+    if not url:
+        abort(HTTPStatus.BAD_REQUEST, description='Missing station URL')
     return RadioStation(Name=station_name, Url=url)
 
 
