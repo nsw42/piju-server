@@ -104,7 +104,8 @@ def build_radio_station_from_api_data() -> RadioStation:
     url = data.get('url')
     if not url:
         abort(HTTPStatus.BAD_REQUEST, description='Missing station URL')
-    return RadioStation(Name=station_name, Url=url)
+    artwork_url = data.get('artwork')  # optional
+    return RadioStation(Name=station_name, Url=url, ArtworkUrl=artwork_url)
 
 
 def extract_id(uri_or_id):
@@ -223,7 +224,8 @@ def json_playlist(playlist: Playlist, include_genres: InformationLevel, include_
 def json_radio_station(station: RadioStation, include_urls: bool = False):
     rtn = {
         'link': url_for('one_radio_station', stationid=station.Id),
-        'name': station.Name
+        'name': station.Name,
+        'artwork': station.ArtworkUrl
     }
     if include_urls:
         rtn['url'] = station.Url

@@ -96,6 +96,7 @@ class Database():
             raise NotFoundException(f"Radio {stationid} does not exist")
         existing_station.Name = station.Name
         existing_station.Url = station.Url
+        existing_station.ArtworkUrl = station.ArtworkUrl
         self.session.commit()
         return existing_station
 

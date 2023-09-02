@@ -73,6 +73,7 @@ class RadioStation(Base):
     Id = Column(Integer, primary_key=True)
     Name = Column(String)
     Url = Column(String)
+    ArtworkUrl = Column(String)
 
 
 class Track(Base):
