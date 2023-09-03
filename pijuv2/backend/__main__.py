@@ -380,6 +380,7 @@ def current_status():
             rtn['MaximumTrackIndex'] = app.current_player.maximum_track_index
         elif app.current_player == app.stream_player:
             rtn['CurrentStream'] = app.current_player.currently_playing
+            rtn['CurrentTrackIndex'] = rtn['MaximumTrackIndex'] = 1
 
     return gzippable_jsonify(rtn)
 
