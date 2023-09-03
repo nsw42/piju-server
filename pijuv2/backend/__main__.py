@@ -50,6 +50,9 @@ class InformationLevel:
             return default
 
 
+# HELPER FUNCTIONS ----------------------------------------------------------------------------
+
+
 def build_playlist_from_api_data(db: Database) -> Tuple[Playlist, List[str]]:
     data = request.get_json()
     if not data:
@@ -452,7 +455,7 @@ def get_artwork(trackid):
             return Response(track.ArtworkBlob, headers={'Cache-Control': 'max-age=300'}, mimetype=mime)
 
         else:
-            abort(HTTPStatus.NOT_FOUND, description="Track has no artwork")
+            return abort(HTTPStatus.NOT_FOUND, description="Track has no artwork")
 
 
 @app.route("/artworkinfo/<trackid>")
@@ -715,6 +718,8 @@ def player_volume():
         except (AttributeError, KeyError, ValueError):
             abort(HTTPStatus.BAD_REQUEST, description='Volume must be specified and numeric')
 
+    return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
+
 
 @app.route("/playlists/", methods=['GET', 'POST'])
 def playlists():
@@ -726,11 +731,14 @@ def playlists():
             for playlist in db.get_all_playlists():
                 rtn.append(json_playlist(playlist, include_genres=genre_info, include_tracks=tracks_info))
             return gzippable_jsonify(rtn)
+
     elif request.method == 'POST':
         with DatabaseAccess() as db:
             playlist, missing = build_playlist_from_api_data(db)
             db.create_playlist(playlist)
             return response_for_import_playlist(playlist, missing)
+
+    return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
 @app.route("/playlists/<playlistid>", methods=['DELETE', 'GET', 'PUT'])
@@ -744,11 +752,13 @@ def one_playlist(playlistid):
             except NotFoundException:
                 abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
             return gzippable_jsonify(json_playlist(playlist, include_genres=genre_info, include_tracks=track_info))
+
     elif request.method == 'PUT':
         with DatabaseAccess() as db:
             playlist, missing = build_playlist_from_api_data(db)
             playlist = db.update_playlist(playlistid, playlist)
             return response_for_import_playlist(playlist, missing)
+
     elif request.method == 'DELETE':
         with DatabaseAccess() as db:
             try:
@@ -756,6 +766,8 @@ def one_playlist(playlistid):
             except NotFoundException:
                 abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
             return ('', HTTPStatus.NO_CONTENT)
+
+    return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
 @app.route("/queue/", methods=['GET', 'DELETE', 'OPTIONS', 'PUT'])
@@ -811,6 +823,8 @@ def queue():
                     abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
         return ('', HTTPStatus.NO_CONTENT)
 
+    return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
+
 
 def add_track_to_queue(track: Track):
     """
@@ -840,6 +854,8 @@ def radio_stations():
             }
             return gzippable_jsonify(response)
 
+    return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
+
 
 @app.route("/radio/<stationid>", methods=['DELETE', 'GET', 'PUT'])
 def one_radio_station(stationid):
@@ -852,11 +868,13 @@ def one_radio_station(stationid):
             except NotFoundException:
                 abort(HTTPStatus.NOT_FOUND, description="Unknown radio station id")
             return gzippable_jsonify(json_radio_station(station, include_urls=include_urls))
+
     elif request.method == 'PUT':
         station = build_radio_station_from_api_data()
         with DatabaseAccess() as db:
             existing_station = db.update_radio_station(stationid, station)
             return gzippable_jsonify(json_radio_station(existing_station))
+
     elif request.method == 'DELETE':
         with DatabaseAccess() as db:
             try:
@@ -864,6 +882,7 @@ def one_radio_station(stationid):
             except NotFoundException:
                 abort(HTTPStatus.NOT_FOUND, description='Unknown radio station id')
             return ('', HTTPStatus.NO_CONTENT)
+    return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
 @app.route("/scanner/scan", methods=['POST'])
