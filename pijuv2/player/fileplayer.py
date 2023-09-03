@@ -13,10 +13,10 @@ from ..database.schema import Track
 
 QueuedTrack = namedtuple('QueuedTrack', 'filepath, trackid, artist, title, artwork')
 # filepath: str
-# trackid: int
+# trackid: int - None for YouTube files; set for Tracks from the database
 # artist: str
 # title: str
-# artwork: str
+# artwork: str - only for YouTube files (and even then may be unknown); is always None for Tracks from the database
 
 
 class FilePlayer(PlayerInterface):
