@@ -6,7 +6,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.pool import QueuePool
 
-from .schema import Base, Album, Genre, Playlist, Track
+from .schema import Base, Album, Genre, Playlist, RadioStation, Track
 
 
 FILENAME = 'file.db'
@@ -64,6 +64,16 @@ class Database():
     def commit(self):
         self.session.commit()
 
+    def add_radio_station(self, station: RadioStation):
+        self.session.add(station)
+        self.session.commit()
+        self.session.refresh(station)
+        return station
+
+    def get_all_radio_stations(self) -> List[RadioStation]:
+        result = self.session.execute(select(RadioStation).order_by(RadioStation.Id))
+        return result.scalars().all()
+
     def create_playlist(self, playlist: Playlist):
         self.session.add(playlist)
         self.session.commit()
@@ -73,12 +83,22 @@ class Database():
     def update_playlist(self, playlistid: int, playlist: Playlist):
         existing_playlist = self.get_playlist_by_id(playlistid)
         if not existing_playlist:
-            raise NotFoundException(f"Playlist {playlist.Id} does not exist")
+            raise NotFoundException(f"Playlist {playlistid} does not exist")
         existing_playlist.Title = playlist.Title
         existing_playlist.Entries = playlist.Entries
         existing_playlist.Genres = playlist.Genres
         self.session.commit()
         return existing_playlist
+
+    def update_radio_station(self, stationid: int, station: RadioStation):
+        existing_station = self.get_radio_station_by_id(stationid)
+        if not existing_station:
+            raise NotFoundException(f"Radio {stationid} does not exist")
+        existing_station.Name = station.Name
+        existing_station.Url = station.Url
+        existing_station.ArtworkUrl = station.ArtworkUrl
+        self.session.commit()
+        return existing_station
 
     def delete_album(self, albumid: int):
         album = self.get_album_by_id(albumid)  # raises NotFoundException if necessary
@@ -88,6 +108,11 @@ class Database():
     def delete_playlist(self, playlistid: int):
         playlist = self.get_playlist_by_id(playlistid)  # raises NotFoundException if necessary
         self.session.delete(playlist)
+        self.session.commit()
+
+    def delete_radio_station(self, stationid: int):
+        station = self.get_radio_station_by_id(stationid)  # raises NotFoundException if necessary
+        self.session.delete(station)
         self.session.commit()
 
     def delete_track(self, trackid: int):
@@ -283,6 +308,9 @@ class Database():
         Raises NotFoundException for an unknown id
         """
         return self.get_x_by_id(Playlist, playlistid)
+
+    def get_radio_station_by_id(self, stationid: int) -> RadioStation:
+        return self.get_x_by_id(RadioStation, stationid)
 
     def get_track_by_id(self, trackid: int) -> Track:
         """

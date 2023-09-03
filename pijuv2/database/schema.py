@@ -67,6 +67,15 @@ class Playlist(Base):
                           back_populates="Playlists")
 
 
+class RadioStation(Base):
+    __tablename__ = 'RadioStations'
+
+    Id = Column(Integer, primary_key=True)
+    Name = Column(String)
+    Url = Column(String)
+    ArtworkUrl = Column(String)
+
+
 class Track(Base):
     __tablename__ = 'Tracks'
 

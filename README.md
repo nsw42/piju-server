@@ -19,6 +19,8 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 * 4.1: Support DELETE method on /queue/
 * 4.2: Add the ability to play from a given index in the queue
 * 5.0: Add support for playing tracks from YouTube
+* 5.1: Add the ability to retrieve download history
+* 6.0: Add support for playing streaming radio
 
 ## Dependencies
 

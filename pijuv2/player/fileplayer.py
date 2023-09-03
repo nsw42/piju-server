@@ -6,26 +6,26 @@ from typing import List, Optional
 
 from .mp3player import MP3MusicPlayer
 from .mpvmusicplayer import MPVMusicPlayer
+from .playerinterface import CurrentStatusStrings, PlayerInterface
 
 from ..database.schema import Track
 
 
 QueuedTrack = namedtuple('QueuedTrack', 'filepath, trackid, artist, title, artwork')
 # filepath: str
-# trackid: int
+# trackid: int - None for YouTube files; set for Tracks from the database
 # artist: str
 # title: str
-# artwork: str
+# artwork: str - only for YouTube files (and even then may be unknown); is always None for Tracks from the database
 
 
-class MusicPlayer:
+class FilePlayer(PlayerInterface):
     def __init__(self, queue: List[Track] = None, identifier: str = '', mp3audiodevice=None):
+        super().__init__()
         self.queue = []
         self.current_tracklist_identifier = identifier
         self.set_queue(queue, identifier)
         self.current_player = None
-        self.current_status = 'stopped'
-        self.current_volume = 100
         self.index = None
         self.mp3audiodevice = mp3audiodevice
 
@@ -165,7 +165,7 @@ class MusicPlayer:
         # play the next song in the queue
         if self.index is None:
             return
-        logging.debug(f"MusicPlayer.next ({self.current_player})")
+        logging.debug(f"FilePlayer.next ({self.current_player})")
         if self.index + 1 < len(self.queue):
             self.play_from_real_queue_index(self.index + 1)
         else:
@@ -178,32 +178,32 @@ class MusicPlayer:
     # Wrapper over the lower-layer interface
 
     def pause(self):
-        logging.debug(f"MusicPlayer.pause ({self.current_player})")
+        logging.debug(f"FilePlayer.pause ({self.current_player})")
         if self.current_player:
             self.current_player.pause()
-        self.current_status = 'paused'
+        self.current_status = CurrentStatusStrings.PAUSED
 
     def resume(self):
-        logging.debug(f"MusicPlayer.resume ({self.current_player})")
+        logging.debug(f"FilePlayer.resume ({self.current_player})")
         if self.current_player:
             self.current_player.resume()
-        self.current_status = 'playing'
+        self.current_status = CurrentStatusStrings.PLAYING
 
     def set_volume(self, volume: int):
-        logging.debug(f"MusicPlayer.set_volume {volume}")
+        logging.debug(f"FilePlayer.set_volume {volume}")
         if self.current_player:
             self.current_player.set_volume(volume)
         self.current_volume = volume
 
     def stop(self):
-        logging.debug(f"MusicPlayer.stop ({self.current_player})")
+        logging.debug(f"FilePlayer.stop ({self.current_player})")
         self._stop_player()
         self.current_tracklist_identifier = ''
-        self.current_status = 'stopped'
+        self.current_status = CurrentStatusStrings.STOPPED
         self.index = None
 
     # callbacks
     def on_music_end(self):
         # maybe flush the queue at the end??
-        logging.debug(f"MusicPlayer.on_music_end ({self.current_player})")
+        logging.debug(f"FilePlayer.on_music_end ({self.current_player})")
         self.next()
