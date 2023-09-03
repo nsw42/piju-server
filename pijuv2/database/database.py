@@ -304,7 +304,7 @@ class Database():
         """
         return self.get_x_by_id(Playlist, playlistid)
 
-    def get_radio_station_by_id(self, stationid: int):
+    def get_radio_station_by_id(self, stationid: int) -> RadioStation:
         return self.get_x_by_id(RadioStation, stationid)
 
     def get_track_by_id(self, trackid: int) -> Track:
