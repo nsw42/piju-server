@@ -534,11 +534,8 @@ def update_player_next():
 
 @app.route("/player/pause", methods=['POST'])
 def update_player_pause():
-    if app.current_player == app.file_player:
-        app.current_player.pause()
-        return ('', HTTPStatus.NO_CONTENT)
-    else:
-        abort(HTTPStatus.CONFLICT, "Pause not supported when playing streaming content")
+    app.current_player.pause()
+    return ('', HTTPStatus.NO_CONTENT)
 
 
 @app.route("/player/play", methods=['POST'])
@@ -683,11 +680,8 @@ def update_player_prev():
 
 @app.route("/player/resume", methods=['POST'])
 def update_player_resume():
-    if app.current_player == app.file_player:
-        app.current_player.resume()
-        return ('', HTTPStatus.NO_CONTENT)
-    else:
-        abort(HTTPStatus.CONFLICT, "Resume not supported when playing streaming content")
+    app.current_player.resume()
+    return ('', HTTPStatus.NO_CONTENT)
 
 
 @app.route("/player/stop", methods=['POST'])

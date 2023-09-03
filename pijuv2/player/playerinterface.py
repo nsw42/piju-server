@@ -15,6 +15,12 @@ class PlayerInterface:
         self.current_status = CurrentStatusStrings.STOPPED
         self.current_volume = 100
 
+    def pause(self):
+        raise NotImplementedError()
+
+    def resume(self):
+        raise NotImplementedError()
+
     def stop(self):
         raise NotImplementedError()
 
