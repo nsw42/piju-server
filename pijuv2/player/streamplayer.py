@@ -7,17 +7,27 @@ from .playerinterface import CurrentStatusStrings, PlayerInterface
 class StreamPlayer(PlayerInterface):
     def __init__(self, audio_device: str):
         super().__init__()
-        self.currently_playing = None
-        self.current_url = None
+        self.currently_playing_name = None
+        self.currently_playing_url = None
+        self.currently_playing_artwork = None
         self.player_subprocess = None
         self.audio_device = audio_device
 
-    def play(self, name, url):
+    def _stop(self):
+        """
+        Stop playback, but don't clear metadata, supporting both stop() and pause()
+        """
+        if self.player_subprocess:
+            self.player_subprocess.terminate()
+        self.player_subprocess = None
+
+    def play(self, name: str, url: str, artwork: str):
         if self.player_subprocess:
             self.stop()
         self.current_status = CurrentStatusStrings.PLAYING
-        self.currently_playing = name
-        self.current_url = url
+        self.currently_playing_name = name
+        self.currently_playing_url = url
+        self.currently_playing_artwork = artwork
         if self.audio_device:
             child_environment = dict(os.environ)
             child_environment['SDL_AUDIODRIVER'] = 'alsa'
@@ -38,7 +48,7 @@ class StreamPlayer(PlayerInterface):
         Required for interface compatibility but we cannot actually
         pause. So just stop, but make it look like we've paused.
         """
-        self.stop()
+        self._stop()
         self.current_status = CurrentStatusStrings.PAUSED
 
     def resume(self):
@@ -46,13 +56,13 @@ class StreamPlayer(PlayerInterface):
         Like pause(), required for interface compatibility.
         Restarts playing the last url that was played.
         """
-        self.play(self.currently_playing, self.current_url)
+        if self.currently_playing_name:
+            self.play(self.currently_playing_name, self.currently_playing_url, self.currently_playing_artwork)
 
     def stop(self):
-        if self.player_subprocess:
-            self.player_subprocess.terminate()
-        self.player_subprocess = None
+        self._stop()
         self.current_status = CurrentStatusStrings.STOPPED
+        self.currently_playing_name = self.currently_playing_url = self.currently_playing_artwork = None
 
     def set_volume(self, volume):
         self.current_volume = volume

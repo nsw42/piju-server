@@ -364,22 +364,28 @@ def add_security_headers(resp):
 @app.route("/")
 def current_status():
     with DatabaseAccess() as db:
+        c_p = app.current_player
         rtn = {
             'WorkerStatus': app.worker.current_status,
-            'PlayerStatus': app.current_player.current_status,
-            'PlayerVolume': app.current_player.current_volume,
+            'PlayerStatus': c_p.current_status,
+            'PlayerVolume': c_p.current_volume,
             'NumberAlbums': db.get_nr_albums(),
             'NumberTracks': db.get_nr_tracks(),
             'ApiVersion': app.api_version_string,
         }
-        if app.current_player == app.file_player:
-            rtn['CurrentTracklistUri'] = app.current_player.current_tracklist_identifier
-            rtn['CurrentTrack'] = json_track_or_file(db, app.current_player.current_track) if \
-                app.current_player.current_track else {}
-            rtn['CurrentTrackIndex'] = None if (app.current_player.index is None) else (app.current_player.index + 1)
-            rtn['MaximumTrackIndex'] = app.current_player.maximum_track_index
-        elif app.current_player == app.stream_player:
-            rtn['CurrentStream'] = app.current_player.currently_playing
+        if c_p == app.file_player:
+            rtn['CurrentTracklistUri'] = c_p.current_tracklist_identifier
+            if c_p.current_track:
+                rtn['CurrentTrack'] = json_track_or_file(db, c_p.current_track)
+                rtn['CurrentArtwork'] = rtn['CurrentTrack']['artwork']
+            else:
+                rtn['CurrentTrack'] = {}
+                rtn['CurrentArtwork'] = None
+            rtn['CurrentTrackIndex'] = None if (c_p.index is None) else (c_p.index + 1)
+            rtn['MaximumTrackIndex'] = c_p.maximum_track_index
+        elif c_p == app.stream_player:
+            rtn['CurrentStream'] = c_p.currently_playing_name
+            rtn['CurrentArtwork'] = c_p.currently_playing_artwork
             rtn['CurrentTrackIndex'] = rtn['MaximumTrackIndex'] = 1
 
     return gzippable_jsonify(rtn)
@@ -625,7 +631,7 @@ def update_player_play_from_radio(db: Database, stationid: int):
     except NotFoundException:
         abort(HTTPStatus.NOT_FOUND, "Requested station id not found")
     select_player(app.stream_player)
-    app.current_player.play(station.Name, station.Url)
+    app.current_player.play(station.Name, station.Url, station.ArtworkUrl)
 
 
 def update_player_play_from_youtube(url):
