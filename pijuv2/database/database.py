@@ -110,6 +110,11 @@ class Database():
         self.session.delete(playlist)
         self.session.commit()
 
+    def delete_radio_station(self, stationid: int):
+        station = self.get_radio_station_by_id(stationid)  # raises NotFoundException if necessary
+        self.session.delete(station)
+        self.session.commit()
+
     def delete_track(self, trackid: int):
         track = self.get_track_by_id(trackid)  # raises NotFoundException if necessary
         self.session.delete(track)

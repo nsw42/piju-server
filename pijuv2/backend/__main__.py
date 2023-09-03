@@ -841,7 +841,7 @@ def radio_stations():
             return gzippable_jsonify(response)
 
 
-@app.route("/radio/<stationid>", methods=['GET', 'PUT'])
+@app.route("/radio/<stationid>", methods=['DELETE', 'GET', 'PUT'])
 def one_radio_station(stationid):
     if request.method == 'GET':
         infolevel = InformationLevel.from_string(request.args.get('urls', ''), InformationLevel.Links)
@@ -857,6 +857,13 @@ def one_radio_station(stationid):
         with DatabaseAccess() as db:
             existing_station = db.update_radio_station(stationid, station)
             return gzippable_jsonify(json_radio_station(existing_station))
+    elif request.method == 'DELETE':
+        with DatabaseAccess() as db:
+            try:
+                db.delete_radio_station(stationid)
+            except NotFoundException:
+                abort(HTTPStatus.NOT_FOUND, description='Unknown radio station id')
+            return ('', HTTPStatus.NO_CONTENT)
 
 
 @app.route("/scanner/scan", methods=['POST'])
