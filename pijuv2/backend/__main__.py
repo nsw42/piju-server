@@ -325,6 +325,27 @@ def parse_bool(bool_str: str):
     return False
 
 
+def response_for_import_playlist(playlist: Playlist, missing_tracks: List[str]):
+    response = {
+        'playlistid': playlist.Id,
+        'nrtracks': len(playlist.Entries),
+        'missing': missing_tracks,
+    }
+    return gzippable_jsonify(response)
+
+
+# PLAYBACK HELPER FUNCTIONS -----------------------------------------------------------------------
+
+
+def play_downloaded_files(url, download_info):
+    """
+    A callback after an audio URL has been downloaded
+    """
+    select_player(app.file_player)
+    app.current_player.clear_queue()
+    queue_downloaded_files(url, download_info)
+
+
 def play_track_list(tracks: List[Track], identifier: str, start_at_track_id: int):
     if start_at_track_id is None:
         play_from_index = 0
@@ -339,19 +360,88 @@ def play_track_list(tracks: List[Track], identifier: str, start_at_track_id: int
     app.current_player.play_from_real_queue_index(play_from_index)
 
 
-def response_for_import_playlist(playlist: Playlist, missing_tracks: List[str]):
-    response = {
-        'playlistid': playlist.Id,
-        'nrtracks': len(playlist.Entries),
-        'missing': missing_tracks,
-    }
-    return gzippable_jsonify(response)
+def queue_downloaded_files(url, download_info):
+    select_player(app.file_player)
+    app.download_history.set_info(url, download_info)
+    for one_download in download_info:
+        app.current_player.add_to_queue(str(one_download.filepath), None, one_download.artist, one_download.title,
+                                        one_download.artwork)
 
 
 def select_player(desired_player):
     if (app.current_player != desired_player) and (app.current_player is not None):
         app.current_player.stop()
     app.current_player = desired_player
+
+
+def update_player_play_album(db, albumid, trackid):
+    try:
+        album = db.get_album_by_id(albumid)
+    except NotFoundException:
+        abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
+
+    def track_sort_order(track):
+        return (track.VolumeNumber if track.VolumeNumber else 0,
+                track.TrackNumber if track.TrackNumber else 0)
+    tracks = list(sorted(album.Tracks, key=track_sort_order))
+    play_track_list(tracks, url_for('get_album', albumid=albumid), trackid)
+
+
+def update_player_play_from_queue(queue_pos, trackid):
+    # update_player_play has already ensured we're set up for file playback
+    if not app.current_player.play_from_apparent_queue_index(queue_pos, trackid=trackid):
+        abort(409, "Track index not found")
+
+
+def update_player_play_from_radio(db: Database, stationid: int):
+    stations = db.get_all_radio_stations()
+    index = next((i for i, station in enumerate(stations) if station.Id == stationid), -1)
+    if index == -1:
+        abort(HTTPStatus.NOT_FOUND, "Requested station id not found")
+    station = stations[index]
+    select_player(app.stream_player)
+    app.current_player.play(station.Name, station.Url, station.ArtworkUrl, index, len(stations))
+
+
+def update_player_play_from_youtube(url):
+    app.download_history.add(url)
+    app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE, url, app.piju_config.download_dir, play_downloaded_files))
+
+
+def update_player_play_playlist(db: Database, playlistid, trackid):
+    try:
+        playlist = db.get_playlist_by_id(playlistid)
+    except NotFoundException:
+        abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
+    play_track_list([entry.Track for entry in playlist.Entries],
+                    url_for('one_playlist', playlistid=playlistid),
+                    trackid)
+
+
+def update_player_play_track(db: Database, trackid):
+    # update_player_play has already ensured we're set up for file playback
+    try:
+        track = db.get_track_by_id(trackid)
+    except NotFoundException:
+        abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+    app.current_player.clear_queue()
+    add_track_to_queue(track)
+
+
+def update_player_streaming_prevnext(delta):
+    current_url = app.current_player.currently_playing_url
+    with DatabaseAccess() as db:
+        stations = db.get_all_radio_stations()
+        current_index = next((i for i, station in enumerate(stations) if station.Url == current_url), -1)
+        if current_index > -1:
+            new_index = current_index + delta
+            if 0 <= new_index < len(stations):
+                new_station = stations[new_index]
+                app.current_player.play(new_station.Name,
+                                        new_station.Url,
+                                        new_station.ArtworkUrl,
+                                        new_index,
+                                        len(stations))
 
 
 # RESPONSE HEADERS --------------------------------------------------------------------------------
@@ -374,6 +464,8 @@ def current_status():
             'PlayerVolume': c_p.current_volume,
             'NumberAlbums': db.get_nr_albums(),
             'NumberTracks': db.get_nr_tracks(),
+            'CurrentTrackIndex': None if (c_p.current_track_index is None) else (c_p.current_track_index + 1),
+            'MaximumTrackIndex': c_p.number_of_tracks,
             'ApiVersion': app.api_version_string,
         }
         if c_p == app.file_player:
@@ -384,12 +476,9 @@ def current_status():
             else:
                 rtn['CurrentTrack'] = {}
                 rtn['CurrentArtwork'] = None
-            rtn['CurrentTrackIndex'] = None if (c_p.index is None) else (c_p.index + 1)
-            rtn['MaximumTrackIndex'] = c_p.maximum_track_index
         elif c_p == app.stream_player:
             rtn['CurrentStream'] = c_p.currently_playing_name
             rtn['CurrentArtwork'] = c_p.currently_playing_artwork
-            rtn['CurrentTrackIndex'] = rtn['MaximumTrackIndex'] = 1
 
     return gzippable_jsonify(rtn)
 
@@ -537,9 +626,9 @@ def get_mp3(trackid):
 def update_player_next():
     if app.current_player == app.file_player:
         app.current_player.next()
-        return ('', HTTPStatus.NO_CONTENT)
     else:
-        abort(HTTPStatus.CONFLICT, "Next not supported when playing streaming content")
+        update_player_streaming_prevnext(1)
+    return ('', HTTPStatus.NO_CONTENT)
 
 
 @app.route("/player/pause", methods=['POST'])
@@ -609,83 +698,13 @@ def update_player_play():
     return ('', HTTPStatus.NO_CONTENT)
 
 
-def update_player_play_album(db, albumid, trackid):
-    try:
-        album = db.get_album_by_id(albumid)
-    except NotFoundException:
-        abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
-
-    def track_sort_order(track):
-        return (track.VolumeNumber if track.VolumeNumber else 0,
-                track.TrackNumber if track.TrackNumber else 0)
-    tracks = list(sorted(album.Tracks, key=track_sort_order))
-    play_track_list(tracks, url_for('get_album', albumid=albumid), trackid)
-
-
-def update_player_play_from_queue(queue_pos, trackid):
-    # update_player_play has already ensured we're set up for file playback
-    if not app.current_player.play_from_apparent_queue_index(queue_pos, trackid=trackid):
-        abort(409, "Track index not found")
-
-
-def update_player_play_from_radio(db: Database, stationid: int):
-    try:
-        station = db.get_radio_station_by_id(stationid)
-    except NotFoundException:
-        abort(HTTPStatus.NOT_FOUND, "Requested station id not found")
-    select_player(app.stream_player)
-    app.current_player.play(station.Name, station.Url, station.ArtworkUrl)
-
-
-def update_player_play_from_youtube(url):
-    app.download_history.add(url)
-    app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE, url, app.piju_config.download_dir, play_downloaded_files))
-
-
-def play_downloaded_files(url, download_info):
-    """
-    A callback after an audio URL has been downloaded
-    """
-    select_player(app.file_player)
-    app.current_player.clear_queue()
-    queue_downloaded_files(url, download_info)
-
-
-def queue_downloaded_files(url, download_info):
-    select_player(app.file_player)
-    app.download_history.set_info(url, download_info)
-    for one_download in download_info:
-        app.current_player.add_to_queue(str(one_download.filepath), None, one_download.artist, one_download.title,
-                                        one_download.artwork)
-
-
-def update_player_play_playlist(db: Database, playlistid, trackid):
-    try:
-        playlist = db.get_playlist_by_id(playlistid)
-    except NotFoundException:
-        abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
-    play_track_list([entry.Track for entry in playlist.Entries],
-                    url_for('one_playlist', playlistid=playlistid),
-                    trackid)
-
-
-def update_player_play_track(db: Database, trackid):
-    # update_player_play has already ensured we're set up for file playback
-    try:
-        track = db.get_track_by_id(trackid)
-    except NotFoundException:
-        abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
-    app.current_player.clear_queue()
-    add_track_to_queue(track)
-
-
 @app.route("/player/previous", methods=['POST'])
 def update_player_prev():
     if app.current_player == app.file_player:
         app.current_player.prev()
-        return ('', HTTPStatus.NO_CONTENT)
     else:
-        abort(HTTPStatus.CONFLICT, "Previous not supported when playing streaming content")
+        update_player_streaming_prevnext(-1)
+    return ('', HTTPStatus.NO_CONTENT)
 
 
 @app.route("/player/resume", methods=['POST'])

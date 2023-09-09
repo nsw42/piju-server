@@ -26,20 +26,19 @@ class FilePlayer(PlayerInterface):
         self.current_tracklist_identifier = identifier
         self.set_queue(queue, identifier)
         self.current_player = None
-        self.index = None
         self.mp3audiodevice = mp3audiodevice
 
     @property
     def current_track(self) -> QueuedTrack:
-        return None if self.index is None else self.queue[self.index]
+        return None if self.current_track_index is None else self.queue[self.current_track_index]
 
     @property
-    def maximum_track_index(self) -> int:
+    def number_of_tracks(self) -> int:
         return len(self.queue) if self.queue else None
 
     @property
     def visible_queue(self):
-        return [] if self.index is None else self.queue[self.index:]
+        return [] if self.current_track_index is None else self.queue[self.current_track_index:]
 
     def _play_song(self, filename: str):
         """
@@ -90,14 +89,14 @@ class FilePlayer(PlayerInterface):
             self.queue = [QueuedTrack(track.Filepath, track.Id, track.Artist, track.Title, None) for track in queue]
         else:
             self.queue = []
-        self.index = 0  # invariant: the index of the *currently playing* song
+        self.current_track_index = 0  # invariant: the index of the *currently playing* song
         self.current_tracklist_identifier = identifier
 
     def add_to_queue(self, filepath: str, track_id: int, artist: str, title: str, artwork_uri: str):
         self.queue.append(QueuedTrack(filepath, track_id, artist, title, artwork_uri))
         self.current_tracklist_identifier = "/queue/"
         # If this is the first item in the queue, start playing
-        if self.index is None:
+        if self.current_track_index is None:
             self.play_from_real_queue_index(0)
 
     def remove_from_queue(self, index: int, trackid: int):
@@ -108,16 +107,16 @@ class FilePlayer(PlayerInterface):
         index is 0-based, representing the index into the remaining part of the queue
         trackid is the numeric track id
         """
-        if self.index is not None:
-            index += self.index
+        if self.current_track_index is not None:
+            index += self.current_track_index
         if 0 <= index < len(self.queue) and self.queue[index].trackid == trackid:
             self.queue.pop(index)
             # If this is the currently playing track, jump to the next track
             # (which might result in us stopping playing completely).
             # But, the next track is at the same index we're already at -
             # we've just deleted from the list
-            if index == self.index:
-                self.play_from_real_queue_index(self.index)
+            if index == self.current_track_index:
+                self.play_from_real_queue_index(self.current_track_index)
             return True
         return False
 
@@ -127,8 +126,8 @@ class FilePlayer(PlayerInterface):
         queue index. The real queue index is the list of files, eg tracks of an album.
         Items get removed from the apparent queue, as the index moves through the queue.
         """
-        if self.index is not None:
-            index += self.index
+        if self.current_track_index is not None:
+            index += self.current_track_index
         return self.play_from_real_queue_index(index, trackid)
 
     def play_from_real_queue_index(self, index, trackid: int = None):
@@ -155,7 +154,7 @@ class FilePlayer(PlayerInterface):
         while (0 <= index < len(self.queue)) and not (started := self._play_song(self.queue[index].filepath)):
             index += 1
         if started:
-            self.index = index
+            self.current_track_index = index
             return True
         else:
             self.stop()
@@ -163,17 +162,17 @@ class FilePlayer(PlayerInterface):
 
     def next(self):
         # play the next song in the queue
-        if self.index is None:
+        if self.current_track_index is None:
             return
         logging.debug(f"FilePlayer.next ({self.current_player})")
-        if self.index + 1 < len(self.queue):
-            self.play_from_real_queue_index(self.index + 1)
+        if self.current_track_index + 1 < len(self.queue):
+            self.play_from_real_queue_index(self.current_track_index + 1)
         else:
             self.stop()
             self.clear_queue()
 
     def prev(self):
-        self.play_from_real_queue_index(max(0, self.index - 1))
+        self.play_from_real_queue_index(max(0, self.current_track_index - 1))
 
     # Wrapper over the lower-layer interface
 
@@ -200,7 +199,7 @@ class FilePlayer(PlayerInterface):
         self._stop_player()
         self.current_tracklist_identifier = ''
         self.current_status = CurrentStatusStrings.STOPPED
-        self.index = None
+        self.current_track_index = None
 
     # callbacks
     def on_music_end(self):

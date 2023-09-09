@@ -86,7 +86,7 @@ def test_play_from_real_queue_index__off_by_one(mock_mp3player, mock_isfile):
 
     # Assert
     assert mp.current_status == 'playing'
-    assert mp.index == 1
+    assert mp.current_track_index == 1
     assert mp.current_track.trackid == 234
     mp.current_player.play_song.assert_called_once_with('2.mp3')
 
@@ -109,6 +109,6 @@ def test_play_from_real_queue_index__off_by_one_the_other_way(mock_mp3player, mo
 
     # Assert
     assert mp.current_status == 'playing'
-    assert mp.index == 0
+    assert mp.current_track_index == 0
     assert mp.current_track.trackid == 123
     mp.current_player.play_song.assert_called_once_with('1.mp3')

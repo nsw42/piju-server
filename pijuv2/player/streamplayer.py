@@ -21,13 +21,15 @@ class StreamPlayer(PlayerInterface):
             self.player_subprocess.terminate()
         self.player_subprocess = None
 
-    def play(self, name: str, url: str, artwork: str):
+    def play(self, name: str, url: str, artwork: str, current_index: int, nr_stations: int):
         if self.player_subprocess:
             self.stop()
         self.current_status = CurrentStatusStrings.PLAYING
         self.currently_playing_name = name
         self.currently_playing_url = url
         self.currently_playing_artwork = artwork
+        self.current_track_index = current_index
+        self.number_of_tracks = nr_stations
         if self.audio_device:
             child_environment = dict(os.environ)
             child_environment['SDL_AUDIODRIVER'] = 'alsa'
@@ -57,7 +59,11 @@ class StreamPlayer(PlayerInterface):
         Restarts playing the last url that was played.
         """
         if self.currently_playing_name:
-            self.play(self.currently_playing_name, self.currently_playing_url, self.currently_playing_artwork)
+            self.play(self.currently_playing_name,
+                      self.currently_playing_url,
+                      self.currently_playing_artwork,
+                      self.current_track_index,
+                      self.number_of_tracks)
 
     def stop(self):
         self._stop()
