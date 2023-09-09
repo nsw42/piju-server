@@ -14,6 +14,8 @@ class PlayerInterface:
     def __init__(self):
         self.current_status = CurrentStatusStrings.STOPPED
         self.current_volume = 100
+        self.current_track_index = None  # 0-based
+        # self.number_of_tracks = None  # must be available, but can be a property
 
     def pause(self):
         raise NotImplementedError()

@@ -354,6 +354,22 @@ def select_player(desired_player):
     app.current_player = desired_player
 
 
+def update_player_streaming_prevnext(delta):
+    current_url = app.current_player.currently_playing_url
+    with DatabaseAccess() as db:
+        stations = db.get_all_radio_stations()
+        current_index = next((i for i, station in enumerate(stations) if station.Url == current_url), -1)
+        if current_index > -1:
+            new_index = current_index + delta
+            if 0 <= new_index < len(stations):
+                new_station = stations[new_index]
+                app.current_player.play(new_station.Name,
+                                        new_station.Url,
+                                        new_station.ArtworkUrl,
+                                        new_index,
+                                        len(stations))
+
+
 # RESPONSE HEADERS --------------------------------------------------------------------------------
 
 @app.after_request
@@ -374,6 +390,8 @@ def current_status():
             'PlayerVolume': c_p.current_volume,
             'NumberAlbums': db.get_nr_albums(),
             'NumberTracks': db.get_nr_tracks(),
+            'CurrentTrackIndex': None if (c_p.current_track_index is None) else (c_p.current_track_index + 1),
+            'MaximumTrackIndex': c_p.number_of_tracks,
             'ApiVersion': app.api_version_string,
         }
         if c_p == app.file_player:
@@ -384,12 +402,9 @@ def current_status():
             else:
                 rtn['CurrentTrack'] = {}
                 rtn['CurrentArtwork'] = None
-            rtn['CurrentTrackIndex'] = None if (c_p.index is None) else (c_p.index + 1)
-            rtn['MaximumTrackIndex'] = c_p.maximum_track_index
         elif c_p == app.stream_player:
             rtn['CurrentStream'] = c_p.currently_playing_name
             rtn['CurrentArtwork'] = c_p.currently_playing_artwork
-            rtn['CurrentTrackIndex'] = rtn['MaximumTrackIndex'] = 1
 
     return gzippable_jsonify(rtn)
 
@@ -537,9 +552,9 @@ def get_mp3(trackid):
 def update_player_next():
     if app.current_player == app.file_player:
         app.current_player.next()
-        return ('', HTTPStatus.NO_CONTENT)
     else:
-        abort(HTTPStatus.CONFLICT, "Next not supported when playing streaming content")
+        update_player_streaming_prevnext(1)
+    return ('', HTTPStatus.NO_CONTENT)
 
 
 @app.route("/player/pause", methods=['POST'])
@@ -629,12 +644,13 @@ def update_player_play_from_queue(queue_pos, trackid):
 
 
 def update_player_play_from_radio(db: Database, stationid: int):
-    try:
-        station = db.get_radio_station_by_id(stationid)
-    except NotFoundException:
+    stations = db.get_all_radio_stations()
+    index = next((i for i, station in enumerate(stations) if station.Id == stationid), -1)
+    if index == -1:
         abort(HTTPStatus.NOT_FOUND, "Requested station id not found")
+    station = stations[index]
     select_player(app.stream_player)
-    app.current_player.play(station.Name, station.Url, station.ArtworkUrl)
+    app.current_player.play(station.Name, station.Url, station.ArtworkUrl, index, len(stations))
 
 
 def update_player_play_from_youtube(url):
@@ -683,9 +699,9 @@ def update_player_play_track(db: Database, trackid):
 def update_player_prev():
     if app.current_player == app.file_player:
         app.current_player.prev()
-        return ('', HTTPStatus.NO_CONTENT)
     else:
-        abort(HTTPStatus.CONFLICT, "Previous not supported when playing streaming content")
+        update_player_streaming_prevnext(-1)
+    return ('', HTTPStatus.NO_CONTENT)
 
 
 @app.route("/player/resume", methods=['POST'])
