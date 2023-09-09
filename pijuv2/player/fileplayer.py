@@ -87,9 +87,10 @@ class FilePlayer(PlayerInterface):
     def set_queue(self, queue: Optional[List[Track]], identifier: str):
         if queue:
             self.queue = [QueuedTrack(track.Filepath, track.Id, track.Artist, track.Title, None) for track in queue]
+            self.current_track_index = 0  # invariant: the index of the *currently playing* song
         else:
             self.queue = []
-        self.current_track_index = 0  # invariant: the index of the *currently playing* song
+            self.current_track_index = None
         self.current_tracklist_identifier = identifier
 
     def add_to_queue(self, filepath: str, track_id: int, artist: str, title: str, artwork_uri: str):
