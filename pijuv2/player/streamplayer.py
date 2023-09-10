@@ -148,6 +148,7 @@ class StreamPlayer(PlayerInterface):
         self._stop()
         self.current_status = CurrentStatusStrings.STOPPED
         self.currently_playing_name = self.currently_playing_url = self.currently_playing_artwork = None
+        self.current_track_index = self.number_of_tracks = None
         self.get_track_info_url = self.get_track_info_jq = self.now_playing_artist = self.now_playing_track = None
 
     def set_volume(self, volume):
