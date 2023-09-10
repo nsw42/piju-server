@@ -17,6 +17,7 @@ from werkzeug.exceptions import BadRequest, BadRequestKeyError
 from ..database.database import Database, DatabaseAccess, NotFoundException
 from ..database.schema import Album, Genre, Playlist, PlaylistEntry, RadioStation, Track
 from ..player.fileplayer import FilePlayer
+from ..player.playerinterface import CurrentStatusStrings
 from ..player.streamplayer import StreamPlayer
 from .config import Config
 from .downloadhistory import DownloadHistory
@@ -487,7 +488,7 @@ def current_status():
         elif c_p == app.stream_player:
             rtn['CurrentStream'] = c_p.currently_playing_name
             rtn['CurrentArtwork'] = c_p.currently_playing_artwork
-            if c_p.now_playing_artist and c_p.now_playing_track:
+            if c_p.current_status == CurrentStatusStrings.PLAYING and c_p.now_playing_artist and c_p.now_playing_track:
                 rtn['CurrentTrack'] = {
                     'artist': c_p.now_playing_artist,
                     'title': c_p.now_playing_track
