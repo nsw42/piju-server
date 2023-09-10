@@ -405,7 +405,8 @@ def update_player_play_from_radio(db: Database, stationid: int):
         abort(HTTPStatus.NOT_FOUND, "Requested station id not found")
     station = stations[index]
     select_player(app.stream_player)
-    app.current_player.play(station.Name, station.Url, station.ArtworkUrl, index, len(stations))
+    app.current_player.play(station.Name, station.Url, station.ArtworkUrl, index, len(stations),
+                            station.NowPlayingUrl, station.NowPlayingJq)
 
 
 def update_player_play_from_youtube(url):
@@ -446,7 +447,9 @@ def update_player_streaming_prevnext(delta):
                                         new_station.Url,
                                         new_station.ArtworkUrl,
                                         new_index,
-                                        len(stations))
+                                        len(stations),
+                                        new_station.NowPlayingUrl,
+                                        new_station.NowPlayingJq)
 
 
 # RESPONSE HEADERS --------------------------------------------------------------------------------
@@ -484,6 +487,11 @@ def current_status():
         elif c_p == app.stream_player:
             rtn['CurrentStream'] = c_p.currently_playing_name
             rtn['CurrentArtwork'] = c_p.currently_playing_artwork
+            if c_p.now_playing_artist and c_p.now_playing_track:
+                rtn['CurrentTrack'] = {
+                    'artist': c_p.now_playing_artist,
+                    'title': c_p.now_playing_track
+                }
 
     return gzippable_jsonify(rtn)
 
