@@ -17,6 +17,7 @@ from werkzeug.exceptions import BadRequest, BadRequestKeyError
 from ..database.database import Database, DatabaseAccess, NotFoundException
 from ..database.schema import Album, Genre, Playlist, PlaylistEntry, RadioStation, Track
 from ..player.fileplayer import FilePlayer
+from ..player.playerinterface import CurrentStatusStrings
 from ..player.streamplayer import StreamPlayer
 from .config import Config
 from .downloadhistory import DownloadHistory
@@ -108,7 +109,10 @@ def build_radio_station_from_api_data() -> RadioStation:
     if not url:
         abort(HTTPStatus.BAD_REQUEST, description='Missing station URL')
     artwork_url = data.get('artwork')  # optional
-    return RadioStation(Name=station_name, Url=url, ArtworkUrl=artwork_url)
+    now_playing_url = data.get('now_playing_url')  # optional
+    now_playing_jq = data.get('now_playing_jq')  # optional
+    return RadioStation(Name=station_name, Url=url, ArtworkUrl=artwork_url,
+                        NowPlayingUrl=now_playing_url, NowPlayingJq=now_playing_jq)
 
 
 def extract_id(uri_or_id):
@@ -232,6 +236,8 @@ def json_radio_station(station: RadioStation, include_urls: bool = False):
     }
     if include_urls:
         rtn['url'] = station.Url
+        rtn['now_playing_url'] = station.NowPlayingUrl
+        rtn['now_playing_jq'] = station.NowPlayingJq
     return rtn
 
 
@@ -400,7 +406,8 @@ def update_player_play_from_radio(db: Database, stationid: int):
         abort(HTTPStatus.NOT_FOUND, "Requested station id not found")
     station = stations[index]
     select_player(app.stream_player)
-    app.current_player.play(station.Name, station.Url, station.ArtworkUrl, index, len(stations))
+    app.current_player.play(station.Name, station.Url, station.ArtworkUrl, index, len(stations),
+                            station.NowPlayingUrl, station.NowPlayingJq)
 
 
 def update_player_play_from_youtube(url):
@@ -441,7 +448,9 @@ def update_player_streaming_prevnext(delta):
                                         new_station.Url,
                                         new_station.ArtworkUrl,
                                         new_index,
-                                        len(stations))
+                                        len(stations),
+                                        new_station.NowPlayingUrl,
+                                        new_station.NowPlayingJq)
 
 
 # RESPONSE HEADERS --------------------------------------------------------------------------------
@@ -479,6 +488,11 @@ def current_status():
         elif c_p == app.stream_player:
             rtn['CurrentStream'] = c_p.currently_playing_name
             rtn['CurrentArtwork'] = c_p.currently_playing_artwork
+            if c_p.current_status == CurrentStatusStrings.PLAYING and c_p.now_playing_artist and c_p.now_playing_track:
+                rtn['CurrentTrack'] = {
+                    'artist': c_p.now_playing_artist,
+                    'title': c_p.now_playing_track
+                }
 
     return gzippable_jsonify(rtn)
 
