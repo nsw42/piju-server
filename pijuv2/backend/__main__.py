@@ -108,7 +108,10 @@ def build_radio_station_from_api_data() -> RadioStation:
     if not url:
         abort(HTTPStatus.BAD_REQUEST, description='Missing station URL')
     artwork_url = data.get('artwork')  # optional
-    return RadioStation(Name=station_name, Url=url, ArtworkUrl=artwork_url)
+    now_playing_url = data.get('now_playing_url')  # optional
+    now_playing_jq = data.get('now_playing_jq')  # optional
+    return RadioStation(Name=station_name, Url=url, ArtworkUrl=artwork_url,
+                        NowPlayingUrl=now_playing_url, NowPlayingJq=now_playing_jq)
 
 
 def extract_id(uri_or_id):
@@ -232,6 +235,8 @@ def json_radio_station(station: RadioStation, include_urls: bool = False):
     }
     if include_urls:
         rtn['url'] = station.Url
+        rtn['now_playing_url'] = station.NowPlayingUrl
+        rtn['now_playing_jq'] = station.NowPlayingJq
     return rtn
 
 

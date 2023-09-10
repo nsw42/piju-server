@@ -97,6 +97,8 @@ class Database():
         existing_station.Name = station.Name
         existing_station.Url = station.Url
         existing_station.ArtworkUrl = station.ArtworkUrl
+        existing_station.NowPlayingUrl = station.NowPlayingUrl
+        existing_station.NowPlayingJq = station.NowPlayingJq
         self.session.commit()
         return existing_station
 
