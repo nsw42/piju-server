@@ -9,9 +9,6 @@ from sqlalchemy.pool import QueuePool
 from .schema import Base, Album, Genre, Playlist, RadioStation, Track
 
 
-FILENAME = 'file.db'
-
-
 class PijuDatabaseException(Exception):
     """
     Base class for all database exceptions
@@ -48,18 +45,18 @@ def convert_exception_class(exc):
 
 
 class Database():
-    def __init__(self, path=None):
+    DEFAULT_FILENAME = 'file.db'
+
+    def __init__(self, path=None, create=False):
         if path:
             filename = str(path)
         else:
-            filename = FILENAME
+            filename = Database.DEFAULT_FILENAME
         self.engine = create_engine('sqlite:///' + filename, poolclass=QueuePool)
         self.session = scoped_session(sessionmaker(bind=self.engine))
-
-        # ensure tables exist
-        Base.metadata.create_all(self.engine)
-
-        self.session.commit()
+        if create:
+            Base.metadata.create_all(self.engine)
+            self.session.commit()
 
     def commit(self):
         self.session.commit()
@@ -401,8 +398,8 @@ class Database():
 
 
 class DatabaseAccess:
-    def __init__(self, path=None):
-        self.db = Database(path=path)
+    def __init__(self, path=None, create=False):
+        self.db = Database(path=path, create=create)
 
     def __enter__(self):
         return self.db
