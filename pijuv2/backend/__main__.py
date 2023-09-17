@@ -111,8 +111,11 @@ def build_radio_station_from_api_data() -> RadioStation:
     artwork_url = data.get('artwork')  # optional
     now_playing_url = data.get('now_playing_url')  # optional
     now_playing_jq = data.get('now_playing_jq')  # optional
+    now_playing_artwork_url = data.get('now_playing_artwork_url')  # optional
+    now_playing_artwork_jq = data.get('now_playing_artwork_jq')  # optional
     return RadioStation(Name=station_name, Url=url, ArtworkUrl=artwork_url,
-                        NowPlayingUrl=now_playing_url, NowPlayingJq=now_playing_jq)
+                        NowPlayingUrl=now_playing_url, NowPlayingJq=now_playing_jq,
+                        NowPlayingArtworkUrl=now_playing_artwork_url, NowPlayingArtworkJq=now_playing_artwork_jq)
 
 
 def extract_id(uri_or_id):
@@ -238,6 +241,8 @@ def json_radio_station(station: RadioStation, include_urls: bool = False):
         rtn['url'] = station.Url
         rtn['now_playing_url'] = station.NowPlayingUrl
         rtn['now_playing_jq'] = station.NowPlayingJq
+        rtn['now_playing_artwork_url'] = station.NowPlayingArtworkUrl
+        rtn['now_playing_artwork_jq'] = station.NowPlayingArtworkJq
     return rtn
 
 
