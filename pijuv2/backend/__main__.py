@@ -297,17 +297,22 @@ def parse_args():
     parser = ArgumentParser()
     parser.add_argument('-a', '--mp3audiodevice', action='store',
                         help='Set audio device for mpg123')
-    parser.add_argument('-t', '--doctest', action='store_true',
-                        help="Run self-test and exit")
     parser.add_argument('-c', '--config', metavar='FILE', type=Path,
                         help=f"Load configuration from FILE. Default is {str(Config.default_filepath())}")
+    parser.add_argument('-d', '--database', metavar='FILE', type=Path,
+                        help="Set database path to FILE. Default is %(default)s")
+    parser.add_argument('-t', '--doctest', action='store_true',
+                        help="Run self-test and exit")
     parser.set_defaults(doctest=False,
-                        config=None)
+                        config=None,
+                        database='file.db')
     args = parser.parse_args()
     if args.config and not args.config.is_file():
         parser.error(f"Specified configuration file ({str(args.config)}) could not be found")
     if (args.config is None) and (Config.default_filepath().is_file()):
         args.config = Config.default_filepath()
+    if not args.database.is_file():
+        parser.error("Specified database file does not exist. Use `run.sh` (or alembic) to initialise the database")
     return args
 
 
@@ -993,8 +998,8 @@ def main():
         doctest.testmod()
     else:
         logging.basicConfig(level=logging.DEBUG)
+        Database.DEFAULT_FILENAME = str(args.database)
         config = Config(args.config)
-        _ = Database()  # pre-create tables
         app.piju_config = config
         app.work_queue = Queue()
         app.worker = WorkerThread(app.work_queue)

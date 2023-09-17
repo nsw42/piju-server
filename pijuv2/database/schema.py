@@ -2,6 +2,8 @@ from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, LargeBina
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
+# IMPORTANT: If changing the schema, be sure to create the alembic revision to support the migration of data
+
 Base = declarative_base()
 
 

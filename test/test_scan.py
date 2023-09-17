@@ -7,7 +7,7 @@ TEST_DB = 'test.db'
 
 def test_change_track_genre(tmp_path):
     # setup: track in one genre; that track in an album
-    with DatabaseAccess(path=tmp_path / TEST_DB) as db:
+    with DatabaseAccess(path=tmp_path / TEST_DB, create=True) as db:
         assert db.get_nr_albums() == db.get_nr_tracks() == 0
 
         t1 = Track(Title="Track 1", Genre="Rock")
@@ -16,7 +16,7 @@ def test_change_track_genre(tmp_path):
         t1id = t1.Id
 
     # verify setup is as expected
-    with DatabaseAccess(path=tmp_path / TEST_DB) as db:
+    with DatabaseAccess(path=tmp_path / TEST_DB, create=True) as db:
         assert db.get_nr_albums() == 1
         assert db.get_nr_tracks() == 1
         album = db.get_all_albums()[0]
@@ -27,13 +27,13 @@ def test_change_track_genre(tmp_path):
         assert genre1id == track.Genre
 
     # test: update the track to a new genre
-    with DatabaseAccess(path=tmp_path / TEST_DB) as db:
+    with DatabaseAccess(path=tmp_path / TEST_DB, create=True) as db:
         t2 = Track(Id=t1id, Title="Still Track 1", Genre="Punk")
         albumref = Album(Title="Album")
         set_cross_refs(db, t2, albumref)
 
     # verify updates were as expected
-    with DatabaseAccess(path=tmp_path / TEST_DB) as db:
+    with DatabaseAccess(path=tmp_path / TEST_DB, create=True) as db:
         assert db.get_nr_albums() == 1
         assert db.get_nr_tracks() == 1
 

@@ -18,7 +18,7 @@ def mk_other_albumref():
 
 
 def test_one_compilation_one_album(tmp_path):
-    db = Database(path=tmp_path / TEST_DB)
+    db = Database(path=tmp_path / TEST_DB, create=True)
 
     assert db.get_nr_albums() == 0
 
@@ -40,7 +40,7 @@ def test_one_compilation_one_album(tmp_path):
 
 
 def test_one_album_one_compilation(tmp_path):
-    db = Database(path=tmp_path / TEST_DB)
+    db = Database(path=tmp_path / TEST_DB, create=True)
 
     assert db.get_nr_albums() == 0
 
@@ -62,7 +62,7 @@ def test_one_album_one_compilation(tmp_path):
 
 
 def test_get_all_albums(tmp_path):
-    db = Database(path=tmp_path / TEST_DB)
+    db = Database(path=tmp_path / TEST_DB, create=True)
 
     assert db.get_all_albums() == []
 
@@ -78,7 +78,7 @@ def test_get_all_albums(tmp_path):
 
 
 def test_get_all_tracks(tmp_path):
-    db = Database(path=tmp_path / TEST_DB)
+    db = Database(path=tmp_path / TEST_DB, create=True)
 
     assert db.get_all_tracks() == []
 
@@ -94,7 +94,7 @@ def test_get_all_tracks(tmp_path):
 
 def test_get_album_by_id(tmp_path):
     # Prepare
-    db = Database(path=tmp_path / TEST_DB)
+    db = Database(path=tmp_path / TEST_DB, create=True)
     a1 = mk_other_albumref()
     db.ensure_album_exists(a1)
     a2 = mk_compilation_albumref()
@@ -112,7 +112,7 @@ def test_get_album_by_id(tmp_path):
 
 def test_get_genre_by_id(tmp_path):
     # Prepare
-    db = Database(path=tmp_path / TEST_DB)
+    db = Database(path=tmp_path / TEST_DB, create=True)
 
     genre_name = "Technocrat Jazz"
     genre = db.ensure_genre_exists(genre_name)
@@ -134,7 +134,7 @@ def test_get_genre_by_id(tmp_path):
 
 def test_get_track_by_id(tmp_path):
     # Prepare
-    db = Database(path=tmp_path / TEST_DB)
+    db = Database(path=tmp_path / TEST_DB, create=True)
     t1 = db.ensure_track_exists(Track(Title="Beware of the fish"))
     t2 = db.ensure_track_exists(Track(Title="Something Something"))
 
@@ -152,7 +152,7 @@ def test_change_compilation_to_single_artist(tmp_path):
     # There used to be a bug that finding an album (eg as a compilation)
     # then re-scanning, and the album changing, meant that the first instance
     # of the album would stay around with no tracks in it.
-    db = Database(path=tmp_path / TEST_DB)
+    db = Database(path=tmp_path / TEST_DB, create=True)
 
     assert db.get_all_tracks() == []
     assert db.get_all_albums() == []

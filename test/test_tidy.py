@@ -16,7 +16,7 @@ def mk_non_existing_track():
 
 
 def test_delete_missing_tracks(tmp_path):
-    db = Database(path=tmp_path / TEST_DB)
+    db = Database(path=tmp_path / TEST_DB, create=True)
 
     assert db.get_nr_tracks() == 0
 
@@ -36,7 +36,7 @@ def test_delete_missing_tracks(tmp_path):
 
 
 def test_delete_albums_without_tracks(tmp_path):
-    db = Database(path=tmp_path / TEST_DB)
+    db = Database(path=tmp_path / TEST_DB, create=True)
 
     a1 = db.ensure_album_exists(Album(Title="Album With A Track"))
     t = Track(Title="Dummy Track", Album=a1.Id)
