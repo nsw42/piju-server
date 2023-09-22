@@ -58,12 +58,12 @@ class NowPlayingUpdater(Thread):
         """
         Return the number of seconds to wait before trying again
         """
-        if not self.parent.get_artwork_url:
-            # nothing playing right now
-            return 60
-        url = self.fetch_and_jq(self.parent.get_artwork_url, self.parent.get_artwork_jq, raw=True)
-        self.parent.currently_playing_artwork = url
-        if self.parent.currently_playing_artwork:
+        if self.parent.get_artwork_url:
+            url = self.fetch_and_jq(self.parent.get_artwork_url, self.parent.get_artwork_jq, raw=True)
+        else:
+            url = None
+        if url:
+            self.parent.currently_playing_artwork = url
             return 60
         self.parent.currently_playing_artwork = self.parent.station_artwork
         return 30
