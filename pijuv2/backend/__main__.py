@@ -417,7 +417,8 @@ def update_player_play_from_radio(db: Database, stationid: int):
     station = stations[index]
     select_player(app.stream_player)
     app.current_player.play(station.Name, station.Url, station.ArtworkUrl, index, len(stations),
-                            station.NowPlayingUrl, station.NowPlayingJq)
+                            station.NowPlayingUrl, station.NowPlayingJq,
+                            station.NowPlayingArtworkUrl, station.NowPlayingArtworkJq)
 
 
 def update_player_play_from_youtube(url):
