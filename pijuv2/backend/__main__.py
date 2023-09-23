@@ -416,7 +416,8 @@ def update_player_play_from_radio(db: Database, stationid: int):
         abort(HTTPStatus.NOT_FOUND, "Requested station id not found")
     station = stations[index]
     select_player(app.stream_player)
-    app.current_player.play(station.Name, station.Url, station.ArtworkUrl, index, len(stations),
+    app.current_player.play(station.Name, station.Url, station.ArtworkUrl,
+                            index, len(stations),
                             station.NowPlayingUrl, station.NowPlayingJq,
                             station.NowPlayingArtworkUrl, station.NowPlayingArtworkJq)
 
@@ -455,13 +456,10 @@ def update_player_streaming_prevnext(delta):
             new_index = current_index + delta
             if 0 <= new_index < len(stations):
                 new_station = stations[new_index]
-                app.current_player.play(new_station.Name,
-                                        new_station.Url,
-                                        new_station.ArtworkUrl,
-                                        new_index,
-                                        len(stations),
-                                        new_station.NowPlayingUrl,
-                                        new_station.NowPlayingJq)
+                app.current_player.play(new_station.Name, new_station.Url, new_station.ArtworkUrl,
+                                        new_index, len(stations),
+                                        new_station.NowPlayingUrl, new_station.NowPlayingJq,
+                                        new_station.NowPlayingArtworkUrl, new_station.NowPlayingArtworkJq)
 
 
 # RESPONSE HEADERS --------------------------------------------------------------------------------
