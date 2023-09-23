@@ -93,6 +93,9 @@ class NowPlayingUpdater(Thread):
             if child.returncode == 0:
                 text = child.stdout.strip()
                 logging.debug(f"Filtered text: {text}")
+                if text == 'null':
+                    # A jq filter problem
+                    text = ''
             else:
                 logging.debug("jq failed")
                 text = ''
