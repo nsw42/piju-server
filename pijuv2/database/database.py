@@ -96,6 +96,8 @@ class Database():
         existing_station.ArtworkUrl = station.ArtworkUrl
         existing_station.NowPlayingUrl = station.NowPlayingUrl
         existing_station.NowPlayingJq = station.NowPlayingJq
+        existing_station.NowPlayingArtworkUrl = station.NowPlayingArtworkUrl
+        existing_station.NowPlayingArtworkJq = station.NowPlayingArtworkJq
         self.session.commit()
         return existing_station
 

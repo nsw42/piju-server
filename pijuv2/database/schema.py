@@ -78,6 +78,8 @@ class RadioStation(Base):
     ArtworkUrl = Column(String)
     NowPlayingUrl = Column(String)
     NowPlayingJq = Column(String)
+    NowPlayingArtworkUrl = Column(String)
+    NowPlayingArtworkJq = Column(String)
 
 
 class Track(Base):
