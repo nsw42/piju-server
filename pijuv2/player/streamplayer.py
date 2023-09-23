@@ -148,6 +148,7 @@ class StreamPlayer(PlayerInterface):
         else:
             child_environment = None
         self.player_subprocess = subprocess.Popen(cmd, env=child_environment)
+        self.current_status = CurrentStatusStrings.PLAYING
 
     def play(self,
              name: str,
@@ -159,7 +160,6 @@ class StreamPlayer(PlayerInterface):
              get_track_info_jq: str,
              get_artwork_url: str,
              get_artwork_jq: str):
-        self.current_status = CurrentStatusStrings.PLAYING
         self.currently_playing_name = name
         self.currently_playing_url = url
         self.station_artwork = self.currently_playing_artwork = station_artwork
@@ -178,6 +178,7 @@ class StreamPlayer(PlayerInterface):
         """
         self._stop()
         self.current_status = CurrentStatusStrings.PAUSED
+        self.currently_playing_artwork = self.station_artwork
 
     def resume(self):
         """
