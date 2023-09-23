@@ -60,4 +60,4 @@ $ALEMBIC current 2> /dev/null | grep -q head && { echo Database scehma is up-to-
 cd $SCRIPT_DIR
 
 # Now run the server
-python3 -m pijuv2.backend -d "$DB_FILE"
+exec python3 -m pijuv2.backend -d "$DB_FILE"
