@@ -1,6 +1,7 @@
 Flask
 Pillow
 SQLAlchemy
+alembic
 flake8
 mutagen
 pexpect

@@ -1,4 +1,6 @@
-#! /bin/bash
+#! /bin/sh
+
+SCRIPT_DIR=$(realpath $(dirname $0))
 
 function usage() {
   echo "Usage: $0 [OPTIONS] DBFILE"
@@ -35,16 +37,27 @@ fi
 
 DB_FILE=`realpath "$DB_FILE"`
 
+# Check for alembic
+ALEMBIC=$(command -v alembic)
+if [ -z "$ALEMBIC" ]; then
+  # Try in the default installation
+  ALEMBIC=$HOME/.local/bin/alembic
+  if [ ! -x "$ALEMBIC" ]; then
+    echo alembic not found. Aborting.
+    exit 1
+  fi
+fi
+
 # Update database schema as necessary
 export DB_FILE
-pushd pijuv2/database >& /dev/null
-alembic current 2> /dev/null | grep -q head && { echo Database scehma is up-to-date; } || {
+cd $SCRIPT_DIR/pijuv2/database
+$ALEMBIC current 2> /dev/null | grep -q head && { echo Database scehma is up-to-date; } || {
   BACKUP=${DB_FILE}.bak
   echo "Updating database file: keeping a backup as $BACKUP"
   cp -pf "$DB_FILE" "$BACKUP"
-  alembic upgrade head || { echo Database upgrade failed. Aborting.; exit 1; }
+  $ALEMBIC upgrade head || { echo Database upgrade failed. Aborting.; exit 1; }
 }
-popd >& /dev/null
+cd $SCRIPT_DIR
 
 # Now run the server
 python3 -m pijuv2.backend -d "$DB_FILE"
