@@ -1,4 +1,6 @@
-#! /bin/bash
+#! /bin/sh
+
+SCRIPT_DIR=$(realpath $(dirname $0))
 
 function usage() {
   echo "Usage: $0 [OPTIONS] DBFILE"
@@ -37,14 +39,14 @@ DB_FILE=`realpath "$DB_FILE"`
 
 # Update database schema as necessary
 export DB_FILE
-pushd pijuv2/database >& /dev/null
+cd $SCRIPT_DIR/pijuv2/database
 alembic current 2> /dev/null | grep -q head && { echo Database scehma is up-to-date; } || {
   BACKUP=${DB_FILE}.bak
   echo "Updating database file: keeping a backup as $BACKUP"
   cp -pf "$DB_FILE" "$BACKUP"
   alembic upgrade head || { echo Database upgrade failed. Aborting.; exit 1; }
 }
-popd >& /dev/null
+cd $SCRIPT_DIR
 
 # Now run the server
 python3 -m pijuv2.backend -d "$DB_FILE"
