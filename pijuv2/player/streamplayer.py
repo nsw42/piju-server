@@ -31,7 +31,7 @@ class NowPlayingUpdater(Thread):
                 next_check = min(next_fetch_track_info, next_fetch_artwork_info)
             sleep(next_check - now)
 
-    def do_one_fetch_track_info(self):
+    def do_one_fetch_track_info(self) -> int:
         """
         Return the number of seconds to wait before trying again
         """
@@ -54,7 +54,7 @@ class NowPlayingUpdater(Thread):
             return 60
         return 30
 
-    def do_one_fetch_artwork_info(self):
+    def do_one_fetch_artwork_info(self) -> int:
         """
         Return the number of seconds to wait before trying again
         """
@@ -68,7 +68,7 @@ class NowPlayingUpdater(Thread):
         self.parent.currently_playing_artwork = self.parent.station_artwork
         return 30
 
-    def fetch_and_jq(self, url: str, jq_filter: Optional[str], raw: bool):
+    def fetch_and_jq(self, url: str, jq_filter: Optional[str], raw: bool) -> str:
         """
         Fetch the given url and transform it with the given jq filter
         """
