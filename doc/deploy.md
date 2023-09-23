@@ -38,42 +38,63 @@ instructions.
 
 ### Start the server (as a one-off; not yet configured to auto-start)
 
-This step checks that all dependencies have installed successfully, and that
-the PiJu server software has been installed and configured correctly. If any
-errors happen here, fix them before trying to configure the piju-server
+This step checks that all dependencies have installed successfully, that the
+PiJu server software has been installed and configured correctly, and also
+creates an empty database (using the filename that's assumed in the init.d
+service script).
+
+If any errors happen here, fix them before trying to configure the piju-server
 software to start automatically.
 
 Logged in as piju:
 
 ```sh
 cd piju-server
-python3 -m pijuv2.backend
+./run.sh -C file.db
 ```
 
 Ctrl-C to exit
 
 ### Configure the server to start automatically
 
-* scp init.d/piju to /etc/init.d/piju
+* Copy the script to the Pi:
+
+    ```sh
+    scp init.d/piju-server to /etc/init.d/piju-server
+    ```
+
 * Make the script executable:
 
     ```sh
-    sudo chown root:root /etc/init.d/piju
-    sudo chmod 755 /etc/init.d/piju
+    sudo chown root:root /etc/init.d/piju-server
+    sudo chmod 755 /etc/init.d/piju-server
     ```
 
 * Create relevant log directory and add it as a service:
 
     ```sh
-    sudo mkdir /var/log/piju
-    sudo chmod 777 /var/log/piju
-    sudo rc-update add piju default
+    sudo mkdir /var/log/piju-server
+    sudo chmod 777 /var/log/piju-server
+    sudo rc-update add piju-server default
     ```
 
 * Start the service:
 
     ```sh
-    sudo /etc/init.d/piju start
+    sudo /etc/init.d/piju-server start
+    ```
+
+* Check that it started successfully:
+
+    ```sh
+    sudo /etc/init.d/piju-server status
+    ```
+
+* Check the log files as necessary:
+
+    ```sh
+    less /var/log/piju-server/piju-server.err
+    less /var/log/piju-server/piju-server.log
     ```
 
 ### Set up log rotation
@@ -87,8 +108,9 @@ apk add logrotate
 Write a logrotate configuration file (`/etc/logrotate.d/piju`):
 
 ```text
-/var/log/piju/piju.log
-/var/log/piju/piju.err
+/var/log/piju-server/piju-server.log /var/log/piju-server/piju-server.err
+/var/log/piju-touchscreen/piju-touchscreen.log /var/log/piju-touchscreen/piju-touchscreen.err
+/var/log/piju-webui/pijuwebui.log /var/log/piju-webui/pijuwebui.err
 {
     su piju piju
     daily
@@ -98,6 +120,11 @@ Write a logrotate configuration file (`/etc/logrotate.d/piju`):
     copytruncate
 }
 ```
+
+(Note that this also sets up log rotation for the touchscreen and webui piju
+components, on the assumption that you're going to install them. The
+`missingok` config line means that it's not a problem if you choose not to run
+these.)
 
 Installing logrotate automatically causes it to run daily. It shouldn't be
 necessary to perform any further configuration.

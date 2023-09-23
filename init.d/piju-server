@@ -1,11 +1,11 @@
 #!/sbin/openrc-run
 
-command="/usr/bin/python3"
-command_args="-m pijuv2.backend"
+command="/home/piju/piju-server/run.sh"
+command_args="file.db"
 command_args_foreground="${command_args}"
 command_user="piju:piju"
 command_background=true
 directory="/home/piju/piju-server"
 pidfile="/run/$RC_SVCNAME.pid"
-output_log="/var/log/piju/piju.log"
-error_log="/var/log/piju/piju.err"
+output_log="/var/log/piju-server/piju-server.log"
+error_log="/var/log/piju-server/piju-server.err"
