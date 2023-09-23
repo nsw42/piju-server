@@ -178,6 +178,7 @@ class StreamPlayer(PlayerInterface):
         """
         self._stop()
         self.current_status = CurrentStatusStrings.PAUSED
+        self.currently_playing_artwork = self.station_artwork
 
     def resume(self):
         """
