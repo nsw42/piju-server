@@ -38,7 +38,7 @@ fi
 DB_FILE=`realpath "$DB_FILE"`
 
 # Check for alembic
-ALEMBIC=$(which alembic)
+ALEMBIC=$(command -v alembic)
 if [ -z "$ALEMBIC" ]; then
   # Try in the default installation
   ALEMBIC=$HOME/.local/bin/alembic
