@@ -3,6 +3,7 @@ Pillow
 SQLAlchemy
 alembic
 flake8
+json5
 mutagen
 pexpect
 requests
