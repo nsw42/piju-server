@@ -882,7 +882,7 @@ def queue():
                     abort(HTTPStatus.NOT_FOUND, "Unknown track id")
                 except ValueError:
                     abort(HTTPStatus.BAD_REQUEST, "Unrecognised track id")
-            app.current_player.set_queue(new_queue, "/queue/")
+                app.current_player.set_queue(new_queue, "/queue/")
         else:
             abort(HTTPStatus.BAD_REQUEST, "No track id, url or new queue order specified")
         return ('', HTTPStatus.NO_CONTENT)
