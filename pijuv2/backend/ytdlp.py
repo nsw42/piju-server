@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Iterable
 import subprocess
 
-from .downloadinfo import DownloadInfo
+from .downloadinfo import DownloadInfo, DownloadInfoDatabaseSingleton
 
 
 def select_thumbnail(thumbnails):
@@ -30,7 +30,7 @@ def fetch_audio(url, download_dir) -> Iterable[DownloadInfo]:
     except subprocess.CalledProcessError:
         return []
     local_files = result.stdout.splitlines()
-    download_info = []
+    all_download_info = []
     for local_file in local_files:
         filepath = Path(local_file)
         metadata_path = filepath.with_suffix('.info.json')
@@ -40,5 +40,8 @@ def fetch_audio(url, download_dir) -> Iterable[DownloadInfo]:
             title = metadata.get('title')
             artwork = select_thumbnail(metadata.get('thumbnails'))
             url = metadata.get('webpage_url')
-        download_info.append(DownloadInfo(filepath, artist, title, artwork, url))
-    return download_info
+        fake_trackid = DownloadInfoDatabaseSingleton().get_id_for_filepath(filepath)
+        one_download_info = DownloadInfo(filepath, artist, title, artwork, url, fake_trackid)
+        all_download_info.append(one_download_info)
+        DownloadInfoDatabaseSingleton().add_download_info(fake_trackid, one_download_info)
+    return all_download_info

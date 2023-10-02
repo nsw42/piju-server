@@ -2,18 +2,19 @@ from collections import namedtuple
 import logging
 import os.path
 import time
-from typing import List, Optional
+from typing import List, Union
 
 from .mp3player import MP3MusicPlayer
 from .mpvmusicplayer import MPVMusicPlayer
 from .playerinterface import CurrentStatusStrings, PlayerInterface
 
+from ..backend.downloadinfo import DownloadInfo  # TODO: Layering is a mess
 from ..database.schema import Track
 
 
 QueuedTrack = namedtuple('QueuedTrack', 'filepath, trackid, artist, title, artwork')
 # filepath: str
-# trackid: int - None for YouTube files; set for Tracks from the database
+# trackid: int - negative for YouTube files; non-negative for Tracks from the database
 # artist: str
 # title: str
 # artwork: str - only for YouTube files (and even then may be unknown); is always None for Tracks from the database
@@ -85,10 +86,15 @@ class FilePlayer(PlayerInterface):
         self.queue = []  # list of QueuedTrack
         self.current_track_index = None
 
-    def set_queue(self, queue: Optional[List[Track]], identifier: str):
-        if queue:
+    def set_queue(self, new_queue: List[Union[DownloadInfo, Track]], identifier: str):
+        if new_queue:
             currently_playing = self.queue[self.current_track_index] if self.current_track_index else None
-            self.queue = [QueuedTrack(track.Filepath, track.Id, track.Artist, track.Title, None) for track in queue]
+            self.queue = []
+            for item in new_queue:
+                if isinstance(item, DownloadInfo):
+                    self.queue.append(QueuedTrack(str(item.filepath), item.fake_trackid, item.artist, item.title, item.artwork))
+                else:
+                    self.queue.append(QueuedTrack(item.Filepath, item.Id, item.Artist, item.Title, None))
             self.current_track_index = 0  # invariant: the index of the *currently playing* song
             if (not currently_playing) or (currently_playing.trackid != self.queue[0].trackid):
                 self.play_from_real_queue_index(0)

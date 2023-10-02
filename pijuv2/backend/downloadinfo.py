@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Union
 
 
-DownloadInfo = namedtuple('DownloadInfo', 'filepath, artist, title, artwork, url')
+DownloadInfo = namedtuple('DownloadInfo', 'filepath, artist, title, artwork, url, fake_trackid')
 # filepath: Path
 # artist: str
 # title: str
