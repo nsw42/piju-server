@@ -937,7 +937,8 @@ def radio_stations():
         with DatabaseAccess() as db:
             stations = db.get_all_radio_stations()
             if len(desired_station_order) != len(stations) or len(set(desired_station_order)) != len(stations):
-                abort(HTTPStatus.BAD_REQUEST, "Submitted list does not specify the order for all stations, or contains duplicates")
+                msg = "Submitted list does not specify the order for all stations, or contains duplicates"
+                abort(HTTPStatus.BAD_REQUEST, msg)
             for station in stations:
                 station.SortOrder = desired_station_order.index(station.Id)
         return ('', HTTPStatus.NO_CONTENT)
