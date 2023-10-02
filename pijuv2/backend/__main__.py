@@ -466,8 +466,6 @@ def update_player_streaming_prevnext(delta):
 
 @app.after_request
 def add_security_headers(resp):
-    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Access-Control-Allow-Headers, Access-Control-Allow-Methods, Access-Control-Allow-Origin'
-    resp.headers['Access-Control-Allow-Methods'] = '*'
     resp.headers['Access-Control-Allow-Origin'] = '*'
     return resp
 
@@ -851,20 +849,31 @@ def queue():
         data = request.get_json()
         if not data:
             abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
-        trackid = extract_id(data.get('track', ''))
-        youtubeurl = data.get('url')
-        if youtubeurl:
-            app.download_history.add(youtubeurl)
-            app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE, youtubeurl, app.piju_config.download_dir,
-                                queue_downloaded_files))
-        else:
+        # there are three different possibilities here:
+        #   track: trackid  # add the given track to queue
+        #   url: url        # add the audio from the given URL to queue
+        #   queue: [trackid_or_url]  # reorder the queue
+        if trackid := extract_id(data.get('track', '')):
             with DatabaseAccess() as db:
-                if trackid is None:
-                    abort(HTTPStatus.BAD_REQUEST, description="Invalid or missing track id")
                 try:
                     add_track_to_queue(db.get_track_by_id(trackid))
                 except NotFoundException:
                     abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+        elif youtubeurl := data.get('url'):
+            app.download_history.add(youtubeurl)
+            app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE, youtubeurl, app.piju_config.download_dir,
+                                queue_downloaded_files))
+        elif new_queue_order := data.get('queue'):
+            # TODO: Support YouTube audio in queue rearrangements
+            # but needs backend work, first
+            with DatabaseAccess() as db:
+                try:
+                    new_queue = [db.get_track_by_id(trackid) for trackid in new_queue_order]
+                except NotFoundException:
+                    abort(HTTPStatus.NOT_FOUND, "Unknown track id")
+            app.current_player.set_queue(new_queue, "/queue/")
+        else:
+            abort(HTTPStatus.BAD_REQUEST, "No track id, url or new queue order specified")
         return ('', HTTPStatus.NO_CONTENT)
 
     return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -880,7 +889,7 @@ def add_track_to_queue(track: Track):
     app.current_player.add_to_queue(track.Filepath, track.Id, track.Artist, track.Title, artwork_uri)
 
 
-@app.route("/radio/", methods=['GET', 'POST', 'PUT'])
+@app.route("/radio/", methods=['GET', 'OPTIONS', 'POST', 'PUT'])
 def radio_stations():
     if request.method == 'GET':
         with DatabaseAccess() as db:
@@ -888,6 +897,14 @@ def radio_stations():
             for station in db.get_all_radio_stations():
                 rtn.append(json_radio_station(station))
             return gzippable_jsonify(rtn)
+
+    elif request.method == 'OPTIONS':
+        response = make_response('', HTTPStatus.NO_CONTENT)
+        response.headers['Access-Control-Allow-Headers'] = ', '.join(['Content-Type',
+                                                                      'Access-Control-Allow-Headers',
+                                                                      'Access-Control-Allow-Methods',
+                                                                      'Access-Control-Allow-Origin'])
+        response.headers['Access-Control-Allow-Methods'] = ', '.join(request.url_rule.methods)
 
     elif request.method == 'POST':
         station = build_radio_station_from_api_data()
