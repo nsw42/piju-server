@@ -1,8 +1,9 @@
 from enum import Enum
 import logging
-import pexpect
 import re
 from threading import Thread
+
+import pexpect
 
 
 class MpgOutputAction(Enum):
@@ -176,6 +177,8 @@ class MPyg321Player:
     """Main class for mpg321 player management"""
     player = None
     player_name = "mpg123"
+    player_version = None
+    current_volume = None
     status = None
     output_processor = None
     song_path = ""
@@ -200,8 +203,8 @@ class MPyg321Player:
             try:
                 version_process = pexpect.spawn(str(player) + " --version")
                 valid_player = str(player)
-            except pexpect.exceptions.ExceptionPexpect:
-                raise MPyg321WrongPlayerPathError("Invalid file path provided")
+            except pexpect.exceptions.ExceptionPexpect as exc:
+                raise MPyg321WrongPlayerPathError("Invalid file path provided") from exc
 
         else:
             try:
@@ -211,20 +214,19 @@ class MPyg321Player:
                 try:
                     version_process = pexpect.spawn("mpg321 --version", encoding='utf-8')
                     valid_player = "mpg321"
-                except pexpect.exceptions.ExceptionPexpect:
-                    raise MPyg321NoPlayerFoundError(
-                        """No suitable player found""")
+                except pexpect.exceptions.ExceptionPexpect as exc:
+                    raise MPyg321NoPlayerFoundError("No suitable player found") from exc
 
         suitable_versions = [
             re.compile(r"mpg123 ([0-9.]+)"),
             re.compile(r"mpg321 version ([0-9.]+)")
         ]
-        index = version_process.expect(suitable_versions)
+        version_process.expect(suitable_versions)
         try:
             self.player_name = valid_player
             self.player_version = tuple(map(int, version_process.match.group(1).split('.')))  # e.g. (1, 30, 2)
-        except IndexError:
-            raise MPyg321NoPlayerFoundError("""No suitable player found""")
+        except IndexError as exc:
+            raise MPyg321NoPlayerFoundError("No suitable player found") from exc
         return valid_player
 
     def set_player(self, player, audiodevice):
