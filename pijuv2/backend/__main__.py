@@ -466,6 +466,8 @@ def update_player_streaming_prevnext(delta):
 
 @app.after_request
 def add_security_headers(resp):
+    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Access-Control-Allow-Headers, Access-Control-Allow-Methods, Access-Control-Allow-Origin'
+    resp.headers['Access-Control-Allow-Methods'] = '*'
     resp.headers['Access-Control-Allow-Origin'] = '*'
     return resp
 
@@ -878,7 +880,7 @@ def add_track_to_queue(track: Track):
     app.current_player.add_to_queue(track.Filepath, track.Id, track.Artist, track.Title, artwork_uri)
 
 
-@app.route("/radio/", methods=['GET', 'POST'])
+@app.route("/radio/", methods=['GET', 'POST', 'PUT'])
 def radio_stations():
     if request.method == 'GET':
         with DatabaseAccess() as db:
@@ -895,6 +897,22 @@ def radio_stations():
                 'id': station.Id
             }
             return gzippable_jsonify(response)
+
+    elif request.method == 'PUT':
+        # reorder stations
+        desired_station_order = request.get_json()
+        if not isinstance(desired_station_order, list):
+            abort(HTTPStatus.BAD_REQUEST, "List of station identifiers expected")
+        desired_station_order = [extract_id(station) for station in desired_station_order]
+        if None in desired_station_order:
+            abort(HTTPStatus.BAD_REQUEST, "Unrecognised station id in list")
+        with DatabaseAccess() as db:
+            stations = db.get_all_radio_stations()
+            if len(desired_station_order) != len(stations) or len(set(desired_station_order)) != len(stations):
+                abort(HTTPStatus.BAD_REQUEST, "Submitted list does not specify the order for all stations, or contains duplicates")
+            for station in stations:
+                station.SortOrder = desired_station_order.index(station.Id)
+        return ('', HTTPStatus.NO_CONTENT)
 
     return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
 

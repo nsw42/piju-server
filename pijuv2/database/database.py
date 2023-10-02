@@ -68,7 +68,7 @@ class Database():
         return station
 
     def get_all_radio_stations(self) -> List[RadioStation]:
-        result = self.session.execute(select(RadioStation).order_by(RadioStation.Id))
+        result = self.session.execute(select(RadioStation).order_by(RadioStation.SortOrder))
         return result.scalars().all()
 
     def create_playlist(self, playlist: Playlist):
@@ -98,6 +98,7 @@ class Database():
         existing_station.NowPlayingJq = station.NowPlayingJq
         existing_station.NowPlayingArtworkUrl = station.NowPlayingArtworkUrl
         existing_station.NowPlayingArtworkJq = station.NowPlayingArtworkJq
+        existing_station.SortOrder = station.SortOrder
         self.session.commit()
         return existing_station
 
