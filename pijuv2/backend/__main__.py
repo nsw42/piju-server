@@ -981,7 +981,8 @@ def start_scan():
         abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
     subdir = data.get('dir')
     scandir = app.piju_config.music_dir if (subdir is None) else os.path.join(app.piju_config.music_dir, subdir)
-    # TODO: Error checking on scandir
+    if not os.path.isdir(scandir):
+        abort(HTTPStatus.BAD_REQUEST, f"Directory {subdir} does not exist")
     app.work_queue.put((WorkRequests.SCAN_DIRECTORY, scandir))
     return ('', HTTPStatus.NO_CONTENT)
 
