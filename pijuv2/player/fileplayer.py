@@ -92,9 +92,18 @@ class FilePlayer(PlayerInterface):
             self.queue = []
             for item in new_queue:
                 if isinstance(item, DownloadInfo):
-                    self.queue.append(QueuedTrack(str(item.filepath), item.fake_trackid, item.artist, item.title, item.artwork))
+                    queue_item = QueuedTrack(str(item.filepath),
+                                             item.fake_trackid,
+                                             item.artist,
+                                             item.title,
+                                             item.artwork)
                 else:
-                    self.queue.append(QueuedTrack(item.Filepath, item.Id, item.Artist, item.Title, None))
+                    queue_item = QueuedTrack(item.Filepath,
+                                             item.Id,
+                                             item.Artist,
+                                             item.Title,
+                                             None)
+                self.queue.append(queue_item)
             self.current_track_index = 0  # invariant: the index of the *currently playing* song
             if (not currently_playing) or (currently_playing.trackid != self.queue[0].trackid):
                 self.play_from_real_queue_index(0)
