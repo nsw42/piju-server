@@ -9,7 +9,7 @@ import mimetypes
 import os.path
 from pathlib import Path
 from queue import Queue
-from typing import List, Tuple
+from typing import Iterable, List, Tuple
 
 from flask import abort, Flask, make_response, request, Response, url_for
 from werkzeug.exceptions import BadRequest, BadRequestKeyError
@@ -21,6 +21,7 @@ from ..player.playerinterface import CurrentStatusStrings
 from ..player.streamplayer import StreamPlayer
 from .config import Config
 from .downloadhistory import DownloadHistory
+from .downloadinfo import DownloadInfo, DownloadInfoDatabaseSingleton
 from .workrequests import WorkRequests
 from .workthread import WorkerThread
 
@@ -269,12 +270,14 @@ def json_track(track: Track, include_debuginfo: bool = False):
 
 
 def json_track_or_file(db, queued_track, include_debuginfo: bool = False):
-    if queued_track.trackid is not None:
+    if queued_track.trackid >= 0:
+        # A real track
         track = db.get_track_by_id(queued_track.trackid)
         return json_track(track, include_debuginfo)
     else:
+        # A fake track
         rtn = {
-            'link': None,
+            'link': url_for('get_track', trackid=queued_track.trackid),
             'artist': queued_track.artist,
             'title': queued_track.title,
             'genre': None,
@@ -353,7 +356,7 @@ def response_for_import_playlist(playlist: Playlist, missing_tracks: List[str]):
 # PLAYBACK HELPER FUNCTIONS -----------------------------------------------------------------------
 
 
-def play_downloaded_files(url, download_info):
+def play_downloaded_files(url, download_info: Iterable[DownloadInfo]):
     """
     A callback after an audio URL has been downloaded
     """
@@ -376,11 +379,13 @@ def play_track_list(tracks: List[Track], identifier: str, start_at_track_id: int
     app.current_player.play_from_real_queue_index(play_from_index)
 
 
-def queue_downloaded_files(url, download_info):
+def queue_downloaded_files(url, download_info: Iterable[DownloadInfo]):
     select_player(app.file_player)
     app.download_history.set_info(url, download_info)
     for one_download in download_info:
-        app.current_player.add_to_queue(str(one_download.filepath), None, one_download.artist, one_download.title,
+        app.current_player.add_to_queue(str(one_download.filepath),
+                                        one_download.fake_trackid,
+                                        one_download.artist, one_download.title,
                                         one_download.artwork)
 
 
@@ -466,8 +471,6 @@ def update_player_streaming_prevnext(delta):
 
 @app.after_request
 def add_security_headers(resp):
-    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Access-Control-Allow-Headers, Access-Control-Allow-Methods, Access-Control-Allow-Origin'
-    resp.headers['Access-Control-Allow-Methods'] = '*'
     resp.headers['Access-Control-Allow-Origin'] = '*'
     return resp
 
@@ -851,20 +854,37 @@ def queue():
         data = request.get_json()
         if not data:
             abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
-        trackid = extract_id(data.get('track', ''))
-        youtubeurl = data.get('url')
-        if youtubeurl:
-            app.download_history.add(youtubeurl)
-            app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE, youtubeurl, app.piju_config.download_dir,
-                                queue_downloaded_files))
-        else:
+        # there are three different possibilities here:
+        #   track: trackid  # add the given track to queue
+        #   url: url        # add the audio from the given URL to queue
+        #   queue: [trackid_or_url]  # reorder the queue
+        if trackid := extract_id(data.get('track', '')):
             with DatabaseAccess() as db:
-                if trackid is None:
-                    abort(HTTPStatus.BAD_REQUEST, description="Invalid or missing track id")
                 try:
                     add_track_to_queue(db.get_track_by_id(trackid))
                 except NotFoundException:
                     abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+        elif youtubeurl := data.get('url'):
+            app.download_history.add(youtubeurl)
+            app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE, youtubeurl, app.piju_config.download_dir,
+                                queue_downloaded_files))
+        elif new_queue_order := data.get('queue'):
+            new_queue = []
+            with DatabaseAccess() as db:
+                try:
+                    for trackid in new_queue_order:
+                        trackid = int(trackid)
+                        if trackid >= 0:
+                            new_queue.append(db.get_track_by_id(trackid))
+                        else:
+                            new_queue.append(DownloadInfoDatabaseSingleton().get_download_info(trackid))
+                except NotFoundException:
+                    abort(HTTPStatus.NOT_FOUND, "Unknown track id")
+                except ValueError:
+                    abort(HTTPStatus.BAD_REQUEST, "Unrecognised track id")
+            app.current_player.set_queue(new_queue, "/queue/")
+        else:
+            abort(HTTPStatus.BAD_REQUEST, "No track id, url or new queue order specified")
         return ('', HTTPStatus.NO_CONTENT)
 
     return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -880,7 +900,7 @@ def add_track_to_queue(track: Track):
     app.current_player.add_to_queue(track.Filepath, track.Id, track.Artist, track.Title, artwork_uri)
 
 
-@app.route("/radio/", methods=['GET', 'POST', 'PUT'])
+@app.route("/radio/", methods=['GET', 'OPTIONS', 'POST', 'PUT'])
 def radio_stations():
     if request.method == 'GET':
         with DatabaseAccess() as db:
@@ -888,6 +908,14 @@ def radio_stations():
             for station in db.get_all_radio_stations():
                 rtn.append(json_radio_station(station))
             return gzippable_jsonify(rtn)
+
+    elif request.method == 'OPTIONS':
+        response = make_response('', HTTPStatus.NO_CONTENT)
+        response.headers['Access-Control-Allow-Headers'] = ', '.join(['Content-Type',
+                                                                      'Access-Control-Allow-Headers',
+                                                                      'Access-Control-Allow-Methods',
+                                                                      'Access-Control-Allow-Origin'])
+        response.headers['Access-Control-Allow-Methods'] = ', '.join(request.url_rule.methods)
 
     elif request.method == 'POST':
         station = build_radio_station_from_api_data()
