@@ -80,6 +80,7 @@ class RadioStation(Base):
     NowPlayingJq = Column(String)
     NowPlayingArtworkUrl = Column(String)
     NowPlayingArtworkJq = Column(String)
+    SortOrder = Column(Integer)
 
 
 class Track(Base):
