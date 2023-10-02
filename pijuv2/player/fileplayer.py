@@ -88,7 +88,7 @@ class FilePlayer(PlayerInterface):
 
     def set_queue(self, new_queue: List[Union[DownloadInfo, Track]], identifier: str):
         if new_queue:
-            currently_playing = self.queue[self.current_track_index] if self.current_track_index else None
+            currently_playing = None if (self.current_track_index is None) else self.queue[self.current_track_index]
             self.queue = []
             for item in new_queue:
                 if isinstance(item, DownloadInfo):
