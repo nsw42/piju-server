@@ -937,7 +937,8 @@ def radio_stations():
         with DatabaseAccess() as db:
             stations = db.get_all_radio_stations()
             if len(desired_station_order) != len(stations) or len(set(desired_station_order)) != len(stations):
-                abort(HTTPStatus.BAD_REQUEST, "Submitted list does not specify the order for all stations, or contains duplicates")
+                msg = "Submitted list does not specify the order for all stations, or contains duplicates"
+                abort(HTTPStatus.BAD_REQUEST, msg)
             for station in stations:
                 station.SortOrder = desired_station_order.index(station.Id)
         return ('', HTTPStatus.NO_CONTENT)
@@ -980,7 +981,8 @@ def start_scan():
         abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
     subdir = data.get('dir')
     scandir = app.piju_config.music_dir if (subdir is None) else os.path.join(app.piju_config.music_dir, subdir)
-    # TODO: Error checking on scandir
+    if not os.path.isdir(scandir):
+        abort(HTTPStatus.BAD_REQUEST, f"Directory {subdir} does not exist")
     app.work_queue.put((WorkRequests.SCAN_DIRECTORY, scandir))
     return ('', HTTPStatus.NO_CONTENT)
 

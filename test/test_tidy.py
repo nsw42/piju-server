@@ -7,7 +7,7 @@ TEST_DB = 'test.db'
 
 def mk_existing_track(tmp_path):
     existing_path = tmp_path / 'dummy.mp3'
-    open(existing_path, 'w').write('dummy')
+    open(existing_path, 'w', encoding='utf-8').write('dummy')
     return Track(Filepath=str(existing_path), Title='Dummy track')
 
 
@@ -30,17 +30,17 @@ def test_delete_missing_tracks(tmp_path):
 
     assert db.get_nr_tracks() == 1
 
-    t = db.get_all_tracks()[0]
-    assert t.Id == existing_track.Id
-    assert t.Filepath == existing_track.Filepath
+    trk = db.get_all_tracks()[0]
+    assert trk.Id == existing_track.Id
+    assert trk.Filepath == existing_track.Filepath
 
 
 def test_delete_albums_without_tracks(tmp_path):
     db = Database(path=tmp_path / TEST_DB, create=True)
 
-    a1 = db.ensure_album_exists(Album(Title="Album With A Track"))
-    t = Track(Title="Dummy Track", Album=a1.Id)
-    db.ensure_track_exists(t)
+    album1 = db.ensure_album_exists(Album(Title="Album With A Track"))
+    trk = Track(Title="Dummy Track", Album=album1.Id)
+    db.ensure_track_exists(trk)
 
     db.ensure_album_exists(Album(Title="Album Without Tracks"))
 
@@ -52,6 +52,6 @@ def test_delete_albums_without_tracks(tmp_path):
     assert db.get_nr_tracks() == 1
     assert db.get_nr_albums() == 1
 
-    a = db.get_all_albums()[0]
-    assert a.Id == a1.Id
-    assert a.Title == "Album With A Track"
+    album2 = db.get_all_albums()[0]
+    assert album2.Id == album1.Id
+    assert album2.Title == "Album With A Track"

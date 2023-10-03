@@ -34,7 +34,7 @@ def fetch_audio(url, download_dir) -> Iterable[DownloadInfo]:
     for local_file in local_files:
         filepath = Path(local_file)
         metadata_path = filepath.with_suffix('.info.json')
-        with open(metadata_path) as handle:
+        with open(metadata_path, encoding='utf-8') as handle:
             metadata = json.load(handle)
             artist = metadata.get('artist')
             title = metadata.get('title')
