@@ -5,8 +5,8 @@ from pijuv2.database.schema import Album, Track
 TEST_DB = 'test.db'
 
 
-def mk_albumref(artist, is_compilation, genres=[]):
-    return Album(Artist=artist, Title="Test Album Title", IsCompilation=is_compilation, Genres=genres)
+def mk_albumref(artist, is_compilation, genres=None):
+    return Album(Artist=artist, Title="Test Album Title", IsCompilation=is_compilation, Genres=genres if genres else [])
 
 
 def mk_compilation_albumref():
@@ -95,19 +95,19 @@ def test_get_all_tracks(tmp_path):
 def test_get_album_by_id(tmp_path):
     # Prepare
     db = Database(path=tmp_path / TEST_DB, create=True)
-    a1 = mk_other_albumref()
-    db.ensure_album_exists(a1)
-    a2 = mk_compilation_albumref()
-    db.ensure_album_exists(a2)
-    assert a1.Id != a2.Id
-    assert a1.Artist != a2.Artist
+    album1 = mk_other_albumref()
+    db.ensure_album_exists(album1)
+    album2 = mk_compilation_albumref()
+    db.ensure_album_exists(album2)
+    assert album1.Id != album2.Id
+    assert album1.Artist != album2.Artist
     assert db.get_nr_albums() == 2
 
     # Act
-    found = db.get_album_by_id(a1.Id)
+    found = db.get_album_by_id(album1.Id)
 
     # Check
-    assert found.Artist == a1.Artist
+    assert found.Artist == album1.Artist
 
 
 def test_get_genre_by_id(tmp_path):
@@ -135,14 +135,14 @@ def test_get_genre_by_id(tmp_path):
 def test_get_track_by_id(tmp_path):
     # Prepare
     db = Database(path=tmp_path / TEST_DB, create=True)
-    t1 = db.ensure_track_exists(Track(Title="Beware of the fish"))
-    t2 = db.ensure_track_exists(Track(Title="Something Something"))
+    trk1 = db.ensure_track_exists(Track(Title="Beware of the fish"))
+    trk2 = db.ensure_track_exists(Track(Title="Something Something"))
 
-    assert t1.Id != t2.Id
+    assert trk1.Id != trk2.Id
     assert db.get_nr_tracks() == 2
 
     # Act
-    found = db.get_track_by_id(t1.Id)
+    found = db.get_track_by_id(trk1.Id)
 
     # Check
     assert found.Title == "Beware of the fish"
@@ -159,33 +159,33 @@ def test_change_compilation_to_single_artist(tmp_path):
 
     # Simulate the outline of the logic from scan.directory
     # First pass: as a compilation
-    t1 = Track(Filepath='dummy.mp3',
-               Title='My Track',
-               Artist='Various Artists',
-               TrackNumber=1,
-               TrackCount=1)
-    a1 = Album(Title='My Album',
-               Artist='Various Artists',
-               IsCompilation=True)
-    set_cross_refs(db, t1, a1)
+    trk1 = Track(Filepath='dummy.mp3',
+                 Title='My Track',
+                 Artist='Various Artists',
+                 TrackNumber=1,
+                 TrackCount=1)
+    album1 = Album(Title='My Album',
+                   Artist='Various Artists',
+                   IsCompilation=True)
+    set_cross_refs(db, trk1, album1)
 
     assert len(db.get_all_tracks()) == 1
     assert len(db.get_all_albums()) == 1
 
-    assert t1.Id is not None
-    assert len(a1.Tracks) == 1
+    assert trk1.Id is not None
+    assert len(album1.Tracks) == 1
 
     # Second pass: as a single artist
-    t2 = Track(Id=t1.Id,
-               Filepath='dummy.mp3',
-               Title='My Track',
-               Artist='Bill and Ben',
-               TrackNumber=1,
-               TrackCount=1)
-    a2 = Album(Title='My Album',
-               Artist='Bill and Ben',
-               IsCompilation=False)
-    set_cross_refs(db, t2, a2)
+    trk2 = Track(Id=trk1.Id,
+                 Filepath='dummy.mp3',
+                 Title='My Track',
+                 Artist='Bill and Ben',
+                 TrackNumber=1,
+                 TrackCount=1)
+    album2 = Album(Title='My Album',
+                   Artist='Bill and Ben',
+                   IsCompilation=False)
+    set_cross_refs(db, trk2, album2)
 
     assert len(db.get_all_tracks()) == 1
     assert len(db.get_all_albums()) == 1
