@@ -8,7 +8,7 @@ from .mp3player import MP3MusicPlayer
 from .mpvmusicplayer import MPVMusicPlayer
 from .playerinterface import CurrentStatusStrings, PlayerInterface
 
-from ..backend.downloadinfo import DownloadInfo  # TODO: Layering is a mess
+from ..backend.downloadinfo import DownloadInfo
 from ..database.schema import Track
 
 
