@@ -103,3 +103,23 @@ def extract_ids(uris_or_ids):
     [123, 456, 789]
     """
     return [extract_id(uri_or_id) for uri_or_id in uris_or_ids]
+
+
+def parse_bool(bool_str: str):
+    """
+    >>> parse_bool('yes')
+    True
+    >>> parse_bool('y')
+    True
+    >>> parse_bool('Y')
+    True
+    >>> parse_bool('True')
+    True
+    >>> parse_bool('False')
+    False
+    >>> parse_bool('XYZ')
+    False
+    """
+    if bool_str.lower() in ('y', 'yes', 'true'):
+        return True
+    return False
