@@ -3,20 +3,11 @@ import doctest
 import logging
 import mimetypes
 from pathlib import Path
-from queue import Queue
-
-from flask import Flask
 
 from ..database.database import Database
-from ..player.fileplayer import FilePlayer
-from ..player.streamplayer import StreamPlayer
+from .appfactory import create_app
 from .config import Config
-from .downloadhistory import DownloadHistory
-from .routes import routes
-from .workthread import WorkerThread
 
-
-app = Flask(__name__)
 
 mimetypes.init()
 
@@ -46,14 +37,6 @@ def parse_args():
     return args
 
 
-# RESPONSE HEADERS --------------------------------------------------------------------------------
-
-@app.after_request
-def add_security_headers(resp):
-    resp.headers['Access-Control-Allow-Origin'] = '*'
-    return resp
-
-
 # MAIN --------------------------------------------------------------------------------------------
 
 def main():
@@ -64,17 +47,8 @@ def main():
     else:
         logging.basicConfig(level=logging.DEBUG)
         Database.DEFAULT_FILENAME = str(args.database)
-        config = Config(args.config)
-        app.piju_config = config
-        app.work_queue = Queue()
-        app.worker = WorkerThread(app.work_queue)
+        app = create_app()
         app.worker.start()
-        app.file_player = FilePlayer(mp3audiodevice=args.mp3audiodevice)
-        app.stream_player = StreamPlayer(audio_device=args.mp3audiodevice)
-        app.current_player = app.file_player
-        app.api_version_string = '6.0'
-        app.download_history = DownloadHistory()
-        app.register_blueprint(routes)
         # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
         # see https://developer.apple.com/forums/thread/682332
         app.run(use_reloader=False, host='0.0.0.0', threaded=True)

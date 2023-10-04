@@ -52,6 +52,12 @@ def response_for_import_playlist(playlist: Playlist, missing_tracks: List[str]):
     return gzippable_jsonify(response)
 
 
+@routes.after_request
+def add_security_headers(resp):
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    return resp
+
+
 @routes.route("/")
 def current_status():
     with DatabaseAccess() as db:
