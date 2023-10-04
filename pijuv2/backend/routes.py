@@ -7,7 +7,7 @@ import os.path
 from pathlib import Path
 from typing import List
 
-from flask import abort, Blueprint, current_app, make_response, request, Response, url_for
+from flask import abort, Blueprint, current_app, jsonify, make_response, request, Response, url_for
 from werkzeug.exceptions import BadRequest, BadRequestKeyError
 
 from ..database.database import DatabaseAccess, NotFoundException
@@ -27,13 +27,14 @@ routes = Blueprint('routes', __name__, url_prefix='')
 
 
 def gzippable_jsonify(content):
-    content = json.dumps(content, separators=(',', ':'))  # avoid whitespace in response
     if 'gzip' in request.headers.get('Accept-Encoding', '').lower():
+        content = json.dumps(content, separators=(',', ':'))  # avoid whitespace in response
         content = gzip.compress(content.encode('utf-8'), 5)
-    response = make_response(content)
-    response.headers['Content-Length'] = len(content)
-    response.headers['Content-Encoding'] = 'gzip'
-    return response
+        response = make_response(content)
+        response.headers['Content-Length'] = len(content)
+        response.headers['Content-Encoding'] = 'gzip'
+        return response
+    return jsonify(content)
 
 
 def normalize_punctuation(search_string):

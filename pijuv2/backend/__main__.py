@@ -46,7 +46,7 @@ def main():
         doctest.testmod()
     else:
         logging.basicConfig(level=logging.DEBUG)
-        Database.DEFAULT_FILENAME = str(args.database)
+        Database.DEFAULT_URI = Database.SQLITE_PREFIX + str(args.database)
         app = create_app()
         app.worker.start()
         # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
