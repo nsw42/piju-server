@@ -186,9 +186,9 @@ class MPyg321Player:
     performance_mode = True
     current_position = None
 
-    def __init__(self, player=None, audiodevice=None, performance_mode=True):
+    def __init__(self, player=None, performance_mode=True):
         """Builds the player and creates the callbacks"""
-        self.set_player(player, audiodevice)
+        self.set_player(player)
         self.output_processor = Thread(target=self.process_output)
         self.output_processor.daemon = True
         self.performance_mode = performance_mode
@@ -229,11 +229,10 @@ class MPyg321Player:
             raise MPyg321NoPlayerFoundError("No suitable player found") from exc
         return valid_player
 
-    def set_player(self, player, audiodevice):
+    def set_player(self, player):
         """Sets the player"""
         player = self.set_version_and_get_player(player)
         args = "--remote" if self.player_name == "mpg123" else "-R test"
-        args += " --audiodevice " + audiodevice if audiodevice else ""
         logging.debug('mpyg321 player %s args %s', player, args)
         self.player = pexpect.spawn(str(player) + " " + args)
         self.player.delaybeforesend = None

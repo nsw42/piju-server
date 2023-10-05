@@ -4,8 +4,8 @@ from .mpyg321 import MPyg321Player, PlayerStatus
 
 
 class MP3MusicPlayer(MPyg321Player):
-    def __init__(self, parent, audiodevice=None):
-        super().__init__(audiodevice=audiodevice)
+    def __init__(self, parent):
+        super().__init__()
         self.volume(100)
         self.parent = parent
 
