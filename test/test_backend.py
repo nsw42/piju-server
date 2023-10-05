@@ -1,3 +1,4 @@
+# pylint: disable=redefined-outer-name,unnecessary-dunder-call
 from unittest.mock import MagicMock, patch
 
 import pytest
