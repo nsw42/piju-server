@@ -8,9 +8,6 @@ from .appfactory import create_app
 from .config import Config
 
 
-mimetypes.init()
-
-
 # HELPER FUNCTIONS ----------------------------------------------------------------------------
 
 def parse_args():
@@ -42,6 +39,7 @@ def main():
     Database.DEFAULT_URI = Database.SQLITE_PREFIX + str(args.database)
     app = create_app()
     app.worker.start()
+    mimetypes.init()
     # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
     # see https://developer.apple.com/forums/thread/682332
     app.run(use_reloader=False, host='0.0.0.0', threaded=True)
