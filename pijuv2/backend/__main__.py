@@ -12,8 +12,6 @@ from .config import Config
 
 def parse_args():
     parser = ArgumentParser()
-    parser.add_argument('-a', '--mp3audiodevice', action='store',
-                        help='Set audio device for mpg123')
     parser.add_argument('-c', '--config', metavar='FILE', type=Path,
                         help=f"Load configuration from FILE. Default is {str(Config.default_filepath())}")
     parser.add_argument('-d', '--database', metavar='FILE', type=Path,
