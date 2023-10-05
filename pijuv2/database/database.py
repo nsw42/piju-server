@@ -45,14 +45,15 @@ def convert_exception_class(exc):
 
 
 class Database():
-    DEFAULT_FILENAME = 'file.db'
+    SQLITE_PREFIX = 'sqlite:///'
+    DEFAULT_URI = SQLITE_PREFIX + 'file.db'
 
     def __init__(self, path=None, create=False):
         if path:
-            filename = str(path)
+            uri = Database.SQLITE_PREFIX + str(path)
         else:
-            filename = Database.DEFAULT_FILENAME
-        self.engine = create_engine('sqlite:///' + filename, poolclass=QueuePool)
+            uri = Database.DEFAULT_URI
+        self.engine = create_engine(uri, poolclass=QueuePool)
         self.session = scoped_session(sessionmaker(bind=self.engine))
         if create:
             Base.metadata.create_all(self.engine)
