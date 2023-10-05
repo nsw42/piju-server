@@ -1,5 +1,4 @@
 from argparse import ArgumentParser
-import doctest
 import logging
 import mimetypes
 from pathlib import Path
@@ -22,10 +21,7 @@ def parse_args():
                         help=f"Load configuration from FILE. Default is {str(Config.default_filepath())}")
     parser.add_argument('-d', '--database', metavar='FILE', type=Path,
                         help="Set database path to FILE. Default is %(default)s")
-    parser.add_argument('-t', '--doctest', action='store_true',
-                        help="Run self-test and exit")
-    parser.set_defaults(doctest=False,
-                        config=None,
+    parser.set_defaults(config=None,
                         database='file.db')
     args = parser.parse_args()
     if args.config and not args.config.is_file():
@@ -42,16 +38,13 @@ def parse_args():
 def main():
     args = parse_args()
 
-    if args.doctest:
-        doctest.testmod()
-    else:
-        logging.basicConfig(level=logging.DEBUG)
-        Database.DEFAULT_URI = Database.SQLITE_PREFIX + str(args.database)
-        app = create_app()
-        app.worker.start()
-        # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
-        # see https://developer.apple.com/forums/thread/682332
-        app.run(use_reloader=False, host='0.0.0.0', threaded=True)
+    logging.basicConfig(level=logging.DEBUG)
+    Database.DEFAULT_URI = Database.SQLITE_PREFIX + str(args.database)
+    app = create_app()
+    app.worker.start()
+    # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
+    # see https://developer.apple.com/forums/thread/682332
+    app.run(use_reloader=False, host='0.0.0.0', threaded=True)
 
 
 if __name__ == '__main__':
