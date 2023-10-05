@@ -21,7 +21,6 @@ class Config:
         if config_filepath:
             self._init_from_file(config_filepath)
         else:
-            self.audio_device = None  # Use system default
             self.music_dir = Path.home() / 'Music'
             self.download_dir = Path('/tmp')
 
@@ -33,7 +32,6 @@ class Config:
     def _init_from_file(self, filepath):
         with filepath.open('r') as handle:
             data = json5.load(handle)
-            self.audio_device = data.get('audio_device', None)
             self.music_dir = data.get('music_dir')
             self.music_dir = Path(self.music_dir) if self.music_dir else Config.default_musicdir()
 

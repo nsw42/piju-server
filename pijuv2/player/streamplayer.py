@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 import subprocess
 from threading import Thread
 from time import sleep, time
@@ -106,7 +105,7 @@ class NowPlayingUpdater(Thread):
 
 
 class StreamPlayer(PlayerInterface):
-    def __init__(self, audio_device: str):
+    def __init__(self):
         super().__init__()
         self.currently_playing_name = None
         self.currently_playing_url = None
@@ -118,7 +117,6 @@ class StreamPlayer(PlayerInterface):
         self.get_artwork_url = None
         self.get_artwork_jq = None
         self.player_subprocess = None
-        self.audio_device = audio_device
         self.now_playing_artist = None  # updated by the NowPlayingUpdater
         self.now_playing_track = None  # updated by the NowPlayingUpdater
         self.update_now_playing_thread = NowPlayingUpdater(self)
@@ -141,13 +139,7 @@ class StreamPlayer(PlayerInterface):
                '-volume', str(self.current_volume),
                '-loglevel', 'warning',
                self.currently_playing_url]
-        if self.audio_device:
-            child_environment = dict(os.environ)
-            child_environment['SDL_AUDIODRIVER'] = 'alsa'
-            child_environment['AUDIODEV'] = self.audio_device
-        else:
-            child_environment = None
-        self.player_subprocess = subprocess.Popen(cmd, env=child_environment)
+        self.player_subprocess = subprocess.Popen(cmd)
         self.current_status = CurrentStatusStrings.PLAYING
 
     def play(self,

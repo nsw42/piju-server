@@ -20,8 +20,8 @@ def create_app() -> Flask:
     app.piju_config = Config(config_file)
     app.work_queue = Queue()
     app.worker = WorkerThread(app.work_queue)
-    app.file_player = FilePlayer(mp3audiodevice=app.piju_config.audio_device)
-    app.stream_player = StreamPlayer(audio_device=app.piju_config.audio_device)
+    app.file_player = FilePlayer()
+    app.stream_player = StreamPlayer()
     app.current_player = app.file_player
     app.api_version_string = '6.0'
     app.download_history = DownloadHistory()
