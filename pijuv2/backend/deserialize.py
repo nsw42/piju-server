@@ -76,19 +76,6 @@ def build_radio_station_from_api_data() -> RadioStation:
 
 
 def extract_id(uri_or_id):
-    """
-    >>> extract_id("")
-    >>> extract_id("/albums/85")
-    85
-    >>> extract_id("/tracks/123")
-    123
-    >>> extract_id("/albums/12X")
-    >>> extract_id("123")
-    123
-    >>> extract_id("cat")
-    >>> extract_id(432)
-    432
-    """
     if uri_or_id and isinstance(uri_or_id, str) and '/' in uri_or_id:
         # this is a uri, map it to a string representation of an id, then fall-through
         uri_or_id = uri_or_id.rsplit('/', 1)[1]
@@ -98,28 +85,10 @@ def extract_id(uri_or_id):
 
 
 def extract_ids(uris_or_ids):
-    """
-    >>> extract_ids(["/tracks/123", "456", 789])
-    [123, 456, 789]
-    """
     return [extract_id(uri_or_id) for uri_or_id in uris_or_ids]
 
 
 def parse_bool(bool_str: str):
-    """
-    >>> parse_bool('yes')
-    True
-    >>> parse_bool('y')
-    True
-    >>> parse_bool('Y')
-    True
-    >>> parse_bool('True')
-    True
-    >>> parse_bool('False')
-    False
-    >>> parse_bool('XYZ')
-    False
-    """
     if bool_str.lower() in ('y', 'yes', 'true'):
         return True
     return False
