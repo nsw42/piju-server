@@ -87,3 +87,13 @@ def test_get_track(client, mock_track12):
     assert response.json['link'] == '/tracks/12'
     assert response.json['artist'] == 'Motörhead'
     assert response.json['title'] == 'Ace of Spades'
+    assert response.json['artwork'] is None
+    assert response.json['artworkinfo'] is None
+
+
+def test_get_track_with_artwork(client, mock_track12):
+    mock_track12.ArtworkPath = '/over/the/rainbow.jpg'
+    response = client.get('/tracks/12')
+    assert response.status_code == 200
+    assert response.json['artwork'] == '/artwork/12'
+    assert response.json['artworkinfo'] == '/artworkinfo/12'
