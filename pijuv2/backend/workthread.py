@@ -11,8 +11,9 @@ from .ytdlp import fetch_audio
 
 
 class WorkerThread(threading.Thread):
-    def __init__(self, work_queue: Queue):
+    def __init__(self, app, work_queue: Queue):
         super().__init__(name='WorkerThread', daemon=True)
+        self.app = app
         self.work_queue = work_queue
         self.current_status = 'Not started'
 
@@ -43,7 +44,7 @@ class WorkerThread(threading.Thread):
                     local_files = fetch_audio(url=url, download_dir=download_dir)
                     callback = request[3]
                     if callback:
-                        callback(url, local_files)
+                        callback(self.app, url, local_files)
 
                 else:
                     logging.error(f"Unrecognised request: {request[0]}")

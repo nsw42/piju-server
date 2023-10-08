@@ -23,29 +23,34 @@ def add_track_to_queue(track: Track):
     current_app.current_player.add_to_queue(track.Filepath, track.Id, track.Artist, track.Title, artwork_uri)
 
 
-def play_downloaded_files(url, download_info: Iterable[DownloadInfo]):
+def play_downloaded_files(app, url, download_info: Iterable[DownloadInfo]):
     """
-    A callback after an audio URL has been downloaded
+    A callback after an audio URL has been downloaded - executed within the
+    context of WorkerThread, so cannot rely on accessing current_app
     """
-    select_player(current_app.file_player)
-    current_app.current_player.clear_queue()
-    queue_downloaded_files(url, download_info)
+    select_player(app, app.file_player)
+    app.current_player.clear_queue()
+    queue_downloaded_files(app, url, download_info)
 
 
-def queue_downloaded_files(url, download_info: Iterable[DownloadInfo]):
-    select_player(current_app.file_player)
-    current_app.download_history.set_info(url, download_info)
+def queue_downloaded_files(app, url, download_info: Iterable[DownloadInfo]):
+    """
+    A callback after an audio URL has been downloaded - executed within the
+    context of WorkerThread, so cannot rely on accessing current_app
+    """
+    select_player(app, app.file_player)
+    app.download_history.set_info(url, download_info)
     for one_download in download_info:
-        current_app.current_player.add_to_queue(str(one_download.filepath),
-                                                one_download.fake_trackid,
-                                                one_download.artist, one_download.title,
-                                                one_download.artwork)
+        app.current_player.add_to_queue(str(one_download.filepath),
+                                        one_download.fake_trackid,
+                                        one_download.artist, one_download.title,
+                                        one_download.artwork)
 
 
-def select_player(desired_player):
-    if (current_app.current_player != desired_player) and (current_app.current_player is not None):
-        current_app.current_player.stop()
-    current_app.current_player = desired_player
+def select_player(app, desired_player):
+    if (app.current_player != desired_player) and (app.current_player is not None):
+        app.current_player.stop()
+    app.current_player = desired_player
 
 
 def update_player_play_track_list(tracks: Iterable[Track], identifier: str, start_at_track_id: int):
@@ -57,7 +62,7 @@ def update_player_play_track_list(tracks: Iterable[Track], identifier: str, star
             play_from_index = track_ids.index(start_at_track_id)
         except ValueError:
             abort(HTTPStatus.BAD_REQUEST, "Requested track is not in the specified album")
-    select_player(current_app.file_player)
+    select_player(current_app, current_app.file_player)
     current_app.current_player.set_queue(tracks, identifier)
     current_app.current_player.play_from_real_queue_index(play_from_index)
 
@@ -87,7 +92,7 @@ def update_player_play_from_radio(db: Database, stationid: int):
     if index == -1:
         abort(HTTPStatus.NOT_FOUND, "Requested station id not found")
     station = stations[index]
-    select_player(current_app.stream_player)
+    select_player(current_app, current_app.stream_player)
     current_app.current_player.play(station.Name, station.Url, station.ArtworkUrl,
                                     index, len(stations),
                                     station.NowPlayingUrl, station.NowPlayingJq,
