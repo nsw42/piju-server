@@ -288,7 +288,7 @@ def update_player_play():
 
         else:
             # File-based playback required
-            select_player(current_app.file_player)
+            select_player(current_app, current_app.file_player)
 
             if albumid is not None:
                 update_player_play_album(db, albumid, trackid)

@@ -19,7 +19,7 @@ def create_app() -> Flask:
         raise Exception(f"Config file {config_file} not found")
     app.piju_config = Config(config_file)
     app.work_queue = Queue()
-    app.worker = WorkerThread(app.work_queue)
+    app.worker = WorkerThread(app, app.work_queue)
     app.file_player = FilePlayer()
     app.stream_player = StreamPlayer()
     app.current_player = app.file_player
