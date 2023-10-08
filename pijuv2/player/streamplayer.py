@@ -1,13 +1,61 @@
+from collections import defaultdict
 import json
 import logging
 import subprocess
 from threading import Thread
-from time import sleep, time
+import time
 from typing import Optional
 
 import requests
 
 from .playerinterface import CurrentStatusStrings, PlayerInterface
+
+
+def fetch(url: str) -> str:
+    """
+    Fetch the data from the given url and return it as plaintext.
+    Returns None if the fetch failed
+    """
+    try:
+        response = requests.get(url, timeout=30)
+        if not response.ok:
+            logging.debug(f"requests.get failed: {response.status_code}")
+            return None
+    except (requests.ConnectionError, requests.ConnectTimeout, requests.Timeout) as e:
+        logging.warning(f"requests.get failed: {e}")
+        return None
+    logging.debug(f"Fetched text: {response.text}")
+    return response.text
+
+
+def jq(data: str, jq_filter: str) -> Optional[str]:
+    """
+    Run the given string through jq, with the given filter, and return the result
+    as a JSON-decoded object.
+    Returns None if jq fails.
+    """
+    logging.debug(f"{jq_filter}")
+    cmd = ['jq', jq_filter]
+    child = subprocess.run(cmd,
+                           input=data,
+                           capture_output=True,
+                           check=False,  # if it fails, empty output will be fine
+                           text=True)
+    if child.returncode != 0:
+        logging.debug("jq failed")
+        return None
+
+    text = child.stdout.strip()
+    logging.debug(f"Filtered text: {text}")
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError:
+        logging.debug(f"JSON decode error: could not decode: {text}")
+        return None
+    if value == 'null':
+        # Possibly a jq filter problem, or possibly no relevant information available at the moment
+        return None
+    return value
 
 
 class NowPlayingUpdater(Thread):
@@ -17,91 +65,32 @@ class NowPlayingUpdater(Thread):
         self.start()
 
     def run(self):
-        next_fetch_track_info = next_fetch_artwork_info = time()  # fetch as soon as we start playing
+        next_fetch = time.monotonic()  # fetch as soon as we start playing
         while True:
-            now = time()
+            now = time.monotonic()
             if self.parent.current_status != CurrentStatusStrings.PLAYING:
-                next_check = now + 10
-            else:
-                if now >= next_fetch_track_info:
-                    next_fetch_track_info = now + self.do_one_fetch_track_info()
-                if now >= next_fetch_artwork_info:
-                    next_fetch_artwork_info = now + self.do_one_fetch_artwork_info()
-                next_check = min(next_fetch_track_info, next_fetch_artwork_info)
-            sleep(next_check - now)
+                time.sleep(10)
+                continue
 
-    def do_one_fetch_track_info(self) -> int:
-        """
-        Return the number of seconds to wait before trying again
-        """
-        if not self.parent.get_track_info_url:
-            # nothing playing right now
-            return 60
-        text = self.fetch_and_jq(self.parent.get_track_info_url, self.parent.get_track_info_jq, raw=False)
+            if now < next_fetch:
+                time.sleep(10)
+                continue
 
-        try:
-            data = json.loads(text)
-            if not isinstance(data, dict):
-                logging.debug("Data in wrong format. Discarding")
-                data = {}
-        except json.JSONDecodeError:
-            logging.debug(f"JSON decode error: could not decode: {text}")
-            data = {}
-        self.parent.now_playing_artist = data.get('artist')
-        self.parent.now_playing_track = data.get('track')
-        if self.parent.now_playing_artist and self.parent.now_playing_track:
-            return 60
-        return 30
-
-    def do_one_fetch_artwork_info(self) -> int:
-        """
-        Return the number of seconds to wait before trying again
-        """
-        if self.parent.get_artwork_url:
-            url = self.fetch_and_jq(self.parent.get_artwork_url, self.parent.get_artwork_jq, raw=True)
-        else:
-            url = None
-        if url:
-            self.parent.currently_playing_artwork = url
-            return 60
-        self.parent.currently_playing_artwork = self.parent.station_artwork
-        return 30
-
-    def fetch_and_jq(self, url: str, jq_filter: Optional[str], raw: bool) -> str:
-        """
-        Fetch the given url and transform it with the given jq filter
-        """
-        response = requests.get(url, timeout=30)
-        if not response.ok:
-            logging.debug(f"requests.get failed: {response.status_code}")
-            return 30
-
-        logging.debug(f"Fetched text: {response.text}")
-        if jq_filter:
-            # content needs to be filtered
-            logging.debug(f"{jq_filter}")
-            cmd = ['jq']
-            if raw:
-                cmd.append('-r')
-            cmd.append(jq_filter)
-            child = subprocess.run(cmd,
-                                   input=response.text,
-                                   capture_output=True,
-                                   check=False,  # if it fails, empty output will be fine
-                                   text=True)
-            if child.returncode == 0:
-                text = child.stdout.strip()
-                logging.debug(f"Filtered text: {text}")
-                if text == 'null':
-                    # A jq filter problem
-                    text = ''
-            else:
-                logging.debug("jq failed")
-                text = ''
-        else:
-            # content is apparently already in the correct form
-            text = response.text
-        return text
+            min_delta = None
+            for url, updates in self.parent.dynamic_info.items():
+                data = fetch(url)
+                if not data:
+                    # ensure we don't show out-of-date information, but try again soon
+                    for _, save_results in updates:
+                        save_results(None)
+                    min_delta = min(min_delta, 10) if min_delta else 10
+                    continue
+                for jq_filter, save_results in updates:
+                    filtered_data = jq(data, jq_filter) if jq_filter else data
+                    delta = save_results(filtered_data)
+                    min_delta = min(min_delta, delta) if min_delta else delta
+            next_fetch = now + min_delta
+            time.sleep(min_delta)
 
 
 class StreamPlayer(PlayerInterface):
@@ -112,10 +101,7 @@ class StreamPlayer(PlayerInterface):
         self.currently_playing_artwork = None
         self.station_artwork = None
         self.number_of_tracks = None
-        self.get_track_info_url = None
-        self.get_track_info_jq = None
-        self.get_artwork_url = None
-        self.get_artwork_jq = None
+        self.dynamic_info = {}
         self.player_subprocess = None
         self.now_playing_artist = None  # updated by the NowPlayingUpdater
         self.now_playing_track = None  # updated by the NowPlayingUpdater
@@ -157,11 +143,32 @@ class StreamPlayer(PlayerInterface):
         self.station_artwork = self.currently_playing_artwork = station_artwork
         self.current_track_index = current_index
         self.number_of_tracks = nr_stations
-        self.get_track_info_url = get_track_info_url
-        self.get_track_info_jq = get_track_info_jq
-        self.get_artwork_url = get_artwork_url
-        self.get_artwork_jq = get_artwork_jq
+        self.dynamic_info = defaultdict(list)
+        self.dynamic_info[get_track_info_url].append((get_track_info_jq, self.set_track_info))
+        self.dynamic_info[get_artwork_url].append((get_artwork_jq, self.set_artwork))
+        self.now_playing_artist = self.now_playing_track = None
         self._play()
+
+    def set_track_info(self, track_info):
+        if not isinstance(track_info, dict):
+            logging.debug("Data in wrong format. Discarding")
+            track_info = {}
+        self.now_playing_artist = track_info.get('artist')
+        self.now_playing_track = track_info.get('track')
+        if self.now_playing_artist and self.now_playing_track:
+            return 60
+        return 30
+
+    def set_artwork(self, artwork_url):
+        if artwork_url and not isinstance(artwork_url, str):
+            logging.debug("Data in wrong format. Discarding")
+            artwork_url = None
+        if artwork_url:
+            self.currently_playing_artwork = artwork_url
+            return 60
+        else:
+            self.currently_playing_artwork = self.station_artwork
+            return 30
 
     def pause(self):
         """
@@ -185,7 +192,8 @@ class StreamPlayer(PlayerInterface):
         self.current_status = CurrentStatusStrings.STOPPED
         self.currently_playing_name = self.currently_playing_url = self.currently_playing_artwork = None
         self.current_track_index = self.number_of_tracks = None
-        self.get_track_info_url = self.get_track_info_jq = self.now_playing_artist = self.now_playing_track = None
+        self.now_playing_artist = self.now_playing_track = None
+        self.dynamic_info = {}
 
     def set_volume(self, volume):
         self.current_volume = volume
