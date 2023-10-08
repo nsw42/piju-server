@@ -3,6 +3,7 @@ Functions related to data serialization, ie converting from in-memory to
 an over-the-wire representation
 """
 
+from functools import lru_cache
 import os.path
 
 from flask import url_for
@@ -31,6 +32,7 @@ class InformationLevel:
             return default
 
 
+@lru_cache(maxsize=32)
 def json_album(album: Album, include_tracks: InformationLevel):
     tracks = list(album.Tracks)
     tracks = sorted(tracks, key=lambda track: (track.VolumeNumber or 0, track.TrackNumber or 0))
@@ -65,6 +67,7 @@ def json_album(album: Album, include_tracks: InformationLevel):
     return rtn
 
 
+@lru_cache(maxsize=32)
 def json_genre(genre: Genre, include_albums: InformationLevel, include_playlists: InformationLevel):
     rtn = {
         'link': url_for('routes.get_genre', genreid=genre.Id),
@@ -84,6 +87,7 @@ def json_genre(genre: Genre, include_albums: InformationLevel, include_playlists
     return rtn
 
 
+@lru_cache(maxsize=32)
 def json_playlist(playlist: Playlist, include_genres: InformationLevel, include_tracks: InformationLevel):
     entries = list(playlist.Entries)
     rtn = {
@@ -104,6 +108,7 @@ def json_playlist(playlist: Playlist, include_genres: InformationLevel, include_
     return rtn
 
 
+@lru_cache(maxsize=32)
 def json_radio_station(station: RadioStation, include_urls: bool = False):
     rtn = {
         'link': url_for('routes.one_radio_station', stationid=station.Id),
@@ -119,6 +124,7 @@ def json_radio_station(station: RadioStation, include_urls: bool = False):
     return rtn
 
 
+@lru_cache(maxsize=32)
 def json_track(track: Track, include_debuginfo: bool = False):
     if not track:
         return {}
@@ -141,6 +147,7 @@ def json_track(track: Track, include_debuginfo: bool = False):
     return rtn
 
 
+@lru_cache(maxsize=32)
 def json_track_or_file(db, queued_track, include_debuginfo: bool = False):
     if queued_track.trackid >= 0:
         # A real track
