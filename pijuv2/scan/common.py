@@ -59,7 +59,7 @@ def parse_datetime_str(datestr: str):
 
 def find_coverart_file(music_absolutepath: pathlib.Path):
     directory = music_absolutepath.parent
-    for leaf in 'cover.jpg', 'cover.png':
+    for leaf in 'cover.jpg', 'cover.png', 'cover.webp':
         artwork_path = directory / leaf
         if artwork_path.is_file():
             return str(artwork_path)
