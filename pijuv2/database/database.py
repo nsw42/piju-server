@@ -48,16 +48,28 @@ class Database():
     SQLITE_PREFIX = 'sqlite:///'
     DEFAULT_URI = SQLITE_PREFIX + 'file.db'
 
+    class EngineSingleton:
+        def __init__(self, val):
+            self.val = val
+    __engine_singleton = None
+
     def __init__(self, path=None, create=False):
         if path:
             uri = Database.SQLITE_PREFIX + str(path)
         else:
             uri = Database.DEFAULT_URI
-        self.engine = create_engine(uri, poolclass=QueuePool)
-        self.session = scoped_session(sessionmaker(bind=self.engine))
         if create:
+            # Use a dedicated engine (primarily to support the unit tests)
+            self.engine = create_engine(uri, poolclass=QueuePool)
+            self.session = scoped_session(sessionmaker(bind=self.engine))
             Base.metadata.create_all(self.engine)
             self.session.commit()
+        else:
+            # Use the engine singleton
+            if not Database.__engine_singleton:
+                Database.__engine_singleton = Database.EngineSingleton(create_engine(uri, poolclass=QueuePool))
+            self.engine = Database.__engine_singleton.val
+            self.session = scoped_session(sessionmaker(bind=self.engine))
 
     def commit(self):
         self.session.commit()
