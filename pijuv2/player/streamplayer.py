@@ -11,7 +11,7 @@ import requests
 from .playerinterface import CurrentStatusStrings, PlayerInterface
 
 
-def fetch(url: str) -> str:
+def fetch(url: str) -> Optional[str]:
     """
     Fetch the data from the given url and return it as plaintext.
     Returns None if the fetch failed
@@ -21,7 +21,7 @@ def fetch(url: str) -> str:
         if not response.ok:
             logging.debug(f"requests.get failed: {response.status_code}")
             return None
-    except (requests.ConnectionError, requests.ConnectTimeout, requests.Timeout) as e:
+    except (requests.ConnectionError, requests.Timeout) as e:
         logging.warning(f"requests.get failed: {e}")
         return None
     logging.debug(f"Fetched text: {response.text}")
@@ -69,6 +69,9 @@ class NowPlayingUpdater(Thread):
         while True:
             now = time.monotonic()
             if self.parent.current_status != CurrentStatusStrings.PLAYING:
+                for _, updates in self.parent.dynamic_info.items():
+                    for _, save_results in updates:
+                        save_results(None)
                 time.sleep(10)
                 continue
 
@@ -150,6 +153,8 @@ class StreamPlayer(PlayerInterface):
         self._play()
 
     def set_track_info(self, track_info):
+        if track_info is None:
+            track_info = {}
         if not isinstance(track_info, dict):
             logging.debug("Data in wrong format. Discarding")
             track_info = {}
