@@ -1,8 +1,9 @@
 import logging
+import threading
 from typing import Any, Iterable, List
 
 from sqlalchemy import create_engine, func, select, or_
-from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.pool import QueuePool
 
@@ -44,14 +45,24 @@ def convert_exception_class(exc):
         return UnknownException
 
 
+class ThreadSpecificEngines:
+    def __init__(self):
+        self.engines = {}
+
+    def get(self, uri):
+        thread = threading.current_thread().ident
+        engine = self.engines.get(thread)
+        if engine is None:
+            logging.debug(f'Creating new engine for thread {thread}')
+            self.engines[thread] = engine = create_engine(uri, poolclass=QueuePool)
+        return engine
+
+
 class Database():
     SQLITE_PREFIX = 'sqlite:///'
     DEFAULT_URI = SQLITE_PREFIX + 'file.db'
 
-    class EngineSingleton:
-        def __init__(self, val):
-            self.val = val
-    __engine_singleton = None
+    engines = ThreadSpecificEngines()
 
     def __init__(self, path=None, create=False):
         if path:
@@ -61,15 +72,13 @@ class Database():
         if create:
             # Use a dedicated engine (primarily to support the unit tests)
             self.engine = create_engine(uri, poolclass=QueuePool)
-            self.session = scoped_session(sessionmaker(bind=self.engine))
+            self.session = Session(self.engine)
             Base.metadata.create_all(self.engine)
             self.session.commit()
         else:
             # Use the engine singleton
-            if not Database.__engine_singleton:
-                Database.__engine_singleton = Database.EngineSingleton(create_engine(uri, poolclass=QueuePool))
-            self.engine = Database.__engine_singleton.val
-            self.session = scoped_session(sessionmaker(bind=self.engine))
+            self.engine = Database.engines.get(uri)
+            self.session = Session(self.engine)
 
     def commit(self):
         self.session.commit()
