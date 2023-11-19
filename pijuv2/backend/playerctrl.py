@@ -80,6 +80,25 @@ def update_player_play_album(db, albumid, trackid):
     update_player_play_track_list(tracks, url_for('routes.get_album', albumid=albumid), trackid)
 
 
+def update_player_play_from_local(db: Database, albumid: int, playlistid: int, queue_pos: int, trackid: int):
+    select_player(current_app, current_app.file_player)
+
+    if albumid is not None:
+        update_player_play_album(db, albumid, trackid)
+
+    elif playlistid is not None:
+        update_player_play_playlist(db, playlistid, trackid)
+
+    elif queue_pos is not None:
+        update_player_play_from_queue(queue_pos, trackid)
+
+    elif trackid:
+        update_player_play_track(db, trackid)
+
+    else:
+        assert False, "Internal error: Unhandled code path"
+
+
 def update_player_play_from_queue(queue_pos, trackid):
     # update_player_play has already ensured we're set up for file playback
     if not current_app.current_player.play_from_apparent_queue_index(queue_pos, trackid=trackid):

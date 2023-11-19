@@ -15,9 +15,9 @@ from ..database.schema import Playlist
 from ..player.playerinterface import CurrentStatusStrings
 from .downloadinfo import DownloadInfoDatabaseSingleton
 from .deserialize import build_playlist_from_api_data, build_radio_station_from_api_data, extract_id, parse_bool
-from .playerctrl import add_track_to_queue, queue_downloaded_files, select_player, update_player_play_album
-from .playerctrl import update_player_play_from_queue, update_player_play_from_radio, update_player_play_from_youtube
-from .playerctrl import update_player_play_playlist, update_player_play_track, update_player_streaming_prevnext
+from .playerctrl import add_track_to_queue, queue_downloaded_files
+from .playerctrl import update_player_play_from_local, update_player_play_from_radio, update_player_play_from_youtube
+from .playerctrl import update_player_streaming_prevnext
 from .serialize import json_genre, json_playlist, json_track_or_file
 from .serialize import InformationLevel
 from .serialize import json_album, json_radio_station, json_track
@@ -293,23 +293,7 @@ def update_player_play():
             update_player_play_from_radio(db, radioid)
 
         else:
-            # File-based playback required
-            select_player(current_app, current_app.file_player)
-
-            if albumid is not None:
-                update_player_play_album(db, albumid, trackid)
-
-            elif playlistid is not None:
-                update_player_play_playlist(db, playlistid, trackid)
-
-            elif queue_pos is not None:
-                update_player_play_from_queue(queue_pos, trackid)
-
-            elif trackid:
-                update_player_play_track(db, trackid)
-
-            else:
-                assert False, "Internal error: Unhandled code path"
+            update_player_play_from_local(db, albumid, playlistid, queue_pos, trackid)
 
     return ('', HTTPStatus.NO_CONTENT)
 
