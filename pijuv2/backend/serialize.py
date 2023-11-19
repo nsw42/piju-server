@@ -78,7 +78,7 @@ def json_genre(genre: Genre, include_albums: InformationLevel, include_playlists
     elif include_albums in (InformationLevel.AllInfo, InformationLevel.DebugInfo):
         rtn['albums'] = [json_album(album, include_tracks=include_albums) for album in genre.Albums]
     if include_playlists == InformationLevel.Links:
-        rtn['playlists'] = [url_for('routes.one_playlist', playlistid=playlist.Id) for playlist in genre.Playlists]
+        rtn['playlists'] = [url_for('routes.get_one_playlist', playlistid=playlist.Id) for playlist in genre.Playlists]
     elif include_playlists in (InformationLevel.AllInfo, InformationLevel.DebugInfo):
         rtn['playlists'] = [json_playlist(playlist,
                                           include_genres=InformationLevel.NoInfo,
@@ -91,7 +91,7 @@ def json_genre(genre: Genre, include_albums: InformationLevel, include_playlists
 def json_playlist(playlist: Playlist, include_genres: InformationLevel, include_tracks: InformationLevel):
     entries = list(playlist.Entries)
     rtn = {
-        'link': url_for('routes.one_playlist', playlistid=playlist.Id),
+        'link': url_for('routes.get_one_playlist', playlistid=playlist.Id),
         'title': playlist.Title,
     }
     if include_genres == InformationLevel.Links:
