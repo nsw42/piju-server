@@ -3,10 +3,11 @@ Functions related to data deserialization, ie converting from an
 over-the-wire representation to an in-memory object
 """
 
-from http import HTTPStatus
 from typing import List, Tuple
 
-from flask import abort, current_app, request
+from flask import current_app, request
+from werkzeug.exceptions import BadRequest, NotFound
+
 from ..database.database import Database, NotFoundException
 from ..database.schema import Playlist, PlaylistEntry, RadioStation
 
@@ -14,17 +15,16 @@ from ..database.schema import Playlist, PlaylistEntry, RadioStation
 def build_playlist_from_api_data(db: Database) -> Tuple[Playlist, List[str]]:
     data = request.get_json()
     if not data:
-        abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
+        raise BadRequest('No data found in request')
     title = data.get('title')
     trackids = extract_ids(data.get('tracks', []))
     files = data.get('files', [])
     if title in (None, ""):
-        abort(HTTPStatus.BAD_REQUEST, "Playlist title must be specified")
+        raise BadRequest("Playlist title must be specified")
     if (not trackids) and (not files):
-        abort(HTTPStatus.BAD_REQUEST, "Either a list of tracks or a list of files must be specified")
+        raise BadRequest("Either a list of tracks or a list of files must be specified")
     if (trackids) and (files):
-        abort(HTTPStatus.BAD_REQUEST,
-              "Only one of a list of tracks and a list of files is permitted")
+        raise BadRequest("Only one of a list of tracks and a list of files is permitted")
     if files:
         tracks = []
         missing = []
@@ -39,13 +39,13 @@ def build_playlist_from_api_data(db: Database) -> Tuple[Playlist, List[str]]:
     else:
         missing = []
         if None in trackids:
-            abort(HTTPStatus.BAD_REQUEST, "Invalid track reference")
+            raise BadRequest("Invalid track reference")
         try:
             tracks = [db.get_track_by_id(trackid) for trackid in trackids]
-        except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+        except NotFoundException as exc:
+            raise NotFound("Unknown track id") from exc
     if not tracks:
-        abort(HTTPStatus.BAD_REQUEST, "No tracks found. Will not create an empty playlist.")
+        raise BadRequest("No tracks found. Will not create an empty playlist.")
     playlist_entries = []
     for index, track in enumerate(tracks):
         playlist_entries.append(PlaylistEntry(PlaylistIndex=index, TrackId=track.Id))
@@ -58,13 +58,13 @@ def build_playlist_from_api_data(db: Database) -> Tuple[Playlist, List[str]]:
 def build_radio_station_from_api_data() -> RadioStation:
     data = request.get_json()
     if data is None:
-        abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
+        raise BadRequest('No data found in request')
     station_name = data.get('name')
     if not station_name:
-        abort(HTTPStatus.BAD_REQUEST, description='Missing station name')
+        raise BadRequest('Missing station name')
     url = data.get('url')
     if not url:
-        abort(HTTPStatus.BAD_REQUEST, description='Missing station URL')
+        raise BadRequest('Missing station URL')
     artwork_url = data.get('artwork')  # optional
     now_playing_url = data.get('now_playing_url')  # optional
     now_playing_jq = data.get('now_playing_jq')  # optional

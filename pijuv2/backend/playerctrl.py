@@ -2,10 +2,10 @@
 Player control functionality for the backend: an API-aware wrapper around ..player.*
 """
 
-from http import HTTPStatus
 from typing import Iterable
 
-from flask import abort, current_app, url_for
+from flask import current_app, url_for
+from werkzeug.exceptions import BadRequest, Conflict, NotFound
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
 from ..database.schema import Track
@@ -60,8 +60,8 @@ def update_player_play_track_list(tracks: Iterable[Track], identifier: str, star
         track_ids = [track.Id for track in tracks]
         try:
             play_from_index = track_ids.index(start_at_track_id)
-        except ValueError:
-            abort(HTTPStatus.BAD_REQUEST, "Requested track is not in the specified album")
+        except ValueError as exc:
+            raise BadRequest("Requested track is not in the specified album") from exc
     select_player(current_app, current_app.file_player)
     current_app.current_player.set_queue(tracks, identifier)
     current_app.current_player.play_from_real_queue_index(play_from_index)
@@ -70,8 +70,8 @@ def update_player_play_track_list(tracks: Iterable[Track], identifier: str, star
 def update_player_play_album(db, albumid, trackid):
     try:
         album = db.get_album_by_id(albumid)
-    except NotFoundException:
-        abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
+    except NotFoundException as exc:
+        raise NotFound("Unknown album id") from exc
 
     def track_sort_order(track):
         return (track.VolumeNumber if track.VolumeNumber else 0,
@@ -102,14 +102,14 @@ def update_player_play_from_local(db: Database, albumid: int, playlistid: int, q
 def update_player_play_from_queue(queue_pos, trackid):
     # update_player_play has already ensured we're set up for file playback
     if not current_app.current_player.play_from_apparent_queue_index(queue_pos, trackid=trackid):
-        abort(409, "Track index not found")
+        raise Conflict("Track index not found")
 
 
 def update_player_play_from_radio(db: Database, stationid: int):
     stations = db.get_all_radio_stations()
     index = next((i for i, station in enumerate(stations) if station.Id == stationid), -1)
     if index == -1:
-        abort(HTTPStatus.NOT_FOUND, "Requested station id not found")
+        raise NotFound("Requested station id not found")
     station = stations[index]
     select_player(current_app, current_app.stream_player)
     current_app.current_player.play(station.Name, station.Url, station.ArtworkUrl,
@@ -144,8 +144,8 @@ def update_player_streaming_prevnext(delta):
 def update_player_play_playlist(db: Database, playlistid, trackid):
     try:
         playlist = db.get_playlist_by_id(playlistid)
-    except NotFoundException:
-        abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
+    except NotFoundException as exc:
+        raise NotFound("Unknown playlist id") from exc
     update_player_play_track_list([entry.Track for entry in playlist.Entries],
                                   url_for('one_playlist', playlistid=playlistid),
                                   trackid)
@@ -155,7 +155,7 @@ def update_player_play_track(db: Database, trackid):
     # update_player_play has already ensured we're set up for file playback
     try:
         track = db.get_track_by_id(trackid)
-    except NotFoundException:
-        abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+    except NotFoundException as exc:
+        raise NotFound("Unknown track id") from exc
     current_app.current_player.clear_queue()
     add_track_to_queue(track)
