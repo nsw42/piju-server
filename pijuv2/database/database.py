@@ -31,13 +31,6 @@ class DatabaseIntegrityException(PijuDatabaseException):
     """
 
 
-class MaximumEngineCountException(PijuDatabaseException):
-    """
-    An exception raised when the configured number of
-    database engines has been created.
-    """
-
-
 class UnknownException(PijuDatabaseException):
     """
     Something bad happened, but it's not clear what
