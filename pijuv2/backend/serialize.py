@@ -111,7 +111,7 @@ def json_playlist(playlist: Playlist, include_genres: InformationLevel, include_
 @lru_cache(maxsize=32)
 def json_radio_station(station: RadioStation, include_urls: bool = False):
     rtn = {
-        'link': url_for('routes.one_radio_station', stationid=station.Id),
+        'link': url_for('routes.get_one_radio_station', stationid=station.Id),
         'name': station.Name,
         'artwork': station.ArtworkUrl
     }

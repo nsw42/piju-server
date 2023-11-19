@@ -147,7 +147,7 @@ def update_player_play_playlist(db: Database, playlistid, trackid):
     except NotFoundException as exc:
         raise NotFound("Unknown playlist id") from exc
     update_player_play_track_list([entry.Track for entry in playlist.Entries],
-                                  url_for('one_playlist', playlistid=playlistid),
+                                  url_for('get_one_playlist', playlistid=playlistid),
                                   trackid)
 
 
