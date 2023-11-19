@@ -30,6 +30,7 @@ ERR_MSG_UNKNOWN_GENRE_ID = 'Unknown genre id'
 ERR_MSG_UNKNOWN_TRACK_ID = 'Unknown track id'
 ERR_MSG_UNKNOWN_PLAYLIST_ID = 'Unknown playlist id'
 ERR_MSG_UNKNOWN_RADIO_ID = 'Unknown radio station id'
+ERR_MSG_NO_QUEUE_WHEN_STREAMING = "Queue operations not permitted when playing streaming content"
 
 
 def gzippable_jsonify(content):
@@ -65,7 +66,7 @@ def add_security_headers(resp):
     return resp
 
 
-@routes.route("/")
+@routes.get("/")
 def current_status():
     with DatabaseAccess() as db:
         c_p = current_app.current_player
@@ -99,7 +100,7 @@ def current_status():
     return gzippable_jsonify(rtn)
 
 
-@routes.route("/albums/")
+@routes.get("/albums/")
 def get_all_albums():
     with DatabaseAccess() as db:
         rtn = []
@@ -108,7 +109,7 @@ def get_all_albums():
         return gzippable_jsonify(rtn)
 
 
-@routes.route("/albums/<albumid>")
+@routes.get("/albums/<albumid>")
 def get_album(albumid):
     track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
     with DatabaseAccess() as db:
@@ -119,7 +120,7 @@ def get_album(albumid):
         return gzippable_jsonify(json_album(album, include_tracks=track_info))
 
 
-@routes.route("/artists/<artist>")
+@routes.get("/artists/<artist>")
 def get_artist(artist):
     track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
     exact = parse_bool(request.args.get('exact', 'True'))
@@ -133,7 +134,7 @@ def get_artist(artist):
         return gzippable_jsonify(result)
 
 
-@routes.route("/artwork/<trackid>")
+@routes.get("/artwork/<trackid>")
 def get_artwork(trackid):
     with DatabaseAccess() as db:
         try:
@@ -163,7 +164,7 @@ def get_artwork(trackid):
             raise NotFound("Track has no artwork")
 
 
-@routes.route("/artworkinfo/<trackid>")
+@routes.get("/artworkinfo/<trackid>")
 def get_artwork_info(trackid):
     with DatabaseAccess() as db:
         try:
@@ -180,7 +181,7 @@ def get_artwork_info(trackid):
         return gzippable_jsonify(rtn)
 
 
-@routes.route("/downloadhistory")
+@routes.get("/downloadhistory")
 def get_download_history():
     rtn = []
     for url in current_app.download_history.entries:
@@ -199,7 +200,7 @@ def get_download_history():
     return gzippable_jsonify(rtn)
 
 
-@routes.route("/genres/")
+@routes.get("/genres/")
 def get_all_genres():
     with DatabaseAccess() as db:
         rtn = []
@@ -210,7 +211,7 @@ def get_all_genres():
         return gzippable_jsonify(rtn)
 
 
-@routes.route("/genres/<genreid>")
+@routes.get("/genres/<genreid>")
 def get_genre(genreid):
     album_info = InformationLevel.from_string(request.args.get('albums', ''))
     playlist_info = InformationLevel.from_string(request.args.get('playlists', ''))
@@ -222,7 +223,7 @@ def get_genre(genreid):
         return gzippable_jsonify(json_genre(genre, include_albums=album_info, include_playlists=playlist_info))
 
 
-@routes.route("/mp3/<trackid>")
+@routes.get("/mp3/<trackid>")
 def get_mp3(trackid):
     with DatabaseAccess() as db:
         try:
@@ -238,7 +239,7 @@ def get_mp3(trackid):
         return response
 
 
-@routes.route("/player/next", methods=['POST'])
+@routes.post("/player/next")
 def update_player_next():
     if current_app.current_player == current_app.file_player:
         current_app.current_player.next()
@@ -247,13 +248,13 @@ def update_player_next():
     return ('', HTTPStatus.NO_CONTENT)
 
 
-@routes.route("/player/pause", methods=['POST'])
+@routes.post("/player/pause")
 def update_player_pause():
     current_app.current_player.pause()
     return ('', HTTPStatus.NO_CONTENT)
 
 
-@routes.route("/player/play", methods=['POST'])
+@routes.post("/player/play")
 def update_player_play():
     data = request.get_json()
     if not data:
@@ -298,7 +299,7 @@ def update_player_play():
     return ('', HTTPStatus.NO_CONTENT)
 
 
-@routes.route("/player/previous", methods=['POST'])
+@routes.post("/player/previous")
 def update_player_prev():
     if current_app.current_player == current_app.file_player:
         current_app.current_player.prev()
@@ -307,238 +308,253 @@ def update_player_prev():
     return ('', HTTPStatus.NO_CONTENT)
 
 
-@routes.route("/player/resume", methods=['POST'])
+@routes.post("/player/resume")
 def update_player_resume():
     current_app.current_player.resume()
     return ('', HTTPStatus.NO_CONTENT)
 
 
-@routes.route("/player/stop", methods=['POST'])
+@routes.post("/player/stop")
 def update_player_stop():
     current_app.current_player.stop()
     return ('', HTTPStatus.NO_CONTENT)
 
 
-@routes.route("/player/volume", methods=['GET', 'POST'])
-def player_volume():
-    if request.method == 'GET':
-        return {"volume": current_app.current_player.current_volume}
+@routes.get("/player/volume")
+def player_get_volume():
+    return {"volume": current_app.current_player.current_volume}
 
-    elif request.method == 'POST':
-        data = request.get_json()
-        if not data:
-            raise BadRequest()
+
+@routes.post("/player/volume")
+def player_set_volume():
+    data = request.get_json()
+    if not data:
+        raise BadRequest()
+    try:
+        volume = data.get('volume')
+        volume = int(volume)
+        for player in (current_app.file_player, current_app.stream_player):
+            player.set_volume(volume)
+        return ('', HTTPStatus.NO_CONTENT)
+    except (AttributeError, KeyError, ValueError) as exc:
+        raise BadRequest('Volume must be specified and numeric') from exc
+
+
+@routes.get("/playlists/")
+def get_playlists():
+    genre_info = InformationLevel.from_string(request.args.get('genres', ''), InformationLevel.NoInfo)
+    tracks_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.NoInfo)
+    with DatabaseAccess() as db:
+        rtn = []
+        for playlist in db.get_all_playlists():
+            rtn.append(json_playlist(playlist, include_genres=genre_info, include_tracks=tracks_info))
+        return gzippable_jsonify(rtn)
+
+
+@routes.post("/playlists/")
+def add_playlist():
+    with DatabaseAccess() as db:
+        playlist, missing = build_playlist_from_api_data(db)
+        db.create_playlist(playlist)
+        return response_for_import_playlist(playlist, missing)
+
+
+@routes.delete("/playlists/<playlistid>")
+def delete_playlist(playlistid):
+    with DatabaseAccess() as db:
         try:
-            volume = data.get('volume')
-            volume = int(volume)
-            for player in (current_app.file_player, current_app.stream_player):
-                player.set_volume(volume)
-            return ('', HTTPStatus.NO_CONTENT)
-        except (AttributeError, KeyError, ValueError) as exc:
-            raise BadRequest('Volume must be specified and numeric') from exc
-
-    return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
+            db.delete_playlist(playlistid)
+        except NotFoundException as exc:
+            raise NotFound(ERR_MSG_UNKNOWN_PLAYLIST_ID) from exc
+        return ('', HTTPStatus.NO_CONTENT)
 
 
-@routes.route("/playlists/", methods=['GET', 'POST'])
-def playlists():
-    if request.method == 'GET':
-        genre_info = InformationLevel.from_string(request.args.get('genres', ''), InformationLevel.NoInfo)
-        tracks_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.NoInfo)
-        with DatabaseAccess() as db:
-            rtn = []
-            for playlist in db.get_all_playlists():
-                rtn.append(json_playlist(playlist, include_genres=genre_info, include_tracks=tracks_info))
-            return gzippable_jsonify(rtn)
-
-    elif request.method == 'POST':
-        with DatabaseAccess() as db:
-            playlist, missing = build_playlist_from_api_data(db)
-            db.create_playlist(playlist)
-            return response_for_import_playlist(playlist, missing)
-
-    return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
+@routes.get("/playlists/<playlistid>")
+def get_one_playlist(playlistid):
+    genre_info = InformationLevel.from_string(request.args.get('genres', ''), InformationLevel.NoInfo)
+    track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
+    with DatabaseAccess() as db:
+        try:
+            playlist = db.get_playlist_by_id(playlistid)
+        except NotFoundException as exc:
+            raise NotFound(ERR_MSG_UNKNOWN_PLAYLIST_ID) from exc
+        return gzippable_jsonify(json_playlist(playlist, include_genres=genre_info, include_tracks=track_info))
 
 
-@routes.route("/playlists/<playlistid>", methods=['DELETE', 'GET', 'PUT'])
-def one_playlist(playlistid):
-    if request.method == 'GET':
-        genre_info = InformationLevel.from_string(request.args.get('genres', ''), InformationLevel.NoInfo)
-        track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
-        with DatabaseAccess() as db:
-            try:
-                playlist = db.get_playlist_by_id(playlistid)
-            except NotFoundException as exc:
-                raise NotFound(ERR_MSG_UNKNOWN_PLAYLIST_ID) from exc
-            return gzippable_jsonify(json_playlist(playlist, include_genres=genre_info, include_tracks=track_info))
-
-    elif request.method == 'PUT':
-        with DatabaseAccess() as db:
-            playlist, missing = build_playlist_from_api_data(db)
-            playlist = db.update_playlist(playlistid, playlist)
-            return response_for_import_playlist(playlist, missing)
-
-    elif request.method == 'DELETE':
-        with DatabaseAccess() as db:
-            try:
-                db.delete_playlist(playlistid)
-            except NotFoundException as exc:
-                raise NotFound(ERR_MSG_UNKNOWN_PLAYLIST_ID) from exc
-            return ('', HTTPStatus.NO_CONTENT)
-
-    return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
+@routes.put("/playlists/<playlistid>")
+def edit_playlist(playlistid):
+    with DatabaseAccess() as db:
+        playlist, missing = build_playlist_from_api_data(db)
+        playlist = db.update_playlist(playlistid, playlist)
+        return response_for_import_playlist(playlist, missing)
 
 
-@routes.route("/queue/", methods=['GET', 'DELETE', 'OPTIONS', 'PUT'])
-def queue():
+@routes.delete("/queue/")
+def queue_delete():
     if current_app.current_player != current_app.file_player:
-        raise Conflict("Queue operations not permitted when playing streaming content")
-    if request.method == 'DELETE':
-        data = request.get_json()
-        if not data:
-            raise BadRequest()
+        raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
+    data = request.get_json()
+    if not data:
+        raise BadRequest()
+    try:
+        index = int(data['index'])
+        trackid = int(data['track'])
+    except KeyError as exc:
+        raise BadRequestKeyError() from exc
+    except ValueError as exc:
+        raise BadRequest() from exc
+    if not current_app.current_player.remove_from_queue(index, trackid):
+        # index or trackid mismatch
+        raise BadRequest('Track id did not match at given index')
+    return ('', HTTPStatus.NO_CONTENT)
+
+
+@routes.get("/queue/")
+def queue_get():
+    if current_app.current_player != current_app.file_player:
+        raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
+    with DatabaseAccess() as db:
+        queue_data = [json_track_or_file(db, queued_track) for
+                      queued_track in current_app.current_player.visible_queue]
+    return gzippable_jsonify(queue_data)
+
+
+@routes.route("/queue/", methods=['OPTIONS'])
+def queue_options():
+    if current_app.current_player != current_app.file_player:
+        raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
+
+    # the request to add to queue looks like a cross-domain request to Chrome,
+    # so it sends OPTIONS before the PUT. Hence we need to support this.
+    response = make_response('', HTTPStatus.NO_CONTENT)
+    response.headers['Access-Control-Allow-Headers'] = '*'  # Maybe tighten this up?
+    response.headers['Access-Control-Allow-Methods'] = ', '.join(request.url_rule.methods)
+    return response
+
+
+@routes.put("/queue/")
+def queue_put():
+    if current_app.current_player != current_app.file_player:
+        raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
+    data = request.get_json()
+    if not data:
+        raise BadRequest()
+    # there are three different possibilities here:
+    #   track: trackid  # add the given track to queue
+    #   url: url        # add the audio from the given URL to queue
+    #   queue: [trackid_or_url]  # reorder the queue
+    if trackid := extract_id(data.get('track', '')):
+        with DatabaseAccess() as db:
+            try:
+                add_track_to_queue(db.get_track_by_id(trackid))
+            except NotFoundException as exc:
+                raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
+    elif youtubeurl := data.get('url'):
+        current_app.download_history.add(youtubeurl)
+        current_app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE,
+                                    youtubeurl,
+                                    current_app.piju_config.download_dir,
+                                    queue_downloaded_files))
+    elif new_queue_order := data.get('queue'):
+        new_queue = []
+        with DatabaseAccess() as db:
+            try:
+                for trackid in new_queue_order:
+                    trackid = int(trackid)
+                    if trackid >= 0:
+                        new_queue.append(db.get_track_by_id(trackid))
+                    else:
+                        new_queue.append(DownloadInfoDatabaseSingleton().get_download_info(trackid))
+            except NotFoundException as exc:
+                raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
+            except ValueError as exc:
+                raise BadRequest("Unrecognised track id") from exc
+            current_app.current_player.set_queue(new_queue, "/queue/")
+    else:
+        raise BadRequest("No track id, url or new queue order specified")
+    return ('', HTTPStatus.NO_CONTENT)
+
+
+@routes.get("/radio/")
+def get_radio_stations():
+    with DatabaseAccess() as db:
+        rtn = []
+        for station in db.get_all_radio_stations():
+            rtn.append(json_radio_station(station))
+        return gzippable_jsonify(rtn)
+
+
+@routes.route("/radio/", methods=['OPTIONS'])
+def radio_stations_options():
+    response = make_response('', HTTPStatus.NO_CONTENT)
+    response.headers['Access-Control-Allow-Headers'] = ', '.join(['Content-Type',
+                                                                  'Access-Control-Allow-Headers',
+                                                                  'Access-Control-Allow-Methods',
+                                                                  'Access-Control-Allow-Origin'])
+    response.headers['Access-Control-Allow-Methods'] = ', '.join(request.url_rule.methods)
+    return response
+
+
+@routes.post("/radio/")
+def add_radio_station():
+    station = build_radio_station_from_api_data()
+    with DatabaseAccess() as db:
+        db.add_radio_station(station)
+        response = {
+            'id': station.Id
+        }
+        return gzippable_jsonify(response)
+
+
+@routes.put("/radio/")
+def radio_stations_put():
+    # reorder stations
+    desired_station_order = request.get_json()
+    if not isinstance(desired_station_order, list):
+        raise BadRequest("List of station identifiers expected")
+    desired_station_order = [extract_id(station) for station in desired_station_order]
+    if None in desired_station_order:
+        raise BadRequest("Unrecognised station id in list")
+    with DatabaseAccess() as db:
+        stations = db.get_all_radio_stations()
+        if len(desired_station_order) != len(stations) or len(set(desired_station_order)) != len(stations):
+            raise BadRequest("Submitted list does not specify the order for all stations, or contains duplicates")
+        for station in stations:
+            station.SortOrder = desired_station_order.index(station.Id)
+    return ('', HTTPStatus.NO_CONTENT)
+
+
+@routes.delete("/radio/<stationid>")
+def delete_one_radio_station(stationid):
+    with DatabaseAccess() as db:
         try:
-            index = int(data['index'])
-            trackid = int(data['track'])
-        except KeyError as exc:
-            raise BadRequestKeyError() from exc
-        except ValueError as exc:
-            raise BadRequest() from exc
-        if not current_app.current_player.remove_from_queue(index, trackid):
-            # index or trackid mismatch
-            raise BadRequest('Track id did not match at given index')
+            db.delete_radio_station(stationid)
+        except NotFoundException as exc:
+            raise NotFound(ERR_MSG_UNKNOWN_RADIO_ID) from exc
         return ('', HTTPStatus.NO_CONTENT)
 
-    elif request.method == 'GET':
-        with DatabaseAccess() as db:
-            queue_data = [json_track_or_file(db, queued_track) for
-                          queued_track in current_app.current_player.visible_queue]
-        return gzippable_jsonify(queue_data)
 
-    elif request.method == 'OPTIONS':
-        # the request to add to queue looks like a cross-domain request to Chrome,
-        # so it sends OPTIONS before the PUT. Hence we need to support this.
-        response = make_response('', HTTPStatus.NO_CONTENT)
-        response.headers['Access-Control-Allow-Headers'] = '*'  # Maybe tighten this up?
-        response.headers['Access-Control-Allow-Methods'] = ', '.join(request.url_rule.methods)
-        return response
-
-    elif request.method == 'PUT':
-        data = request.get_json()
-        if not data:
-            raise BadRequest()
-        # there are three different possibilities here:
-        #   track: trackid  # add the given track to queue
-        #   url: url        # add the audio from the given URL to queue
-        #   queue: [trackid_or_url]  # reorder the queue
-        if trackid := extract_id(data.get('track', '')):
-            with DatabaseAccess() as db:
-                try:
-                    add_track_to_queue(db.get_track_by_id(trackid))
-                except NotFoundException as exc:
-                    raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
-        elif youtubeurl := data.get('url'):
-            current_app.download_history.add(youtubeurl)
-            current_app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE,
-                                        youtubeurl,
-                                        current_app.piju_config.download_dir,
-                                        queue_downloaded_files))
-        elif new_queue_order := data.get('queue'):
-            new_queue = []
-            with DatabaseAccess() as db:
-                try:
-                    for trackid in new_queue_order:
-                        trackid = int(trackid)
-                        if trackid >= 0:
-                            new_queue.append(db.get_track_by_id(trackid))
-                        else:
-                            new_queue.append(DownloadInfoDatabaseSingleton().get_download_info(trackid))
-                except NotFoundException as exc:
-                    raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
-                except ValueError as exc:
-                    raise BadRequest("Unrecognised track id") from exc
-                current_app.current_player.set_queue(new_queue, "/queue/")
-        else:
-            raise BadRequest("No track id, url or new queue order specified")
-        return ('', HTTPStatus.NO_CONTENT)
-
-    return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
+@routes.get("/radio/<stationid>")
+def get_one_radio_station(stationid):
+    infolevel = InformationLevel.from_string(request.args.get('urls', ''), InformationLevel.Links)
+    include_urls = (infolevel in (InformationLevel.AllInfo, InformationLevel.DebugInfo))
+    with DatabaseAccess() as db:
+        try:
+            station = db.get_radio_station_by_id(stationid)
+        except NotFoundException as exc:
+            raise NotFound(ERR_MSG_UNKNOWN_RADIO_ID) from exc
+        return gzippable_jsonify(json_radio_station(station, include_urls=include_urls))
 
 
-@routes.route("/radio/", methods=['GET', 'OPTIONS', 'POST', 'PUT'])
-def radio_stations():
-    if request.method == 'GET':
-        with DatabaseAccess() as db:
-            rtn = []
-            for station in db.get_all_radio_stations():
-                rtn.append(json_radio_station(station))
-            return gzippable_jsonify(rtn)
-
-    elif request.method == 'OPTIONS':
-        response = make_response('', HTTPStatus.NO_CONTENT)
-        response.headers['Access-Control-Allow-Headers'] = ', '.join(['Content-Type',
-                                                                      'Access-Control-Allow-Headers',
-                                                                      'Access-Control-Allow-Methods',
-                                                                      'Access-Control-Allow-Origin'])
-        response.headers['Access-Control-Allow-Methods'] = ', '.join(request.url_rule.methods)
-
-    elif request.method == 'POST':
-        station = build_radio_station_from_api_data()
-        with DatabaseAccess() as db:
-            db.add_radio_station(station)
-            response = {
-                'id': station.Id
-            }
-            return gzippable_jsonify(response)
-
-    elif request.method == 'PUT':
-        # reorder stations
-        desired_station_order = request.get_json()
-        if not isinstance(desired_station_order, list):
-            raise BadRequest("List of station identifiers expected")
-        desired_station_order = [extract_id(station) for station in desired_station_order]
-        if None in desired_station_order:
-            raise BadRequest("Unrecognised station id in list")
-        with DatabaseAccess() as db:
-            stations = db.get_all_radio_stations()
-            if len(desired_station_order) != len(stations) or len(set(desired_station_order)) != len(stations):
-                raise BadRequest("Submitted list does not specify the order for all stations, or contains duplicates")
-            for station in stations:
-                station.SortOrder = desired_station_order.index(station.Id)
-        return ('', HTTPStatus.NO_CONTENT)
-
-    return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
+@routes.put("/radio/<stationid>")
+def edit_radio_station(stationid):
+    station = build_radio_station_from_api_data()
+    with DatabaseAccess() as db:
+        existing_station = db.update_radio_station(stationid, station)
+        return gzippable_jsonify(json_radio_station(existing_station))
 
 
-@routes.route("/radio/<stationid>", methods=['DELETE', 'GET', 'PUT'])
-def one_radio_station(stationid):
-    if request.method == 'GET':
-        infolevel = InformationLevel.from_string(request.args.get('urls', ''), InformationLevel.Links)
-        include_urls = (infolevel in (InformationLevel.AllInfo, InformationLevel.DebugInfo))
-        with DatabaseAccess() as db:
-            try:
-                station = db.get_radio_station_by_id(stationid)
-            except NotFoundException as exc:
-                raise NotFound(ERR_MSG_UNKNOWN_RADIO_ID) from exc
-            return gzippable_jsonify(json_radio_station(station, include_urls=include_urls))
-
-    elif request.method == 'PUT':
-        station = build_radio_station_from_api_data()
-        with DatabaseAccess() as db:
-            existing_station = db.update_radio_station(stationid, station)
-            return gzippable_jsonify(json_radio_station(existing_station))
-
-    elif request.method == 'DELETE':
-        with DatabaseAccess() as db:
-            try:
-                db.delete_radio_station(stationid)
-            except NotFoundException as exc:
-                raise NotFound(ERR_MSG_UNKNOWN_RADIO_ID) from exc
-            return ('', HTTPStatus.NO_CONTENT)
-    return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
-
-
-@routes.route("/scanner/scan", methods=['POST'])
+@routes.post("/scanner/scan")
 def start_scan():
     data = request.get_json()
     if data is None:
@@ -551,14 +567,14 @@ def start_scan():
     return ('', HTTPStatus.NO_CONTENT)
 
 
-@routes.route("/scanner/tidy", methods=['POST'])
+@routes.post("/scanner/tidy")
 def start_tidy():
     current_app.work_queue.put((WorkRequests.DELETE_MISSING_TRACKS, ))
     current_app.work_queue.put((WorkRequests.DELETE_ALBUMS_WITHOUT_TRACKS, ))
     return ('', HTTPStatus.NO_CONTENT)
 
 
-@routes.route("/search/<search_string>")
+@routes.get("/search/<search_string>")
 def search(search_string):
     search_words = normalize_punctuation(search_string).strip().split()
     do_search_albums = parse_bool(request.args.get('albums', 'True'))
@@ -580,7 +596,7 @@ def search(search_string):
     return gzippable_jsonify(rtn)
 
 
-@routes.route("/tracks/")
+@routes.get("/tracks/")
 def get_all_tracks():
     limit = request.args.get('limit', '')
     if limit and limit.isdigit():
@@ -594,7 +610,7 @@ def get_all_tracks():
         return gzippable_jsonify(rtn)
 
 
-@routes.route("/tracks/<trackid>")
+@routes.get("/tracks/<trackid>")
 def get_track(trackid):
     infolevel = InformationLevel.from_string(request.args.get('infolevel', ''), InformationLevel.AllInfo)
     include_debuginfo = (infolevel == InformationLevel.DebugInfo)
