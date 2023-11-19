@@ -10,7 +10,7 @@ from typing import List
 from flask import abort, Blueprint, current_app, jsonify, make_response, request, Response, url_for
 from werkzeug.exceptions import BadRequest, BadRequestKeyError
 
-from ..database.database import DatabaseAccess, NotFoundException
+from ..database.database import DatabaseAccess, NotFoundException, MaximumEngineCountException
 from ..database.schema import Playlist
 from ..player.playerinterface import CurrentStatusStrings
 from .downloadinfo import DownloadInfoDatabaseSingleton
@@ -57,6 +57,11 @@ def response_for_import_playlist(playlist: Playlist, missing_tracks: List[str]):
 def add_security_headers(resp):
     resp.headers['Access-Control-Allow-Origin'] = '*'
     return resp
+
+
+@routes.errorhandler(MaximumEngineCountException)
+def handle_db_limit(exc):
+    return "Maximum number of database connections reached", 503
 
 
 @routes.route("/")

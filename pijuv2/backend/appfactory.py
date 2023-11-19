@@ -4,6 +4,7 @@ from queue import Queue
 
 from flask import Flask
 
+from ..database.database import Database
 from ..player.fileplayer import FilePlayer
 from ..player.streamplayer import StreamPlayer
 from .config import Config
@@ -12,7 +13,7 @@ from .routes import routes
 from .workthread import WorkerThread
 
 
-def create_app() -> Flask:
+def create_app(db_path: str, create_db=False) -> Flask:
     app = Flask(__name__)
     config_file = Path(os.environ.get('PIJU_CONFIG', Config.default_filepath()))
     if not config_file.is_file():
@@ -26,4 +27,5 @@ def create_app() -> Flask:
     app.api_version_string = '6.0'
     app.download_history = DownloadHistory()
     app.register_blueprint(routes)
+    Database.init_db(app, db_path, create_db)
     return app

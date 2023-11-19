@@ -3,7 +3,6 @@ import logging
 import mimetypes
 from pathlib import Path
 
-from ..database.database import Database
 from .appfactory import create_app
 from .config import Config
 
@@ -34,8 +33,7 @@ def main():
     args = parse_args()
 
     logging.basicConfig(level=logging.DEBUG)
-    Database.DEFAULT_URI = Database.SQLITE_PREFIX + str(args.database)
-    app = create_app()
+    app = create_app(args.database)
     app.worker.start()
     mimetypes.init()
     # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work

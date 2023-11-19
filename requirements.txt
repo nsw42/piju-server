@@ -1,6 +1,7 @@
 Flask
 Pillow
 SQLAlchemy
+Flask-SQLAlchemy
 alembic
 flake8
 json5

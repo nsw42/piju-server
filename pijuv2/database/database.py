@@ -1,13 +1,14 @@
 import logging
-import threading
-from typing import Any, Iterable, List
+from typing import Any, Callable, Iterable, List
 
-from sqlalchemy import create_engine, func, select, or_
-from sqlalchemy.orm import Session
+from flask_sqlalchemy import SQLAlchemy
+
+from sqlalchemy import func, select, or_
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
-from sqlalchemy.pool import QueuePool
 
 from .schema import Base, Album, Genre, Playlist, RadioStation, Track
+
+func: Callable  # fixes false positives from pylint
 
 
 class PijuDatabaseException(Exception):
@@ -30,6 +31,13 @@ class DatabaseIntegrityException(PijuDatabaseException):
     """
 
 
+class MaximumEngineCountException(PijuDatabaseException):
+    """
+    An exception raised when the configured number of
+    database engines has been created.
+    """
+
+
 class UnknownException(PijuDatabaseException):
     """
     Something bad happened, but it's not clear what
@@ -45,58 +53,46 @@ def convert_exception_class(exc):
         return UnknownException
 
 
-class ThreadSpecificEngines:
-    def __init__(self):
-        self.engines = {}
-
-    def get(self, uri):
-        thread = threading.current_thread().ident
-        engine = self.engines.get(thread)
-        if engine is None:
-            logging.debug(f'Creating new engine for thread {thread}')
-            self.engines[thread] = engine = create_engine(uri, poolclass=QueuePool)
-        return engine
-
-
 class Database():
     SQLITE_PREFIX = 'sqlite:///'
     DEFAULT_URI = SQLITE_PREFIX + 'file.db'
 
-    engines = ThreadSpecificEngines()
+    db = SQLAlchemy(model_class=Base)
+    initialised = False
 
-    def __init__(self, path=None, create=False):
+    @staticmethod
+    def init_db(app, path=None, create=False):
         if path:
             uri = Database.SQLITE_PREFIX + str(path)
         else:
             uri = Database.DEFAULT_URI
+        app.config['SQLALCHEMY_DATABASE_URI'] = uri
+        Database.db.init_app(app)
         if create:
-            # Use a dedicated engine (primarily to support the unit tests)
-            self.engine = create_engine(uri, poolclass=QueuePool)
-            self.session = Session(self.engine)
-            Base.metadata.create_all(self.engine)
-            self.session.commit()
-        else:
-            # Use the engine singleton
-            self.engine = Database.engines.get(uri)
-            self.session = Session(self.engine)
+            with app.app_context():
+                Database.db.create_all()
+        Database.initialised = True
+
+    def __init__(self):
+        assert Database.initialised
 
     def commit(self):
-        self.session.commit()
+        Database.db.session.commit()
 
     def add_radio_station(self, station: RadioStation):
-        self.session.add(station)
-        self.session.commit()
-        self.session.refresh(station)
+        Database.db.session.add(station)
+        Database.db.session.commit()
+        Database.db.session.refresh(station)
         return station
 
     def get_all_radio_stations(self) -> List[RadioStation]:
-        result = self.session.execute(select(RadioStation).order_by(RadioStation.SortOrder))
+        result = Database.db.session.execute(select(RadioStation).order_by(RadioStation.SortOrder))
         return result.scalars().all()
 
     def create_playlist(self, playlist: Playlist):
-        self.session.add(playlist)
-        self.session.commit()
-        self.session.refresh(playlist)
+        Database.db.session.add(playlist)
+        Database.db.session.commit()
+        Database.db.session.refresh(playlist)
         return playlist
 
     def update_playlist(self, playlistid: int, playlist: Playlist):
@@ -106,7 +102,7 @@ class Database():
         existing_playlist.Title = playlist.Title
         existing_playlist.Entries = playlist.Entries
         existing_playlist.Genres = playlist.Genres
-        self.session.commit()
+        Database.db.session.commit()
         return existing_playlist
 
     def update_radio_station(self, stationid: int, station: RadioStation):
@@ -121,28 +117,28 @@ class Database():
         existing_station.NowPlayingArtworkUrl = station.NowPlayingArtworkUrl
         existing_station.NowPlayingArtworkJq = station.NowPlayingArtworkJq
         existing_station.SortOrder = station.SortOrder
-        self.session.commit()
+        Database.db.session.commit()
         return existing_station
 
     def delete_album(self, albumid: int):
         album = self.get_album_by_id(albumid)  # raises NotFoundException if necessary
-        self.session.delete(album)
-        self.session.commit()
+        Database.db.session.delete(album)
+        Database.db.session.commit()
 
     def delete_playlist(self, playlistid: int):
         playlist = self.get_playlist_by_id(playlistid)  # raises NotFoundException if necessary
-        self.session.delete(playlist)
-        self.session.commit()
+        Database.db.session.delete(playlist)
+        Database.db.session.commit()
 
     def delete_radio_station(self, stationid: int):
         station = self.get_radio_station_by_id(stationid)  # raises NotFoundException if necessary
-        self.session.delete(station)
-        self.session.commit()
+        Database.db.session.delete(station)
+        Database.db.session.commit()
 
     def delete_track(self, trackid: int):
         track = self.get_track_by_id(trackid)  # raises NotFoundException if necessary
-        self.session.delete(track)
-        self.session.commit()
+        Database.db.session.delete(track)
+        Database.db.session.commit()
 
     def ensure_album_exists(self, albumref: Album) -> Album:
         """
@@ -151,7 +147,7 @@ class Database():
         """
         if albumref.IsCompilation:
             albumref.Artist = None
-        res = self.session.query(Album).filter(
+        res = Database.db.session.query(Album).filter(
             Album.Title == albumref.Title,
             Album.Artist == albumref.Artist
         )
@@ -159,16 +155,16 @@ class Database():
         count = res.count()
         if count == 0:
             # Album does not exist
-            self.session.add(albumref)
-            self.session.commit()
-            self.session.refresh(albumref)
+            Database.db.session.add(albumref)
+            Database.db.session.commit()
+            Database.db.session.refresh(albumref)
             return albumref
         elif count == 1:
             album = res.first()
             if (album.ReleaseYear is None) or (albumref.ReleaseYear is not None
                                                and album.ReleaseYear < albumref.ReleaseYear):
                 album.ReleaseYear = albumref.ReleaseYear
-                self.session.commit()
+                Database.db.session.commit()
             return album
         else:
             logging.fatal(f"Multiple results found for album reference: {albumref.Artist}: {albumref.Title}")
@@ -178,16 +174,16 @@ class Database():
         """
         Ensure the given genre exists
         """
-        res = self.session.query(Genre).filter(
+        res = Database.db.session.query(Genre).filter(
             Genre.Name == genre_name
         )
         # TODO: use res.one_or_none() ??
         count = res.count()
         if count == 0:
             genre = Genre(Name=genre_name)
-            self.session.add(genre)
-            self.session.commit()
-            self.session.refresh(genre)
+            Database.db.session.add(genre)
+            Database.db.session.commit()
+            Database.db.session.refresh(genre)
             return genre
         elif count == 1:
             return res.first()
@@ -204,7 +200,7 @@ class Database():
             trackref.Genre = self.ensure_genre_exists(trackref.Genre).Id
         if trackref.Id is None:
             # creating track
-            res = self.session.query(Track).filter(
+            res = Database.db.session.query(Track).filter(
                 Track.Title == trackref.Title,
                 Track.Duration == trackref.Duration,
                 Track.Artist == trackref.Artist,
@@ -218,9 +214,9 @@ class Database():
             if count == 0:
                 # Track does not exist
                 logging.debug("New track: %s", trackref.Filepath)
-                self.session.add(trackref)
-                self.session.commit()
-                self.session.refresh(trackref)
+                Database.db.session.add(trackref)
+                Database.db.session.commit()
+                Database.db.session.refresh(trackref)
                 return trackref
 
             if count > 1:
@@ -260,34 +256,34 @@ class Database():
         """
         Return a list of Album objects where each album has no
         """
-        return self.session.query(Album).filter(~Album.Tracks.any()).all()
+        return Database.db.session.query(Album).filter(~Album.Tracks.any()).all()
 
     def get_all_albums(self) -> List[Album]:
         """
         Primarily for debugging
         """
-        result = self.session.execute(select(Album).order_by(Album.Artist, Album.Title))
+        result = Database.db.session.execute(select(Album).order_by(Album.Artist, Album.Title))
         return result.scalars().all()
 
     def get_all_genres(self) -> List[Genre]:
         """
         Primarily for debugging
         """
-        result = self.session.execute(select(Genre).order_by(Genre.Name))
+        result = Database.db.session.execute(select(Genre).order_by(Genre.Name))
         return result.scalars().all()
 
     def get_all_playlists(self) -> List[Playlist]:
         """
         Primarily for debugging
         """
-        result = self.session.execute(select(Playlist).order_by(Playlist.Title))
+        result = Database.db.session.execute(select(Playlist).order_by(Playlist.Title))
         return result.scalars().all()
 
     def get_all_tracks(self, limit=None) -> List[Track]:
         """
         Primarily for debugging
         """
-        query = self.session.query(Track).order_by(Track.Artist, Track.Album, Track.TrackNumber)
+        query = Database.db.session.query(Track).order_by(Track.Artist, Track.Album, Track.TrackNumber)
         if limit:
             query = query.limit(limit)
         return query.all()
@@ -300,7 +296,7 @@ class Database():
         """
         if substring:
             search_string = '%' + search_string + '%'
-        return (self.session.query(Album)
+        return (Database.db.session.query(Album)
                 .filter(Album.Artist.ilike(search_string))
                 .order_by(Album.Artist)
                 .limit(limit)
@@ -311,7 +307,7 @@ class Database():
         Return the X object for a given id, where X is indicated by x_type (Genre, Playlist, Track, etc)
         Raises NotFoundException for an unknown id
         """
-        res = self.session.query(x_type).filter(
+        res = Database.db.session.query(x_type).filter(
             x_type.Id == x_id
         )
         try:
@@ -348,22 +344,22 @@ class Database():
         Return the Track object for a given file path,
         or None if there is no match in the database.
         """
-        res = self.session.query(Track).filter(
+        res = Database.db.session.query(Track).filter(
             func.lower(Track.Filepath) == func.lower(path)
         )
         return res.one_or_none()
 
     def get_nr_albums(self):
-        return self.session.query(Album).with_entities(func.count(Album.Id)).scalar()
+        return Database.db.session.query(Album).with_entities(func.count(Album.Id)).scalar()
 
     def get_nr_genres(self):
-        return self.session.query(Genre).with_entities(func.count(Genre.Id)).scalar()
+        return Database.db.session.query(Genre).with_entities(func.count(Genre.Id)).scalar()
 
     def get_nr_tracks(self):
-        return self.session.query(Track).with_entities(func.count(Track.Id)).scalar()
+        return Database.db.session.query(Track).with_entities(func.count(Track.Id)).scalar()
 
     def search_for_albums(self, search_words: Iterable[str], limit=100) -> List[Album]:
-        query = self.session.query(Album)
+        query = Database.db.session.query(Album)
         for word in search_words:
             pattern = '%' + word + '%'
             query = query.filter(or_(Album.Title.ilike(pattern), Album.Artist.ilike(pattern)))
@@ -376,7 +372,7 @@ class Database():
         matches the given name.
         If substring is True, then searches for
         """
-        query = self.session.query(Album)
+        query = Database.db.session.query(Album)
         for word in search_words:
             pattern = '%' + word + '%'
             query = query.filter(Album.Artist.ilike(pattern))
@@ -384,7 +380,7 @@ class Database():
         return query.all()
 
     def search_for_tracks(self, search_words: Iterable[str], query_limit=1000, return_limit=100) -> List[Track]:
-        query = self.session.query(Track).join(Album)
+        query = Database.db.session.query(Track).join(Album)
         for word in search_words:
             pattern = '%' + word + '%'
             query = query.filter(or_(Track.Title.ilike(pattern),
@@ -396,8 +392,6 @@ class Database():
         lower_case_words = [word.lower() for word in search_words]
 
         def score_track(track):
-            # print(track.Title)
-            # print('=======================')
             score = 0
             track_lower = track.Title.lower()
             track_title_words = track_lower.split()
@@ -410,11 +404,8 @@ class Database():
                     else:
                         score += 3
                 elif (word not in track.Artist.lower()):
-                    # assert word in get_album_by_id(track.Album).Title.lower()
-                    # print(word, 2)
                     score += 2
                 else:
-                    # print(word, 1)
                     score += 1
             return score
         tracks = [(score_track(track), track) for track in tracks]
@@ -423,8 +414,8 @@ class Database():
 
 
 class DatabaseAccess:
-    def __init__(self, path=None, create=False):
-        self.db = Database(path=path, create=create)
+    def __init__(self):
+        self.db = Database()
 
     def __enter__(self):
         return self.db

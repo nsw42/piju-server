@@ -4,23 +4,27 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from pijuv2.backend.appfactory import create_app
-from pijuv2.database.database import Database, DatabaseAccess
+from pijuv2.database.database import DatabaseAccess
 
 
 @pytest.fixture()
-def client():
-    app = create_app()
+def test_app(tmp_path):
+    app = create_app(tmp_path / 'test.db', create_db=True)
     app.config.update({
         'TESTING': True
     })
-    yield app.test_client()
+    yield app
 
 
 @pytest.fixture()
-def real_db(tmp_path):
-    Database.DEFAULT_URI = Database.SQLITE_PREFIX + str(tmp_path / 'test.db')
-    DatabaseAccess(create=True)
-    yield DatabaseAccess
+def client(test_app):
+    yield test_app.test_client()
+
+
+@pytest.fixture()
+def real_db(test_app):
+    with test_app.app_context():
+        yield DatabaseAccess
 
 
 @pytest.fixture()
