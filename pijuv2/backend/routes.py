@@ -7,8 +7,8 @@ import os.path
 from pathlib import Path
 from typing import List
 
-from flask import abort, Blueprint, current_app, jsonify, make_response, request, Response, url_for
-from werkzeug.exceptions import BadRequest, BadRequestKeyError
+from flask import Blueprint, current_app, jsonify, make_response, request, Response, url_for
+from werkzeug.exceptions import BadRequest, BadRequestKeyError, Conflict, InternalServerError, NotFound
 
 from ..database.database import DatabaseAccess, NotFoundException
 from ..database.schema import Playlist
@@ -114,8 +114,8 @@ def get_album(albumid):
     with DatabaseAccess() as db:
         try:
             album = db.get_album_by_id(albumid)
-        except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_ALBUM_ID)
+        except NotFoundException as exc:
+            raise NotFound(ERR_MSG_UNKNOWN_ALBUM_ID) from exc
         return gzippable_jsonify(json_album(album, include_tracks=track_info))
 
 
@@ -126,7 +126,7 @@ def get_artist(artist):
     with DatabaseAccess() as db:
         albums = db.get_artist(artist, substring=not exact)
         if not albums:
-            abort(HTTPStatus.NOT_FOUND, description="No matching artist found")
+            raise NotFound("No matching artist found")
         result = defaultdict(list)
         for album in albums:
             result[album.Artist].append(json_album(album, include_tracks=track_info))
@@ -138,8 +138,8 @@ def get_artwork(trackid):
     with DatabaseAccess() as db:
         try:
             track = db.get_track_by_id(trackid)
-        except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_TRACK_ID)
+        except NotFoundException as exc:
+            raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
 
         if track.ArtworkPath:
             path = Path(track.ArtworkPath)
@@ -155,12 +155,12 @@ def get_artwork(trackid):
             elif track.ArtworkBlob[:8] == b'\x89\x50\x4e\x47\x0d\x0a\x1a\x0a':
                 mime = mimetypes.types_map['.png']
             else:
-                abort(500, description="Unknown mime type")
+                raise InternalServerError("Unknown mime type")
 
             return Response(track.ArtworkBlob, headers={'Cache-Control': 'max-age=300'}, mimetype=mime)
 
         else:
-            return abort(HTTPStatus.NOT_FOUND, description="Track has no artwork")
+            raise NotFound("Track has no artwork")
 
 
 @routes.route("/artworkinfo/<trackid>")
@@ -168,8 +168,8 @@ def get_artwork_info(trackid):
     with DatabaseAccess() as db:
         try:
             track = db.get_track_by_id(trackid)
-        except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_TRACK_ID)
+        except NotFoundException as exc:
+            raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
 
         has_artwork = (track.ArtworkPath or track.ArtworkBlob)
         rtn = {
@@ -217,8 +217,8 @@ def get_genre(genreid):
     with DatabaseAccess() as db:
         try:
             genre = db.get_genre_by_id(genreid)
-        except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_GENRE_ID)
+        except NotFoundException as exc:
+            raise NotFound(ERR_MSG_UNKNOWN_GENRE_ID) from exc
         return gzippable_jsonify(json_genre(genre, include_albums=album_info, include_playlists=playlist_info))
 
 
@@ -227,8 +227,8 @@ def get_mp3(trackid):
     with DatabaseAccess() as db:
         try:
             track = db.get_track_by_id(trackid)
-        except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_TRACK_ID)
+        except NotFoundException as exc:
+            raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
 
         with open(track.Filepath, 'rb') as handle:
             content = handle.read()
@@ -257,7 +257,7 @@ def update_player_pause():
 def update_player_play():
     data = request.get_json()
     if not data:
-        abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
+        raise BadRequest()
     with DatabaseAccess() as db:
         albumid = extract_id(data.get('album'))
         playlistid = extract_id(data.get('playlist'))
@@ -275,16 +275,16 @@ def update_player_play():
         #   radio (with nothing else)
 
         if not any([albumid, playlistid, queue_pos, trackid, radioid, youtubeurl]):
-            abort(HTTPStatus.BAD_REQUEST, description='Something to play must be specified')
+            raise BadRequest('Something to play must be specified')
 
         if sum(x is not None for x in [albumid, playlistid, queue_pos]) > 1:
-            abort(HTTPStatus.BAD_REQUEST, "At most one of album, playlist and queuepos may be specified")
+            raise BadRequest("At most one of album, playlist and queuepos may be specified")
 
         if radioid and any([albumid, playlistid, queue_pos, trackid, youtubeurl]):
-            abort(HTTPStatus.BAD_REQUEST, "A radio station may not be specified with any other track selection")
+            raise BadRequest("A radio station may not be specified with any other track selection")
 
         if youtubeurl and any([albumid, playlistid, queue_pos, trackid, radioid]):
-            abort(HTTPStatus.BAD_REQUEST, "A URL may not be specified with any other track selection")
+            raise BadRequest("A URL may not be specified with any other track selection")
 
         if youtubeurl:
             update_player_play_from_youtube(youtubeurl)
@@ -343,15 +343,15 @@ def player_volume():
     elif request.method == 'POST':
         data = request.get_json()
         if not data:
-            abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
+            raise BadRequest()
         try:
             volume = data.get('volume')
             volume = int(volume)
             for player in (current_app.file_player, current_app.stream_player):
                 player.set_volume(volume)
             return ('', HTTPStatus.NO_CONTENT)
-        except (AttributeError, KeyError, ValueError):
-            abort(HTTPStatus.BAD_REQUEST, description='Volume must be specified and numeric')
+        except (AttributeError, KeyError, ValueError) as exc:
+            raise BadRequest('Volume must be specified and numeric') from exc
 
     return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
 
@@ -384,8 +384,8 @@ def one_playlist(playlistid):
         with DatabaseAccess() as db:
             try:
                 playlist = db.get_playlist_by_id(playlistid)
-            except NotFoundException:
-                abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_PLAYLIST_ID)
+            except NotFoundException as exc:
+                raise NotFound(ERR_MSG_UNKNOWN_PLAYLIST_ID) from exc
             return gzippable_jsonify(json_playlist(playlist, include_genres=genre_info, include_tracks=track_info))
 
     elif request.method == 'PUT':
@@ -398,8 +398,8 @@ def one_playlist(playlistid):
         with DatabaseAccess() as db:
             try:
                 db.delete_playlist(playlistid)
-            except NotFoundException:
-                abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_PLAYLIST_ID)
+            except NotFoundException as exc:
+                raise NotFound(ERR_MSG_UNKNOWN_PLAYLIST_ID) from exc
             return ('', HTTPStatus.NO_CONTENT)
 
     return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -408,7 +408,7 @@ def one_playlist(playlistid):
 @routes.route("/queue/", methods=['GET', 'DELETE', 'OPTIONS', 'PUT'])
 def queue():
     if current_app.current_player != current_app.file_player:
-        abort(HTTPStatus.CONFLICT, "Queue operations not permitted when playing streaming content")
+        raise Conflict("Queue operations not permitted when playing streaming content")
     if request.method == 'DELETE':
         data = request.get_json()
         if not data:
@@ -442,7 +442,7 @@ def queue():
     elif request.method == 'PUT':
         data = request.get_json()
         if not data:
-            abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
+            raise BadRequest()
         # there are three different possibilities here:
         #   track: trackid  # add the given track to queue
         #   url: url        # add the audio from the given URL to queue
@@ -451,8 +451,8 @@ def queue():
             with DatabaseAccess() as db:
                 try:
                     add_track_to_queue(db.get_track_by_id(trackid))
-                except NotFoundException:
-                    abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_TRACK_ID)
+                except NotFoundException as exc:
+                    raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
         elif youtubeurl := data.get('url'):
             current_app.download_history.add(youtubeurl)
             current_app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE,
@@ -469,13 +469,13 @@ def queue():
                             new_queue.append(db.get_track_by_id(trackid))
                         else:
                             new_queue.append(DownloadInfoDatabaseSingleton().get_download_info(trackid))
-                except NotFoundException:
-                    abort(HTTPStatus.NOT_FOUND, ERR_MSG_UNKNOWN_TRACK_ID)
-                except ValueError:
-                    abort(HTTPStatus.BAD_REQUEST, "Unrecognised track id")
+                except NotFoundException as exc:
+                    raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
+                except ValueError as exc:
+                    raise BadRequest("Unrecognised track id") from exc
                 current_app.current_player.set_queue(new_queue, "/queue/")
         else:
-            abort(HTTPStatus.BAD_REQUEST, "No track id, url or new queue order specified")
+            raise BadRequest("No track id, url or new queue order specified")
         return ('', HTTPStatus.NO_CONTENT)
 
     return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -511,15 +511,14 @@ def radio_stations():
         # reorder stations
         desired_station_order = request.get_json()
         if not isinstance(desired_station_order, list):
-            abort(HTTPStatus.BAD_REQUEST, "List of station identifiers expected")
+            raise BadRequest("List of station identifiers expected")
         desired_station_order = [extract_id(station) for station in desired_station_order]
         if None in desired_station_order:
-            abort(HTTPStatus.BAD_REQUEST, "Unrecognised station id in list")
+            raise BadRequest("Unrecognised station id in list")
         with DatabaseAccess() as db:
             stations = db.get_all_radio_stations()
             if len(desired_station_order) != len(stations) or len(set(desired_station_order)) != len(stations):
-                msg = "Submitted list does not specify the order for all stations, or contains duplicates"
-                abort(HTTPStatus.BAD_REQUEST, msg)
+                raise BadRequest("Submitted list does not specify the order for all stations, or contains duplicates")
             for station in stations:
                 station.SortOrder = desired_station_order.index(station.Id)
         return ('', HTTPStatus.NO_CONTENT)
@@ -535,8 +534,8 @@ def one_radio_station(stationid):
         with DatabaseAccess() as db:
             try:
                 station = db.get_radio_station_by_id(stationid)
-            except NotFoundException:
-                abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_RADIO_ID)
+            except NotFoundException as exc:
+                raise NotFound(ERR_MSG_UNKNOWN_RADIO_ID) from exc
             return gzippable_jsonify(json_radio_station(station, include_urls=include_urls))
 
     elif request.method == 'PUT':
@@ -549,8 +548,8 @@ def one_radio_station(stationid):
         with DatabaseAccess() as db:
             try:
                 db.delete_radio_station(stationid)
-            except NotFoundException:
-                abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_RADIO_ID)
+            except NotFoundException as exc:
+                raise NotFound(ERR_MSG_UNKNOWN_RADIO_ID) from exc
             return ('', HTTPStatus.NO_CONTENT)
     return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
 
@@ -559,11 +558,11 @@ def one_radio_station(stationid):
 def start_scan():
     data = request.get_json()
     if data is None:
-        abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
+        raise BadRequest()
     subdir = data.get('dir')
     scandir = os.path.join(current_app.piju_config.music_dir, subdir if subdir else '')
     if not os.path.isdir(scandir):
-        abort(HTTPStatus.BAD_REQUEST, f"Directory {subdir} does not exist")
+        raise BadRequest(f"Directory {subdir} does not exist")
     current_app.work_queue.put((WorkRequests.SCAN_DIRECTORY, scandir))
     return ('', HTTPStatus.NO_CONTENT)
 
@@ -618,6 +617,6 @@ def get_track(trackid):
     with DatabaseAccess() as db:
         try:
             track = db.get_track_by_id(trackid)
-        except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_TRACK_ID)
+        except NotFoundException as exc:
+            raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
         return gzippable_jsonify(json_track(track, include_debuginfo=include_debuginfo))
