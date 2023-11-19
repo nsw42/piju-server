@@ -25,6 +25,12 @@ from .workrequests import WorkRequests
 
 routes = Blueprint('routes', __name__, url_prefix='')
 
+ERR_MSG_UNKNOWN_ALBUM_ID = 'Unknown album id'
+ERR_MSG_UNKNOWN_GENRE_ID = 'Unknown genre id'
+ERR_MSG_UNKNOWN_TRACK_ID = 'Unknown track id'
+ERR_MSG_UNKNOWN_PLAYLIST_ID = 'Unknown playlist id'
+ERR_MSG_UNKNOWN_RADIO_ID = 'Unknown radio station id'
+
 
 def gzippable_jsonify(content):
     if 'gzip' in request.headers.get('Accept-Encoding', '').lower():
@@ -109,7 +115,7 @@ def get_album(albumid):
         try:
             album = db.get_album_by_id(albumid)
         except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
+            abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_ALBUM_ID)
         return gzippable_jsonify(json_album(album, include_tracks=track_info))
 
 
@@ -133,7 +139,7 @@ def get_artwork(trackid):
         try:
             track = db.get_track_by_id(trackid)
         except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+            abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_TRACK_ID)
 
         if track.ArtworkPath:
             path = Path(track.ArtworkPath)
@@ -163,7 +169,7 @@ def get_artwork_info(trackid):
         try:
             track = db.get_track_by_id(trackid)
         except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+            abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_TRACK_ID)
 
         has_artwork = (track.ArtworkPath or track.ArtworkBlob)
         rtn = {
@@ -212,7 +218,7 @@ def get_genre(genreid):
         try:
             genre = db.get_genre_by_id(genreid)
         except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description="Unknown genre id")
+            abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_GENRE_ID)
         return gzippable_jsonify(json_genre(genre, include_albums=album_info, include_playlists=playlist_info))
 
 
@@ -222,7 +228,7 @@ def get_mp3(trackid):
         try:
             track = db.get_track_by_id(trackid)
         except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+            abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_TRACK_ID)
 
         with open(track.Filepath, 'rb') as handle:
             content = handle.read()
@@ -379,7 +385,7 @@ def one_playlist(playlistid):
             try:
                 playlist = db.get_playlist_by_id(playlistid)
             except NotFoundException:
-                abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
+                abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_PLAYLIST_ID)
             return gzippable_jsonify(json_playlist(playlist, include_genres=genre_info, include_tracks=track_info))
 
     elif request.method == 'PUT':
@@ -393,7 +399,7 @@ def one_playlist(playlistid):
             try:
                 db.delete_playlist(playlistid)
             except NotFoundException:
-                abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
+                abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_PLAYLIST_ID)
             return ('', HTTPStatus.NO_CONTENT)
 
     return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -446,7 +452,7 @@ def queue():
                 try:
                     add_track_to_queue(db.get_track_by_id(trackid))
                 except NotFoundException:
-                    abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+                    abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_TRACK_ID)
         elif youtubeurl := data.get('url'):
             current_app.download_history.add(youtubeurl)
             current_app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE,
@@ -464,7 +470,7 @@ def queue():
                         else:
                             new_queue.append(DownloadInfoDatabaseSingleton().get_download_info(trackid))
                 except NotFoundException:
-                    abort(HTTPStatus.NOT_FOUND, "Unknown track id")
+                    abort(HTTPStatus.NOT_FOUND, ERR_MSG_UNKNOWN_TRACK_ID)
                 except ValueError:
                     abort(HTTPStatus.BAD_REQUEST, "Unrecognised track id")
                 current_app.current_player.set_queue(new_queue, "/queue/")
@@ -530,7 +536,7 @@ def one_radio_station(stationid):
             try:
                 station = db.get_radio_station_by_id(stationid)
             except NotFoundException:
-                abort(HTTPStatus.NOT_FOUND, description="Unknown radio station id")
+                abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_RADIO_ID)
             return gzippable_jsonify(json_radio_station(station, include_urls=include_urls))
 
     elif request.method == 'PUT':
@@ -544,7 +550,7 @@ def one_radio_station(stationid):
             try:
                 db.delete_radio_station(stationid)
             except NotFoundException:
-                abort(HTTPStatus.NOT_FOUND, description='Unknown radio station id')
+                abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_RADIO_ID)
             return ('', HTTPStatus.NO_CONTENT)
     return ('', HTTPStatus.INTERNAL_SERVER_ERROR)
 
@@ -613,5 +619,5 @@ def get_track(trackid):
         try:
             track = db.get_track_by_id(trackid)
         except NotFoundException:
-            abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+            abort(HTTPStatus.NOT_FOUND, description=ERR_MSG_UNKNOWN_TRACK_ID)
         return gzippable_jsonify(json_track(track, include_debuginfo=include_debuginfo))
