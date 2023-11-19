@@ -26,24 +26,9 @@ def build_playlist_from_api_data(db: Database) -> Tuple[Playlist, List[str]]:
     if (trackids) and (files):
         raise BadRequest("Only one of a list of tracks and a list of files is permitted")
     if files:
-        tracks = []
-        missing = []
-        for filepath in files:
-            fullpath = current_app.piju_config.music_dir / filepath
-            track = db.get_track_by_filepath(str(fullpath))
-            if track:
-                tracks.append(track)
-            else:
-                print(f"Could not find a track at {filepath} - looked in {fullpath}")
-                missing.append(filepath)
+        tracks, missing = build_playlist_from_api_data_files(db, files)
     else:
-        missing = []
-        if None in trackids:
-            raise BadRequest("Invalid track reference")
-        try:
-            tracks = [db.get_track_by_id(trackid) for trackid in trackids]
-        except NotFoundException as exc:
-            raise NotFound("Unknown track id") from exc
+        tracks, missing = build_playlist_from_api_data_trackids(db, trackids)
     if not tracks:
         raise BadRequest("No tracks found. Will not create an empty playlist.")
     playlist_entries = []
@@ -53,6 +38,31 @@ def build_playlist_from_api_data(db: Database) -> Tuple[Playlist, List[str]]:
     genres = list(genres)
     genres = [db.get_genre_by_id(genre) for genre in genres]
     return Playlist(Title=title, Entries=playlist_entries, Genres=genres), missing
+
+
+def build_playlist_from_api_data_files(db: Database, files: List[str]):
+    tracks = []
+    missing = []
+    for filepath in files:
+        fullpath = current_app.piju_config.music_dir / filepath
+        track = db.get_track_by_filepath(str(fullpath))
+        if track:
+            tracks.append(track)
+        else:
+            print(f"Could not find a track at {filepath} - looked in {fullpath}")
+            missing.append(filepath)
+    return tracks, missing
+
+
+def build_playlist_from_api_data_trackids(db: Database, trackids: List[int]):
+    missing = []
+    if None in trackids:
+        raise BadRequest("Invalid track reference")
+    try:
+        tracks = [db.get_track_by_id(trackid) for trackid in trackids]
+    except NotFoundException as exc:
+        raise NotFound("Unknown track id") from exc
+    return tracks, missing
 
 
 def build_radio_station_from_api_data() -> RadioStation:
