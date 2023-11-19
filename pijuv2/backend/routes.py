@@ -436,9 +436,11 @@ def queue_options():
 def queue_put():
     if current_app.current_player != current_app.file_player:
         raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
+
     data = request.get_json()
     if not data:
         raise BadRequest()
+
     # there are three different possibilities here:
     #   track: trackid  # add the given track to queue
     #   url: url        # add the audio from the given URL to queue
@@ -449,13 +451,17 @@ def queue_put():
                 add_track_to_queue(db.get_track_by_id(trackid))
             except NotFoundException as exc:
                 raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
-    elif youtubeurl := data.get('url'):
+        return ('', HTTPStatus.NO_CONTENT)
+
+    if youtubeurl := data.get('url'):
         current_app.download_history.add(youtubeurl)
         current_app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE,
                                     youtubeurl,
                                     current_app.piju_config.download_dir,
                                     queue_downloaded_files))
-    elif new_queue_order := data.get('queue'):
+        return ('', HTTPStatus.NO_CONTENT)
+
+    if new_queue_order := data.get('queue'):
         new_queue = []
         with DatabaseAccess() as db:
             try:
@@ -470,9 +476,9 @@ def queue_put():
             except ValueError as exc:
                 raise BadRequest("Unrecognised track id") from exc
             current_app.current_player.set_queue(new_queue, "/queue/")
-    else:
-        raise BadRequest("No track id, url or new queue order specified")
-    return ('', HTTPStatus.NO_CONTENT)
+        return ('', HTTPStatus.NO_CONTENT)
+
+    raise BadRequest("No track id, url or new queue order specified")
 
 
 @routes.get("/radio/")
