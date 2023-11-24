@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Iterable, List
+from typing import Any, Callable, Iterable, List, Optional
 
 from flask_sqlalchemy import SQLAlchemy
 
@@ -247,7 +247,7 @@ class Database():
 
     def get_albums_without_tracks(self) -> List[Album]:
         """
-        Return a list of Album objects where each album has no
+        Return a list of Album objects where the album contains no Tracks
         """
         return Database.db.session.query(Album).filter(~Album.Tracks.any()).all()
 
@@ -280,6 +280,32 @@ class Database():
         if limit:
             query = query.limit(limit)
         return query.all()
+
+    def get_all_tracks_paged(self, start_id, limit) -> Optional[List[Track]]:
+        """
+        Calling get_all_tracks() can exceed available memory.
+        get_all_tracks_paged() therefore allows stepping through all tracks in bite-size chunks.
+        Returns None if start_id is greater than the maximum allocated track id;
+        otherwise, returns a (possibly-empty) list of Track items.
+        Can therefore be used as:
+            ```
+            start = 0
+            page_size = 100
+            while (tracks := db.get_all_tracks_paged(start, page_size)) is not None:
+                # do something with tracks
+                start += page_size
+            ```
+        """
+        query = select(Track).where(start_id <= Track.Id).where(Track.Id < start_id + limit).order_by(Track.Id)
+        result = Database.db.session.execute(query).scalars().all()
+        if not result:
+            # No tracks found - was start_id too big, or is there just a big gap in the allocated ids?
+            max_track = Database.db.session.execute(select(Track).order_by(Track.Id.desc())).first()
+            logging.debug("max_track: %s", max_track)
+            if (max_track is None) or (start_id > max_track[0].Id):
+                return None
+            return []
+        return result
 
     def get_artist(self, search_string: str, substring: bool, limit=100) -> List[Album]:
         """

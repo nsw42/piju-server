@@ -1,3 +1,4 @@
+import logging
 import os.path
 
 from .database import Database
@@ -5,10 +6,17 @@ from .database import Database
 
 def delete_missing_tracks(db: Database):
     to_delete = []
-    for track in db.get_all_tracks():
-        if not os.path.isfile(track.Filepath):
-            to_delete.append(track.Id)
+    start_id = 0
+    query_size = 100
+    while (tracks := db.get_all_tracks_paged(start_id, query_size)) is not None:
+        logging.debug(f"delete_missing_tracks: offset={start_id}")
+        for track in tracks:
+            if not os.path.isfile(track.Filepath):
+                logging.debug(f"{track.Filepath} ({track.Id}) not found")
+                to_delete.append(track.Id)
+        start_id += query_size
     for track_id in to_delete:
+        logging.debug(f"Deleting {track_id}")
         db.delete_track(track_id)
 
 
