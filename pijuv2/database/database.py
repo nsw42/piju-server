@@ -300,9 +300,9 @@ class Database():
         result = Database.db.session.execute(query).scalars().all()
         if not result:
             # No tracks found - was start_id too big, or is there just a big gap in the allocated ids?
-            max_track = Database.db.session.execute(select(Track).order_by(Track.Id.desc())).first()
-            logging.debug("max_track: %s", max_track)
-            if (max_track is None) or (start_id > max_track[0].Id):
+            max_track_id = Database.db.session.query(Track).with_entities(func.max(Track.Id)).first()
+            logging.debug("max_track: %s", max_track_id)
+            if (max_track_id is None) or (start_id > max_track_id[0]):
                 return None
             return []
         return result
