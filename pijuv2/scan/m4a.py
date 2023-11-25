@@ -1,14 +1,16 @@
 import logging
+from pathlib import Path
+from typing import Optional, Tuple
 
 import mutagen.mp4
 
-from ..database.schema import Album, Track
-from .common import find_coverart_file, get_artwork_size, parse_datetime_str
+from ..database.schema import Album, Artwork, Track
+from .common import find_coverart_file, get_artwork_size, make_artwork_ref, parse_datetime_str
 
 logger = logging.getLogger(__name__)
 
 
-def scan_m4a(absolute_path):
+def scan_m4a(absolute_path: Path) -> Tuple[Track, Artwork, Optional[Album]]:
     logging.debug(f"Scanning M4A: {absolute_path}")
     mp4 = mutagen.mp4.MP4(absolute_path)
     if not mp4.tags:
@@ -59,10 +61,6 @@ def scan_m4a(absolute_path):
         ReleaseDate=get_tag_datetime_value(['\xa9day']),
         MusicBrainzTrackId=None,
         MusicBrainzArtistId=None,
-        ArtworkPath=artwork_path,
-        ArtworkBlob=artwork_blob,
-        ArtworkWidth=artwork_size.width if artwork_size else None,
-        ArtworkHeight=artwork_size.height if artwork_size else None,
     )
 
     albumref = Album(
@@ -75,4 +73,6 @@ def scan_m4a(absolute_path):
         ReleaseYear=track.ReleaseDate.year if track.ReleaseDate else None
     )
 
-    return track, albumref
+    artworkref = make_artwork_ref(artwork_path, artwork_blob, artwork_size)
+
+    return track, albumref, artworkref

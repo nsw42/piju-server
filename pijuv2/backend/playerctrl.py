@@ -18,7 +18,7 @@ def add_track_to_queue(track: Track):
     Pre-requisite: the caller is responsible for ensuring that current_player
     is a queueing-capable player (ie the file_player)
     """
-    has_artwork = (track.ArtworkPath or track.ArtworkBlob)
+    has_artwork = bool(track.Artwork)
     artwork_uri = url_for('routes.get_artwork', trackid=track.Id) if has_artwork else None
     current_app.current_player.add_to_queue(track.Filepath, track.Id, track.Artist, track.Title, artwork_uri)
 

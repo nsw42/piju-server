@@ -1,10 +1,11 @@
 import logging
 from pathlib import Path
+from typing import Tuple, Optional
 
 import mutagen.mp3
 
-from ..database.schema import Album, Track
-from .common import find_coverart_file, get_artwork_size, parse_datetime_str
+from ..database.schema import Album, Artwork, Track
+from .common import find_coverart_file, get_artwork_size, make_artwork_ref, parse_datetime_str
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ def parse_ufid(ufid):
     return ufid.data.decode() if ufid else None
 
 
-def scan_mp3(absolute_path: Path):
+def scan_mp3(absolute_path: Path) -> Tuple[Track, Artwork, Optional[Album]]:
     logging.debug(f"Scanning MP3: {absolute_path}")
     mp3 = mutagen.mp3.MP3(absolute_path)
     if not mp3.tags:
@@ -89,10 +90,6 @@ def scan_mp3(absolute_path: Path):
         MusicBrainzTrackId=(parse_ufid(mp3.tags.get('UFID:http://musicbrainz.org'))
                             or get_first_tag_text_value(['TXXX:MusicBrainz Release Track Id'])),
         MusicBrainzArtistId=get_first_tag_text_value(['TXXX:MusicBrainz Artist Id']),
-        ArtworkPath=artwork_path,
-        ArtworkBlob=artwork_blob,
-        ArtworkWidth=artwork_size.width if artwork_size else None,
-        ArtworkHeight=artwork_size.height if artwork_size else None,
     )
 
     if not track.Title:
@@ -109,4 +106,6 @@ def scan_mp3(absolute_path: Path):
         ReleaseYear=track.ReleaseDate.year if track.ReleaseDate else None
     )
 
-    return track, albumref
+    artworkref = make_artwork_ref(artwork_path, artwork_blob, artwork_size)
+
+    return track, albumref, artworkref

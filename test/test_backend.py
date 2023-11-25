@@ -58,7 +58,7 @@ def mock_track12(mock_dbaccess):
     mock_track.TrackNumber = 1
     mock_track.TrackCount = 2
     mock_track.Filepath = '/beware/of/the/leopard.mp3'
-    mock_track.Album = mock_track.ArtworkPath = mock_track.ArtworkBlob = None
+    mock_track.Album = mock_track.Artwork = None
     mock_dbaccess().__enter__().get_track_by_id.return_value = mock_track
     return mock_track
 
@@ -96,8 +96,8 @@ def test_get_track(client, mock_track12):
 
 
 def test_get_track_with_artwork(client, mock_track12):
-    mock_track12.ArtworkPath = '/over/the/rainbow.jpg'
+    mock_track12.Artwork = 6
     response = client.get('/tracks/12')
     assert response.status_code == 200
-    assert response.json['artwork'] == '/artwork/12'
-    assert response.json['artworkinfo'] == '/artworkinfo/12'
+    assert response.json['artwork'] == '/artwork/6'
+    assert response.json['artworkinfo'] == '/artworkinfo/6'

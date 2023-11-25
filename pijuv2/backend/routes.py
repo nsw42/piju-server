@@ -134,49 +134,49 @@ def get_artist(artist):
         return gzippable_jsonify(result)
 
 
-@routes.get("/artwork/<trackid>")
-def get_artwork(trackid):
+@routes.get("/artwork/<artworkid>")
+def get_artwork(artworkid):
     with DatabaseAccess() as db:
         try:
-            track = db.get_track_by_id(trackid)
+            artwork = db.get_artwork_by_id(artworkid)
         except NotFoundException as exc:
             raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
 
-        if track.ArtworkPath:
-            path = Path(track.ArtworkPath)
+        if artwork.Path:
+            path = Path(artwork.Path)
             mime = mimetypes.types_map[path.suffix]
-            with open(track.ArtworkPath, 'rb') as handle:
+            with open(artwork.Path, 'rb') as handle:
                 data = handle.read()
 
             return Response(data, headers={'Cache-Control': 'max-age=300'}, mimetype=mime)
 
-        elif track.ArtworkBlob:
-            if track.ArtworkBlob[:3] == b'\xff\xd8\xff':
+        elif artwork.Blob:
+            if artwork.Blob[:3] == b'\xff\xd8\xff':
                 mime = mimetypes.types_map['.jpg']
-            elif track.ArtworkBlob[:8] == b'\x89\x50\x4e\x47\x0d\x0a\x1a\x0a':
+            elif artwork.Blob[:8] == b'\x89\x50\x4e\x47\x0d\x0a\x1a\x0a':
                 mime = mimetypes.types_map['.png']
             else:
                 raise InternalServerError("Unknown mime type")
 
-            return Response(track.ArtworkBlob, headers={'Cache-Control': 'max-age=300'}, mimetype=mime)
+            return Response(artwork.Blob, headers={'Cache-Control': 'max-age=300'}, mimetype=mime)
 
         else:
-            raise NotFound("Track has no artwork")
+            raise NotFound("Unknown artwork id")
 
 
-@routes.get("/artworkinfo/<trackid>")
-def get_artwork_info(trackid):
+@routes.get("/artworkinfo/<artworkid>")
+def get_artwork_info(artworkid):
     with DatabaseAccess() as db:
         try:
-            track = db.get_track_by_id(trackid)
+            artwork = db.get_artwork_by_id(artworkid)
         except NotFoundException as exc:
             raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
 
-        has_artwork = (track.ArtworkPath or track.ArtworkBlob)
+        has_artwork = (artwork.Path or artwork.Blob)
         rtn = {
-            "width": track.ArtworkWidth,
-            "height": track.ArtworkHeight,
-            "image": url_for('routes.get_artwork', trackid=trackid) if has_artwork else None,
+            "width": artwork.Width,
+            "height": artwork.Height,
+            "image": url_for('routes.get_artwork', artworkid=artworkid) if has_artwork else None,
         }
         return gzippable_jsonify(rtn)
 

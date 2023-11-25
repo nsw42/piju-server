@@ -7,6 +7,8 @@ from typing import Optional
 
 from PIL import Image, UnidentifiedImageError
 
+from ..database.schema import Artwork
+
 ArtworkSize = namedtuple('ArtworkSize', 'width height')
 
 
@@ -81,6 +83,13 @@ def get_artwork_size(artwork_path: pathlib.Path, artwork_blob: bytes) -> Optiona
     return ArtworkSize(img.width, img.height)
 
 
-if __name__ == '__main__':
-    import doctest
-    doctest.testmod()
+def make_artwork_ref(artwork_path: str, artwork_blob: bytes, artwork_size: Optional[ArtworkSize]):
+    if artwork_path or artwork_blob:
+        return Artwork(
+            Path=artwork_path,
+            Blob=artwork_blob,
+            Width=artwork_size.width if artwork_size else None,
+            Height=artwork_size.height if artwork_size else None,
+        )
+    else:
+        return None
