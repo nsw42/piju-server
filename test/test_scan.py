@@ -17,7 +17,7 @@ def test_change_track_genre(tmp_path):
 
             trk1 = Track(Title="Track 1", Genre="Rock")
             albumref = Album(Title="Album")
-            set_cross_refs(db, trk1, albumref)
+            set_cross_refs(db, trk1, albumref, None)
             t1id = trk1.Id
 
         # verify setup is as expected
@@ -35,7 +35,7 @@ def test_change_track_genre(tmp_path):
         with DatabaseAccess() as db:
             trk2 = Track(Id=t1id, Title="Still Track 1", Genre="Punk")
             albumref = Album(Title="Album")
-            set_cross_refs(db, trk2, albumref)
+            set_cross_refs(db, trk2, albumref, None)
 
         # verify updates were as expected
         with DatabaseAccess() as db:

@@ -100,7 +100,15 @@ class Track(Base):
     MusicBrainzTrackId = Column(String)
     MusicBrainzArtistId = Column(String)
     Album = Column(Integer, ForeignKey("Albums.Id"))
-    ArtworkPath = Column(String)  # either this or the next will be populated
-    ArtworkBlob = Column(LargeBinary)
-    ArtworkWidth = Column(Integer)
-    ArtworkHeight = Column(Integer)
+    Artwork = Column(Integer, ForeignKey("Artwork.Id"))
+
+
+class Artwork(Base):
+    __tablename__ = 'Artwork'
+
+    Id = Column(Integer, primary_key=True)
+    Path = Column(String)  # either this or the next will be populated
+    Blob = Column(LargeBinary)
+    BlobHash = Column(String)
+    Width = Column(Integer)
+    Height = Column(Integer)

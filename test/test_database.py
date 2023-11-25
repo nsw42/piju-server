@@ -167,7 +167,7 @@ def test_change_compilation_to_single_artist(db_in_app_context):
     album1 = Album(Title='My Album',
                    Artist='Various Artists',
                    IsCompilation=True)
-    set_cross_refs(db_in_app_context, trk1, album1)
+    set_cross_refs(db_in_app_context, trk1, album1, None)
 
     assert len(db_in_app_context.get_all_tracks()) == 1
     assert len(db_in_app_context.get_all_albums()) == 1
@@ -185,7 +185,7 @@ def test_change_compilation_to_single_artist(db_in_app_context):
     album2 = Album(Title='My Album',
                    Artist='Bill and Ben',
                    IsCompilation=False)
-    set_cross_refs(db_in_app_context, trk2, album2)
+    set_cross_refs(db_in_app_context, trk2, album2, None)
 
     assert len(db_in_app_context.get_all_tracks()) == 1
     assert len(db_in_app_context.get_all_albums()) == 1

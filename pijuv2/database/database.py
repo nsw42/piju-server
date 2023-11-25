@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from typing import Any, Callable, Iterable, List, Optional
 
@@ -6,7 +7,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, select, or_
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 
-from .schema import Base, Album, Genre, Playlist, RadioStation, Track
+from .schema import Base, Album, Artwork, Genre, Playlist, RadioStation, Track
 
 func: Callable  # fixes false positives from pylint
 
@@ -44,6 +45,11 @@ def convert_exception_class(exc):
         return DatabaseIntegrityException
     else:
         return UnknownException
+
+
+def calcaulate_blobhash(artwork: Artwork) -> str:
+    hasher = hashlib.sha1(artwork.Blob, usedforsecurity=False)
+    return hasher.hexdigest()
 
 
 class Database():
@@ -163,6 +169,45 @@ class Database():
             logging.fatal(f"Multiple results found for album reference: {albumref.Artist}: {albumref.Title}")
             assert False
 
+    def ensure_artwork_exists(self, artworkref: Artwork) -> Artwork:
+        """
+        Ensure the given artwork reference is present in the database,
+        and return a fully populated object.
+        Required properties of the artwork reference are one of Path or Blob,
+        plus Width and Height.
+        The returned object will additionally have Id set.
+        """
+        if artworkref.Path:
+            existing_artwork = Database.db.session.query(Artwork).filter(
+                Artwork.Path == artworkref.Path
+            ).one_or_none()
+        elif artworkref.Blob:
+            artworkref.BlobHash = calcaulate_blobhash(artworkref)
+            possible_existing_artworks = Database.db.session.query(Artwork).filter(
+                Artwork.BlobHash == artworkref.BlobHash
+            ).all()
+            for possible_existing_artwork in possible_existing_artworks:
+                if possible_existing_artwork.Blob == artworkref.Blob:
+                    existing_artwork = possible_existing_artwork
+                    break
+            else:
+                existing_artwork = None
+        else:
+            assert False
+        if existing_artwork:
+            # Has the artwork size changed?
+            if ((existing_artwork.Width != artworkref.Width) or (existing_artwork.Height != artworkref.Height)):
+                existing_artwork.Width = artworkref.Width
+                existing_artwork.Height = artworkref.Height
+                Database.db.session.commit()
+                Database.db.session.refresh(existing_artwork)
+            return existing_artwork
+        else:
+            Database.db.session.add(artworkref)
+            Database.db.session.commit()
+            Database.db.session.refresh(artworkref)
+            return artworkref
+
     def ensure_genre_exists(self, genre_name: str) -> Genre:
         """
         Ensure the given genre exists
@@ -227,8 +272,7 @@ class Database():
 
         for attr in ['Filepath', 'Title', 'Duration', 'Composer', 'Artist', 'Genre',
                      'VolumeNumber', 'TrackCount', 'TrackNumber', 'ReleaseDate',
-                     'MusicBrainzTrackId', 'MusicBrainzArtistId',
-                     'ArtworkPath', 'ArtworkBlob', 'ArtworkWidth', 'ArtworkHeight']:
+                     'MusicBrainzTrackId', 'MusicBrainzArtistId', 'Artwork']:
             old_val = getattr(track, attr)
             new_val = getattr(trackref, attr)
             if old_val != new_val:
@@ -244,6 +288,13 @@ class Database():
         Raises NotFoundException for an unknown id
         """
         return self.get_x_by_id(Album, albumid)
+
+    def get_artwork_by_id(self, artworkid: int) -> Artwork:
+        """
+        Return the Artwork object for a given id.
+        Raises NotFoundException for an unknown id
+        """
+        return self.get_x_by_id(Artwork, artworkid)
 
     def get_albums_without_tracks(self) -> List[Album]:
         """
@@ -371,6 +422,9 @@ class Database():
     def get_nr_albums(self):
         return Database.db.session.query(Album).with_entities(func.count(Album.Id)).scalar()
 
+    def get_nr_artworks(self):
+        return Database.db.session.query(Artwork).with_entities(func.count(Artwork.Id)).scalar()
+
     def get_nr_genres(self):
         return Database.db.session.query(Genre).with_entities(func.count(Genre.Id)).scalar()
 
@@ -378,6 +432,10 @@ class Database():
         return Database.db.session.query(Track).with_entities(func.count(Track.Id)).scalar()
 
     def search_for_albums(self, search_words: Iterable[str], limit=100) -> List[Album]:
+        """
+        Return a list of Album objects where the album title
+        or the artist name matches the given search words.
+        """
         query = Database.db.session.query(Album)
         for word in search_words:
             pattern = '%' + word + '%'
@@ -388,8 +446,7 @@ class Database():
     def search_for_artist(self, search_words: Iterable[str], limit=100) -> List[Album]:
         """
         Return a list of Album objects where the artist
-        matches the given name.
-        If substring is True, then searches for
+        matches the given search words.
         """
         query = Database.db.session.query(Album)
         for word in search_words:
@@ -399,6 +456,10 @@ class Database():
         return query.all()
 
     def search_for_tracks(self, search_words: Iterable[str], query_limit=1000, return_limit=100) -> List[Track]:
+        """
+        Return a list of Track objects where the track title, album title or artist name
+        matches the given search words.
+        """
         query = Database.db.session.query(Track).join(Album)
         for word in search_words:
             pattern = '%' + word + '%'
@@ -416,7 +477,6 @@ class Database():
             track_title_words = track_lower.split()
             for word in lower_case_words:
                 if (word in track_lower):
-                    # print(word, 3)
                     # Prioritise exact word matches over substring matches
                     if word in track_title_words:
                         score += 4

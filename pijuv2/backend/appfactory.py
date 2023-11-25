@@ -24,7 +24,7 @@ def create_app(db_path: str, create_db=False) -> Flask:
     app.file_player = FilePlayer()
     app.stream_player = StreamPlayer()
     app.current_player = app.file_player
-    app.api_version_string = '6.0'
+    app.api_version_string = '6.1'
     app.download_history = DownloadHistory()
     app.register_blueprint(routes)
     Database.init_db(app, db_path, create_db)
