@@ -10,13 +10,13 @@ from .mp3 import scan_mp3
 # TODO: This is starting to feel like it belongs in the database class
 def set_cross_refs(db: Database, track: Track, albumref: Album, artworkref: Optional[Artwork]):
     editing_track = (track.Id is not None)
+    artwork = db.ensure_artwork_exists(artworkref) if artworkref else None
+    track.Artwork = artwork.Id if artwork else None
     track = db.ensure_track_exists(track)
     # ensure_track_exists() ensures that track.Genre is either None or a genre id
     previous_album_id = track.Album
     album = db.ensure_album_exists(albumref)
     track.Album = album.Id
-    artwork = db.ensure_artwork_exists(artworkref) if artworkref else None
-    track.Artwork = artwork.Id if artwork else None
     # setting track.Album automatically creates the back-reference in album.Tracks,
     # and adding genre to album.Genres also adds the album to the genre.
     # However, if we only ever add to it, we can still have a problem that album.Genres

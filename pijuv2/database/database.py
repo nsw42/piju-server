@@ -195,6 +195,7 @@ class Database():
         else:
             assert False
         if existing_artwork:
+            logging.debug(f"ensure_artwork_exists: existing artwork: {existing_artwork.Id}: {existing_artwork.Path} / {existing_artwork.Blob} ({existing_artwork.Width} x {existing_artwork.Height})")
             # Has the artwork size changed?
             if ((existing_artwork.Width != artworkref.Width) or (existing_artwork.Height != artworkref.Height)):
                 existing_artwork.Width = artworkref.Width
@@ -206,6 +207,7 @@ class Database():
             Database.db.session.add(artworkref)
             Database.db.session.commit()
             Database.db.session.refresh(artworkref)
+            logging.debug(f"ensure_artwork_exists: no existing artwork: New id {artworkref.Id}")
             return artworkref
 
     def ensure_genre_exists(self, genre_name: str) -> Genre:
