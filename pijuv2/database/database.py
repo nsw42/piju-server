@@ -422,6 +422,9 @@ class Database():
     def get_nr_albums(self):
         return Database.db.session.query(Album).with_entities(func.count(Album.Id)).scalar()
 
+    def get_nr_artworks(self):
+        return Database.db.session.query(Artwork).with_entities(func.count(Artwork.Id)).scalar()
+
     def get_nr_genres(self):
         return Database.db.session.query(Genre).with_entities(func.count(Genre.Id)).scalar()
 

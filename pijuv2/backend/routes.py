@@ -75,6 +75,7 @@ def current_status():
             'PlayerStatus': c_p.current_status,
             'PlayerVolume': c_p.current_volume,
             'NumberAlbums': db.get_nr_albums(),
+            'NumberArtworks': db.get_nr_artworks(),
             'NumberTracks': db.get_nr_tracks(),
             'CurrentTrackIndex': None if (c_p.current_track_index is None) else (c_p.current_track_index + 1),
             'MaximumTrackIndex': c_p.number_of_tracks,
