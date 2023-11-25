@@ -21,20 +21,14 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 * 5.0: Add support for playing tracks from YouTube
 * 5.1: Add the ability to retrieve download history
 * 6.0: Add support for playing streaming radio
+* 6.1: Updates as a result of moving artwork into a separate database table
 
 ## Dependencies
 
-* [Flask](https://flask.palletsprojects.com)
-* mutagen
-* pexpect (4.8.0)
-* Pillow
-* SQLAlchemy
+See <requirements.txt> ; install them with `pip install -r requirements.txt`
 
 ## Backlog
 
-* Detect files being deleted
-* Bug fix: Too many open files under heavy load
-* Bug fix: Scanner is finding a lot of tracks without a title
 * Include album disk number to album json in the API
 * Refactor/code tidy of the backend code
 * Tech debt: Move `set_cross_refs` functionality into `ensure_track_exists` in database layer
@@ -59,6 +53,7 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 * Scan: Figure out where genres are being created with name 13 (etc)
 * Scan: Bug fix: duplicate tracks are being created when re-scanning on a different day (dateutil.parser)
 * Scan: Bug fix: Cyberpunk 2077 OST is showing as multiple separate albums
+* Scan: Detect files being deleted. (POST to /scanner/tidy to trigger it)
 * Player: Add remote control of player to play album
 * Player: Add ability to specify start index when starting an album
 * Player: Add ability to play individual tracks
@@ -69,6 +64,8 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 * Bug fix: sometimes ending up with multiple Track entries for a single filepath
 * Bug fix: Better error handling if attempting to play a missing file
 * Bug fix: Changing an album's artist (eg from a compilation to a single artist) was leaving an empty album
+* Bug fix: Too many open files under heavy load
+* Bug fix: Scanner is finding a lot of tracks without a title
 
 ## Credits
 
