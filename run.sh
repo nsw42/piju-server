@@ -51,7 +51,7 @@ fi
 # Update database schema as necessary
 export DB_FILE
 cd $SCRIPT_DIR/pijuv2/database
-$ALEMBIC current 2> /dev/null | grep -q head && { echo Database scehma is up-to-date; } || {
+$ALEMBIC current 2> /dev/null | grep -q head && { echo Database schema is up-to-date; } || {
   BACKUP=${DB_FILE}.bak
   echo "Updating database file: keeping a backup as $BACKUP"
   cp -pf "$DB_FILE" "$BACKUP"
