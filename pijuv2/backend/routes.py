@@ -390,7 +390,7 @@ def edit_playlist(playlistid):
         return response_for_import_playlist(playlist, missing)
 
 
-@routes.delete("/queue/")
+@routes.delete("/queue/", provide_automatic_options=False)
 def queue_delete():
     if current_app.current_player != current_app.file_player:
         raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
@@ -410,7 +410,7 @@ def queue_delete():
     return ('', HTTPStatus.NO_CONTENT)
 
 
-@routes.get("/queue/")
+@routes.get("/queue/", provide_automatic_options=False)
 def queue_get():
     if current_app.current_player != current_app.file_player:
         raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
@@ -420,7 +420,7 @@ def queue_get():
     return gzippable_jsonify(queue_data)
 
 
-@routes.route("/queue/", methods=['OPTIONS'])
+@routes.route("/queue/", methods=['OPTIONS'], provide_automatic_options=False)
 def queue_options():
     if current_app.current_player != current_app.file_player:
         raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
@@ -429,11 +429,11 @@ def queue_options():
     # so it sends OPTIONS before the PUT. Hence we need to support this.
     response = make_response('', HTTPStatus.NO_CONTENT)
     response.headers['Access-Control-Allow-Headers'] = '*'  # Maybe tighten this up?
-    response.headers['Access-Control-Allow-Methods'] = ', '.join(request.url_rule.methods)
+    response.headers['Access-Control-Allow-Methods'] = ', '.join(['DELETE', 'GET', 'OPTIONS', 'PUT'])
     return response
 
 
-@routes.put("/queue/")
+@routes.put("/queue/", provide_automatic_options=False)
 def queue_put():
     if current_app.current_player != current_app.file_player:
         raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
@@ -482,7 +482,7 @@ def queue_put():
     raise BadRequest("No track id, url or new queue order specified")
 
 
-@routes.get("/radio/")
+@routes.get("/radio/", provide_automatic_options=False)
 def get_radio_stations():
     with DatabaseAccess() as db:
         rtn = []
@@ -491,18 +491,18 @@ def get_radio_stations():
         return gzippable_jsonify(rtn)
 
 
-@routes.route("/radio/", methods=['OPTIONS'])
+@routes.route("/radio/", methods=['OPTIONS'], provide_automatic_options=False)
 def radio_stations_options():
     response = make_response('', HTTPStatus.NO_CONTENT)
     response.headers['Access-Control-Allow-Headers'] = ', '.join(['Content-Type',
                                                                   'Access-Control-Allow-Headers',
                                                                   'Access-Control-Allow-Methods',
                                                                   'Access-Control-Allow-Origin'])
-    response.headers['Access-Control-Allow-Methods'] = ', '.join(request.url_rule.methods)
+    response.headers['Access-Control-Allow-Methods'] = ', '.join(['GET', 'OPTIONS', 'POST', 'PUT'])
     return response
 
 
-@routes.post("/radio/")
+@routes.post("/radio/", provide_automatic_options=False)
 def add_radio_station():
     station = build_radio_station_from_api_data()
     with DatabaseAccess() as db:
@@ -513,7 +513,7 @@ def add_radio_station():
         return gzippable_jsonify(response)
 
 
-@routes.put("/radio/")
+@routes.put("/radio/", provide_automatic_options=False)
 def radio_stations_put():
     # reorder stations
     desired_station_order = request.get_json()
