@@ -298,6 +298,13 @@ class Database():
         result = Database.db.session.execute(select(Album).order_by(Album.Artist, Album.Title))
         return result.scalars().all()
 
+    def get_all_artworks(self) -> List[Artwork]:
+        """
+        Primarily for debugging
+        """
+        result = Database.db.session.execute(select(Artwork).order_by(Artwork.Id))
+        return result.scalars().all()
+
     def get_all_genres(self) -> List[Genre]:
         """
         Primarily for debugging

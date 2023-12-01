@@ -36,8 +36,6 @@ def set_cross_refs(db: Database, track: Track, albumref: Album, artworkref: Opti
         genre = db.get_genre_by_id(track.Genre) if track.Genre else None
         if genre and genre not in album.Genres:
             album.Genres.append(genre)
-    # Likewise, we can end up with artwork that is not referenced by any tracks
-    # TODO - Do that here, or in a 'tidy' function, akin to the 'delete albums without tracks'?
 
 
 def scan_directory(basedir: pathlib.Path, db: Database, limit: int = None):

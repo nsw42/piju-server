@@ -1,7 +1,10 @@
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, LargeBinary, String, Table
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy import event
+from sqlalchemy.orm import declarative_base, relationship, Session
 
 # IMPORTANT: If changing the schema, be sure to create the alembic revision to support the migration of data
+# Run:
+#   $ DB_FILE=file.db alembic revision -m "One line description of change" --autogenerate
 
 Base = declarative_base()
 
@@ -100,6 +103,7 @@ class Track(Base):
     MusicBrainzArtistId = Column(String)
     Album = Column(Integer, ForeignKey("Albums.Id"))
     Artwork = Column(Integer, ForeignKey("Artwork.Id"))
+    ArtworkObject = relationship("Artwork", back_populates="Tracks")
 
 
 class Artwork(Base):
@@ -111,3 +115,14 @@ class Artwork(Base):
     BlobHash = Column(String)
     Width = Column(Integer)
     Height = Column(Integer)
+    Tracks = relationship("Track", back_populates="ArtworkObject", cascade="all, delete")
+
+
+# Based on
+# https://stackoverflow.com/questions/51419186/delete-parent-object-when-all-children-have-been-deleted-in-sqlalchemy
+@event.listens_for(Track, 'before_delete')
+def delete_unused_artwork(_mapper, _connection, track):
+    @event.listens_for(Session, 'after_flush', once=True)
+    def act_after_flush(session, _context):
+        if track.ArtworkObject and not track.ArtworkObject.Tracks:
+            session.delete(track.ArtworkObject)

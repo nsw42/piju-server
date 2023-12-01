@@ -6,7 +6,7 @@ import pytest
 
 from pijuv2.scan.directory import set_cross_refs
 from pijuv2.database.database import Database
-from pijuv2.database.schema import Album, Track
+from pijuv2.database.schema import Album, Artwork, Track
 
 TEST_DB = 'test.db'
 
@@ -189,3 +189,21 @@ def test_change_compilation_to_single_artist(db_in_app_context):
 
     assert len(db_in_app_context.get_all_tracks()) == 1
     assert len(db_in_app_context.get_all_albums()) == 1
+
+
+def test_delete_track_deletes_artwork(db_in_app_context):
+    # Setup
+    artref = Artwork(Path="/cover.jpg", Width=888, Height=777)
+    artwork = db_in_app_context.ensure_artwork_exists(artref)
+    trackref = Track(Title="Bohemian Rhapsody in Blue", Artwork=artwork.Id)
+    track = db_in_app_context.ensure_track_exists(trackref)
+
+    assert len(db_in_app_context.get_all_artworks()) == 1
+    assert len(db_in_app_context.get_all_tracks()) == 1
+
+    # Act
+    db_in_app_context.delete_track(track.Id)
+
+    # Check
+    assert len(db_in_app_context.get_all_artworks()) == 0
+    assert len(db_in_app_context.get_all_tracks()) == 0
