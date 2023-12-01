@@ -146,28 +146,22 @@ class Database():
         """
         if albumref.IsCompilation:
             albumref.Artist = None
-        res = Database.db.session.query(Album).filter(
+        album = Database.db.session.query(Album).filter(
             Album.Title == albumref.Title,
             Album.Artist == albumref.Artist
-        )
-        # TODO: use res.one_or_none() ??
-        count = res.count()
-        if count == 0:
+        ).one_or_none()
+        if album is None:
             # Album does not exist
             Database.db.session.add(albumref)
             Database.db.session.commit()
             Database.db.session.refresh(albumref)
             return albumref
-        elif count == 1:
-            album = res.first()
+        else:
             if (album.ReleaseYear is None) or (albumref.ReleaseYear is not None
                                                and album.ReleaseYear < albumref.ReleaseYear):
                 album.ReleaseYear = albumref.ReleaseYear
                 Database.db.session.commit()
             return album
-        else:
-            logging.fatal(f"Multiple results found for album reference: {albumref.Artist}: {albumref.Title}")
-            assert False
 
     def ensure_artwork_exists(self, artworkref: Artwork) -> Artwork:
         """
@@ -214,22 +208,15 @@ class Database():
         """
         Ensure the given genre exists
         """
-        res = Database.db.session.query(Genre).filter(
+        genre = Database.db.session.query(Genre).filter(
             Genre.Name == genre_name
-        )
-        # TODO: use res.one_or_none() ??
-        count = res.count()
-        if count == 0:
+        ).one_or_none()
+        if genre is None:
             genre = Genre(Name=genre_name)
             Database.db.session.add(genre)
             Database.db.session.commit()
             Database.db.session.refresh(genre)
-            return genre
-        elif count == 1:
-            return res.first()
-        else:
-            logging.fatal("Multiple results found for a genre")
-            assert False
+        return genre
 
     def ensure_track_exists(self, trackref: Track) -> Track:
         """
