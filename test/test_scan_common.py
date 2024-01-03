@@ -1,7 +1,10 @@
 import datetime
+from pathlib import Path
+import unicodedata
+
 import pytest
 
-from pijuv2.scan.common import parse_datetime_str
+from pijuv2.scan.common import normalize_filepath, parse_datetime_str
 
 
 @pytest.mark.parametrize("datetimestr, expected",
@@ -25,3 +28,20 @@ def test_parse_datetime_str(datetimestr, expected):
 def test_malformed_values_raise_value_error(malformed_str):
     with pytest.raises(ValueError, match='malformed date: ' + str(malformed_str)):
         parse_datetime_str(malformed_str)
+
+
+@pytest.mark.parametrize("nfc_path", ['Caf' + chr(233), Path('Caf' + chr(233))])
+def test_normalize_filepath_nfc_path(nfc_path):
+    n = normalize_filepath(nfc_path)
+
+    assert unicodedata.is_normalized('NFD', n)
+    assert n[3] == 'e'
+    assert n[4] == chr(0x301)
+
+
+@pytest.mark.parametrize("nfd_path", ['Cafe' + chr(0x301), Path('Cafe' + chr(0x301))])
+def test_normalize_filepath_nfd_path(nfd_path):
+    n = normalize_filepath(nfd_path)
+
+    assert unicodedata.is_normalized('NFD', n)
+    assert n == str(nfd_path)

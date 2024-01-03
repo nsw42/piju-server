@@ -3,7 +3,8 @@ from datetime import datetime
 import io
 import logging
 import pathlib
-from typing import Optional
+from typing import Optional, Union
+import unicodedata
 
 from PIL import Image, UnidentifiedImageError
 
@@ -93,3 +94,10 @@ def make_artwork_ref(artwork_path: str, artwork_blob: bytes, artwork_size: Optio
         )
     else:
         return None
+
+
+def normalize_filepath(path: Union[pathlib.Path, str]) -> str:
+    if not isinstance(path, str):
+        path = str(path)
+
+    return unicodedata.normalize('NFD', path)

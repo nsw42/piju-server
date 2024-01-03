@@ -5,7 +5,7 @@ from typing import Tuple, Optional
 import mutagen.mp3
 
 from ..database.schema import Album, Artwork, Track
-from .common import find_coverart_file, get_artwork_size, make_artwork_ref, parse_datetime_str
+from .common import find_coverart_file, get_artwork_size, make_artwork_ref, parse_datetime_str, normalize_filepath
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ def scan_mp3(absolute_path: Path) -> Tuple[Track, Artwork, Optional[Album]]:
     artwork_size = get_artwork_size(artwork_path, artwork_blob)
 
     track = Track(
-        Filepath=str(absolute_path),
+        Filepath=normalize_filepath(absolute_path),
         Title=get_first_tag_text_value(['TIT2']),
         Duration=int(1000 * mp3.info.length),
         Composer=get_first_tag_text_value(['TCOM']),
