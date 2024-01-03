@@ -34,14 +34,13 @@ def test_malformed_values_raise_value_error(malformed_str):
 def test_normalize_filepath_nfc_path(nfc_path):
     n = normalize_filepath(nfc_path)
 
-    assert unicodedata.is_normalized('NFD', n)
-    assert n[3] == 'e'
-    assert n[4] == chr(0x301)
+    assert unicodedata.is_normalized('NFC', n)
+    assert n == str(nfc_path)
 
 
 @pytest.mark.parametrize("nfd_path", ['Cafe' + chr(0x301), Path('Cafe' + chr(0x301))])
 def test_normalize_filepath_nfd_path(nfd_path):
     n = normalize_filepath(nfd_path)
 
-    assert unicodedata.is_normalized('NFD', n)
-    assert n == str(nfd_path)
+    assert unicodedata.is_normalized('NFC', n)
+    assert n[3] == chr(233)

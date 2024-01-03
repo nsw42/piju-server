@@ -100,4 +100,4 @@ def normalize_filepath(path: Union[pathlib.Path, str]) -> str:
     if not isinstance(path, str):
         path = str(path)
 
-    return unicodedata.normalize('NFD', path)
+    return unicodedata.normalize('NFC', path)
