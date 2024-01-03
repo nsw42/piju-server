@@ -3,6 +3,7 @@ from typing import Optional
 
 from ..database.database import Database
 from ..database.schema import Album, Artwork, Track
+from .common import normalize_filepath
 from .m4a import scan_m4a
 from .mp3 import scan_mp3
 
@@ -43,7 +44,7 @@ def scan_directory(basedir: pathlib.Path, db: Database, limit: int = None):
     for (pattern, scanner) in [('*.mp3', scan_mp3),
                                ('*.m4a', scan_m4a)]:
         for path in basedir.rglob(pattern):
-            existing_track = db.get_track_by_filepath(str(path))
+            existing_track = db.get_track_by_filepath(normalize_filepath(path))
             track, albumref, artworkref = scanner(path)
             if track:
                 if existing_track is not None:

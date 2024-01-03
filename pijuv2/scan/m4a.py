@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 import mutagen.mp4
 
 from ..database.schema import Album, Artwork, Track
-from .common import find_coverart_file, get_artwork_size, make_artwork_ref, parse_datetime_str
+from .common import find_coverart_file, get_artwork_size, make_artwork_ref, parse_datetime_str, normalize_filepath
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ def scan_m4a(absolute_path: Path) -> Tuple[Track, Artwork, Optional[Album]]:
     artwork_size = get_artwork_size(artwork_path, artwork_blob)
 
     track = Track(
-        Filepath=str(absolute_path),
+        Filepath=normalize_filepath(absolute_path),
         Title=get_tag_text_value(['\xa9nam']),
         Duration=int(1000 * mp4.info.length),
         Composer=get_tag_text_value(['\xa9wrt']),

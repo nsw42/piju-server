@@ -10,6 +10,7 @@ from werkzeug.exceptions import BadRequest, NotFound
 
 from ..database.database import Database, NotFoundException
 from ..database.schema import Playlist, PlaylistEntry, RadioStation
+from ..scan.common import normalize_filepath
 
 
 def build_playlist_from_api_data(db: Database) -> Tuple[Playlist, List[str]]:
@@ -45,7 +46,7 @@ def build_playlist_from_api_data_files(db: Database, files: List[str]):
     missing = []
     for filepath in files:
         fullpath = current_app.piju_config.music_dir / filepath
-        track = db.get_track_by_filepath(str(fullpath))
+        track = db.get_track_by_filepath(normalize_filepath(fullpath))
         if track:
             tracks.append(track)
         else:
