@@ -21,8 +21,9 @@ QueuedTrack = namedtuple('QueuedTrack', 'filepath, trackid, artist, title, artwo
 
 
 class FilePlayer(PlayerInterface):
-    def __init__(self, queue: List[Track] = None, identifier: str = ''):
+    def __init__(self, start_background_task, queue: List[Track] = None, identifier: str = ''):
         super().__init__()
+        self.start_background_task = start_background_task
         self.queue = []  # list of QueuedTrack
         self.current_tracklist_identifier = identifier
         self.current_player = None
@@ -57,10 +58,10 @@ class FilePlayer(PlayerInterface):
             time.sleep(1)
         logging.debug(f"Playing {filename}")
         if filename.endswith('.mp3'):
-            self.current_player = MP3MusicPlayer(self)
+            self.current_player = MP3MusicPlayer(self, self.start_background_task)
             self.current_player.play_song(filename)
         else:
-            self.current_player = MPVMusicPlayer(self)
+            self.current_player = MPVMusicPlayer(self, self.start_background_task)
             self.current_player.play_song(filename)
         self.current_player.set_volume(self.current_volume)
         self.current_status = 'playing'
@@ -173,6 +174,7 @@ class FilePlayer(PlayerInterface):
             index += 1
         if started:
             self.current_track_index = index
+            self.send_now_playing_update()
             return True
         else:
             self.stop()
@@ -199,12 +201,14 @@ class FilePlayer(PlayerInterface):
         if self.current_player:
             self.current_player.pause()
         self.current_status = CurrentStatusStrings.PAUSED
+        self.send_now_playing_update()
 
     def resume(self):
         logging.debug(f"FilePlayer.resume ({self.current_player})")
         if self.current_player:
             self.current_player.resume()
         self.current_status = CurrentStatusStrings.PLAYING
+        self.send_now_playing_update()
 
     def set_volume(self, volume: int):
         logging.debug(f"FilePlayer.set_volume {volume}")
@@ -218,6 +222,7 @@ class FilePlayer(PlayerInterface):
         self.current_tracklist_identifier = ''
         self.current_status = CurrentStatusStrings.STOPPED
         self.current_track_index = None
+        self.send_now_playing_update()
 
     # callbacks
     def on_music_end(self):

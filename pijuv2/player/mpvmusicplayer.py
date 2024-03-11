@@ -7,7 +7,7 @@ import threading
 import time
 
 
-class ChildMonitorThread(threading.Thread):
+class ChildMonitorThread:
     def __init__(self, child, callback):
         self.child = child
         self.callback = callback
@@ -31,10 +31,11 @@ class MPVMusicPlayer:
         command = command.encode()
         return command
 
-    def __init__(self, parent):
+    def __init__(self, parent, start_background_task):
         self.parent = parent
         self.ipc_address = '/tmp/piju.mpv-socket'
         self.exe = 'mpv'  # TODO: Config needed?
+        self.start_background_task = start_background_task
 
         self.pause_cmd = MPVMusicPlayer.encode_command(['set_property_string', 'pause', 'yes'])
         self.resume_cmd = MPVMusicPlayer.encode_command(['set_property_string', 'pause', 'no'])
@@ -82,7 +83,7 @@ class MPVMusicPlayer:
         self.child = subprocess.Popen(cmd, stdout=subprocess.DEVNULL)
         # Ensure we notice when the child finishes:
         self.monitor = ChildMonitorThread(self.child, self.parent.on_music_end)
-        self.monitor.start()
+        self.start_background_task(self.monitor.run)
 
     def resume(self):
         logging.debug("MPVPlayer.resume")

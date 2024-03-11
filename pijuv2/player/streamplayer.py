@@ -2,7 +2,6 @@ from collections import defaultdict
 import json
 import logging
 import subprocess
-from threading import Thread
 import time
 from typing import Optional
 
@@ -58,11 +57,10 @@ def jq(data: str, jq_filter: str) -> Optional[str]:
     return value
 
 
-class NowPlayingUpdater(Thread):
-    def __init__(self, parent: 'StreamPlayer'):
-        super().__init__(name="Now Playing Updater thread", target=self.run, daemon=True)
+class NowPlayingUpdater:
+    def __init__(self, parent: 'StreamPlayer', start_background_task):
         self.parent = parent
-        self.start()
+        start_background_task(self.run)
 
     def run(self):
         next_fetch = time.monotonic()  # fetch as soon as we start playing
@@ -97,7 +95,7 @@ class NowPlayingUpdater(Thread):
 
 
 class StreamPlayer(PlayerInterface):
-    def __init__(self):
+    def __init__(self, start_background_task):
         super().__init__()
         self.currently_playing_name = None
         self.currently_playing_url = None
@@ -108,7 +106,7 @@ class StreamPlayer(PlayerInterface):
         self.player_subprocess = None
         self.now_playing_artist = None  # updated by the NowPlayingUpdater
         self.now_playing_track = None  # updated by the NowPlayingUpdater
-        self.update_now_playing_thread = NowPlayingUpdater(self)
+        self.update_now_playing_thread = NowPlayingUpdater(self, start_background_task)
 
     def _stop(self):
         """

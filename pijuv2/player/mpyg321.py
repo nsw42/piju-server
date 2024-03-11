@@ -1,7 +1,6 @@
 from enum import Enum
 import logging
 import re
-from threading import Thread
 
 import pexpect
 
@@ -186,13 +185,11 @@ class MPyg321Player:
     performance_mode = True
     current_position = None
 
-    def __init__(self, player=None, performance_mode=True):
+    def __init__(self, start_background_task, player=None, performance_mode=True):
         """Builds the player and creates the callbacks"""
         self.set_player(player)
-        self.output_processor = Thread(target=self.process_output)
-        self.output_processor.daemon = True
+        self.output_processor = start_background_task(self.process_output)
         self.performance_mode = performance_mode
-        self.output_processor.start()
         self.silence_mpyg_output()
 
     def set_version_and_get_player(self, player):

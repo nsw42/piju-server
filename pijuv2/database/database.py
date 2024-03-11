@@ -197,7 +197,9 @@ class Database():
         else:
             assert False
         if existing_artwork:
-            logging.debug(f"ensure_artwork_exists: existing artwork: {existing_artwork.Id}: {existing_artwork.Path} / {len(existing_artwork.Blob or '')} bytes ({existing_artwork.Width} x {existing_artwork.Height})")
+            logging.debug(f"ensure_artwork_exists: existing artwork: {existing_artwork.Id}: "
+                          f"{existing_artwork.Path} / {len(existing_artwork.Blob or '')} bytes "
+                          f"({existing_artwork.Width} x {existing_artwork.Height})")
             # Has the artwork size changed?
             if ((existing_artwork.Width != artworkref.Width) or (existing_artwork.Height != artworkref.Height)):
                 existing_artwork.Width = artworkref.Width
