@@ -1,8 +1,9 @@
+from contextlib import nullcontext
 import os
 from pathlib import Path
 from queue import Queue
 
-from flask import Flask
+from flask import Flask, has_app_context
 from flask_socketio import SocketIO
 
 from ..database.database import Database
@@ -37,7 +38,8 @@ def create_app(db_path: str, create_db=False) -> Flask:
 
     def update_now_playing():
         print('>update_now_playing')
-        with app.app_context():
+        context_manager = nullcontext if has_app_context() else app.app_context
+        with context_manager():
             print('  app context established')
             broadcast_now_playing_update(app.socketio)
             print('  message broadcast')
