@@ -15,7 +15,7 @@ from ..database.schema import Playlist
 from ..player.playerinterface import CurrentStatusStrings
 from .downloadinfo import DownloadInfoDatabaseSingleton
 from .deserialize import build_playlist_from_api_data, build_radio_station_from_api_data, extract_id, parse_bool
-from .playerctrl import add_track_to_queue, queue_downloaded_files
+from .playerctrl import add_track_to_queue, queue_downloaded_files, select_player
 from .playerctrl import update_player_play_from_local, update_player_play_from_radio, update_player_play_from_youtube
 from .playerctrl import update_player_streaming_prevnext
 from .serialize import json_genre, json_playlist, json_track_or_file
@@ -311,6 +311,19 @@ def update_player_prev():
 
 @routes.post("/player/resume")
 def update_player_resume():
+    if request.content_length:
+        try:
+            data = request.get_json()
+            player_type = data.get('player')
+        except (AttributeError, KeyError):
+            player_type = None
+        if player_type == "radio":
+            desired_player = current_app.stream_player
+        elif player_type == "local":
+            desired_player = current_app.file_player
+        else:
+            raise BadRequest('Request data must be a json object, containing a player key with value radio or local')
+        select_player(current_app, desired_player)
     current_app.current_player.resume()
     return ('', HTTPStatus.NO_CONTENT)
 

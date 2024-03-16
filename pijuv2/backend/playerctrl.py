@@ -49,7 +49,7 @@ def queue_downloaded_files(app, url, download_info: Iterable[DownloadInfo]):
 
 def select_player(app, desired_player):
     if (app.current_player != desired_player) and (app.current_player is not None):
-        app.current_player.stop()
+        app.current_player.pause()
     app.current_player = desired_player
 
 
