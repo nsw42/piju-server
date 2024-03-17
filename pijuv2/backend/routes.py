@@ -5,6 +5,7 @@ import json
 import mimetypes
 import os.path
 from pathlib import Path
+import time
 from typing import List
 
 from flask import Blueprint, current_app, jsonify, make_response, request, Response, url_for
@@ -323,7 +324,9 @@ def update_player_resume():
             desired_player = current_app.file_player
         else:
             raise BadRequest('Request data must be a json object, containing a player key with value radio or local')
-        select_player(current_app, desired_player)
+        was_playing = select_player(current_app, desired_player)
+        if was_playing:
+            time.sleep(1)
     current_app.current_player.resume()
     return ('', HTTPStatus.NO_CONTENT)
 

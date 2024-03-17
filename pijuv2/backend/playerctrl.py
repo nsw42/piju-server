@@ -9,6 +9,7 @@ from werkzeug.exceptions import BadRequest, Conflict, NotFound
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
 from ..database.schema import Track
+from ..player.playerinterface import CurrentStatusStrings
 from .downloadinfo import DownloadInfo
 from .workrequests import WorkRequests
 
@@ -47,10 +48,20 @@ def queue_downloaded_files(app, url, download_info: Iterable[DownloadInfo]):
                                         one_download.artwork)
 
 
-def select_player(app, desired_player):
+def select_player(app, desired_player) -> bool:
+    """
+    Ensures the app.current_player is pointing to the desired app.file_player or
+    app_stream_player, pausing the other if it is already playing.
+    Returns whether a change was made and the old player was already playing.
+    This is needed to allow a pause between stopping one and starting the other.
+    """
+    was_playing = False
     if (app.current_player != desired_player) and (app.current_player is not None):
+        if (app.current_player is not None) and (app.current_player.current_status == CurrentStatusStrings.PLAYING):
+            was_playing = True
         app.current_player.pause()
     app.current_player = desired_player
+    return was_playing
 
 
 def update_player_play_track_list(tracks: Iterable[Track], identifier: str, start_at_track_id: int):
