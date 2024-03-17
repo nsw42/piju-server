@@ -463,39 +463,51 @@ def queue_put():
     #   url: url        # add the audio from the given URL to queue
     #   queue: [trackid_or_url]  # reorder the queue
     if trackid := extract_id(data.get('track', '')):
-        with DatabaseAccess() as db:
-            try:
-                add_track_to_queue(db.get_track_by_id(trackid))
-            except NotFoundException as exc:
-                raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
-        return ('', HTTPStatus.NO_CONTENT)
+        return queue_put_track(trackid)
 
     if youtubeurl := data.get('url'):
-        current_app.download_history.add(youtubeurl)
-        current_app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE,
-                                    youtubeurl,
-                                    current_app.piju_config.download_dir,
-                                    queue_downloaded_files))
-        return ('', HTTPStatus.NO_CONTENT)
+        return queue_put_youtube(youtubeurl)
 
     if new_queue_order := data.get('queue'):
-        new_queue = []
-        with DatabaseAccess() as db:
-            try:
-                for trackid in new_queue_order:
-                    trackid = int(trackid)
-                    if trackid >= 0:
-                        new_queue.append(db.get_track_by_id(trackid))
-                    else:
-                        new_queue.append(DownloadInfoDatabaseSingleton().get_download_info(trackid))
-            except NotFoundException as exc:
-                raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
-            except ValueError as exc:
-                raise BadRequest("Unrecognised track id") from exc
-            current_app.current_player.set_queue(new_queue, "/queue/")
-        return ('', HTTPStatus.NO_CONTENT)
+        return queue_put_reorder(new_queue_order)
 
     raise BadRequest("No track id, url or new queue order specified")
+
+
+def queue_put_track(trackid: int):
+    with DatabaseAccess() as db:
+        try:
+            add_track_to_queue(db.get_track_by_id(trackid))
+        except NotFoundException as exc:
+            raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
+    return ('', HTTPStatus.NO_CONTENT)
+
+
+def queue_put_youtube(youtubeurl: str):
+    current_app.download_history.add(youtubeurl)
+    current_app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE,
+                                youtubeurl,
+                                current_app.piju_config.download_dir,
+                                queue_downloaded_files))
+    return ('', HTTPStatus.NO_CONTENT)
+
+
+def queue_put_reorder(new_queue_order: List[any]):
+    new_queue = []
+    with DatabaseAccess() as db:
+        try:
+            for trackid in new_queue_order:
+                trackid = int(trackid)
+                if trackid >= 0:
+                    new_queue.append(db.get_track_by_id(trackid))
+                else:
+                    new_queue.append(DownloadInfoDatabaseSingleton().get_download_info(trackid))
+        except NotFoundException as exc:
+            raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
+        except ValueError as exc:
+            raise BadRequest("Unrecognised track id") from exc
+        current_app.current_player.set_queue(new_queue, "/queue/")
+    return ('', HTTPStatus.NO_CONTENT)
 
 
 @routes.get("/radio/", provide_automatic_options=False)
