@@ -85,7 +85,7 @@ class FilePlayer(PlayerInterface):
         self.queue = []  # list of QueuedTrack
         self.current_track_index = None
 
-    def set_queue(self, new_queue: List[Union[DownloadInfo, Track]], identifier: str):
+    def set_queue(self, new_queue: List[Union[DownloadInfo, Track]], identifier: str, start_playing: bool = True):
         if new_queue:
             currently_playing = None if (self.current_track_index is None) else self.queue[self.current_track_index]
             self.queue = []
@@ -104,7 +104,7 @@ class FilePlayer(PlayerInterface):
                                              None)
                 self.queue.append(queue_item)
             self.current_track_index = 0  # invariant: the index of the *currently playing* song
-            if (not currently_playing) or (currently_playing.trackid != self.queue[0].trackid):
+            if start_playing and ((not currently_playing) or (currently_playing.trackid != self.queue[0].trackid)):
                 self.play_from_real_queue_index(0)
         else:
             self.clear_queue()

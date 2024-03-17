@@ -74,7 +74,7 @@ def update_player_play_track_list(tracks: Iterable[Track], identifier: str, star
         except ValueError as exc:
             raise BadRequest("Requested track is not in the specified album") from exc
     select_player(current_app, current_app.file_player)
-    current_app.current_player.set_queue(tracks, identifier)
+    current_app.current_player.set_queue(tracks, identifier, start_playing=False)
     current_app.current_player.play_from_real_queue_index(play_from_index)
 
 
