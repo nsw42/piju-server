@@ -146,7 +146,9 @@ def get_artwork(artworkid):
 
         if artwork.Path:
             path = Path(artwork.Path)
-            mime = mimetypes.types_map[path.suffix]
+            mime = mimetypes.types_map.get(path.suffix)
+            if mime is None:
+                mime = mimetypes.common_types.get(path.suffix)
             with open(artwork.Path, 'rb') as handle:
                 data = handle.read()
 
