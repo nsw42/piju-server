@@ -122,7 +122,8 @@ def get_album(albumid):
         return gzippable_jsonify(json_album(album, include_tracks=track_info))
 
 
-@routes.get("/artists/<artist>")
+# Pretend artist is a full-path, so we correctly handle bands like 'AC/DC'
+@routes.get("/artists/<path:artist>")
 def get_artist(artist):
     track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
     exact = parse_bool(request.args.get('exact', 'True'))
