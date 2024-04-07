@@ -127,13 +127,21 @@ def get_artist(artist):
     track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
     exact = parse_bool(request.args.get('exact', 'True'))
     with DatabaseAccess() as db:
-        albums = db.get_artist(artist, substring=not exact)
-        if not albums:
-            raise NotFound("No matching artist found")
-        result = defaultdict(list)
-        for album in albums:
-            result[album.Artist].append(json_album(album, include_tracks=track_info))
-        return gzippable_jsonify(result)
+        if artist.lower() == 'various artists':
+            albums = db.get_compilations()
+            if not albums:
+                raise NotFound("No compilation albums found")
+            result = defaultdict(list)
+            for album in albums:
+                result[artist].append(json_album(album, include_tracks=track_info))
+        else:
+            albums = db.get_artist(artist, substring=not exact)
+            if not albums:
+                raise NotFound("No matching artist found")
+            result = defaultdict(list)
+            for album in albums:
+                result[album.Artist].append(json_album(album, include_tracks=track_info))
+    return gzippable_jsonify(result)
 
 
 @routes.get("/artwork/<artworkid>")

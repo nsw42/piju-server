@@ -5,6 +5,7 @@ from typing import Any, Callable, Iterable, List, Optional
 from flask_sqlalchemy import SQLAlchemy
 
 from sqlalchemy import func, select, or_
+from sqlalchemy.sql.expression import true
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 
 from .schema import Base, Album, Artwork, Genre, Playlist, RadioStation, Track
@@ -358,7 +359,10 @@ class Database():
         """
         Return a list of Album objects where the artist
         matches the given name.
-        If substring is True, then searches for
+        If substring is True, then searches for the given
+        search_string anywhere in the Album artist name;
+        if substring is False, then the search string must
+        match (case-insensitive) the complete artist name;
         """
         if substring:
             search_string = '%' + search_string + '%'
@@ -367,6 +371,18 @@ class Database():
                 .order_by(Album.Artist)
                 .limit(limit)
                 .all())
+
+    def get_compilations(self, limit=100) -> List[Album]:
+        """
+        Return a list of Album objects where the IsCompilation flag is set to True
+        """
+        result = Database.db.session.execute(
+            select(Album)
+            .where(Album.IsCompilation == true())
+            .order_by(Album.Title)
+            .limit(limit)
+        )
+        return result.scalars().all()
 
     def get_x_by_id(self, x_type: Any, x_id: int) -> Any:
         """
