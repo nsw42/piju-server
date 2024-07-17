@@ -158,9 +158,16 @@ class Database():
             Database.db.session.refresh(albumref)
             return albumref
         else:
+            commit = False
+            if (album.VolumeCount is None) or (albumref.VolumeCount is not None
+                                               and album.VolumeCount < albumref.VolumeCount):
+                album.VolumeCount = albumref.VolumeCount
+                commit = True
             if (album.ReleaseYear is None) or (albumref.ReleaseYear is not None
                                                and album.ReleaseYear < albumref.ReleaseYear):
                 album.ReleaseYear = albumref.ReleaseYear
+                commit = True
+            if commit:
                 Database.db.session.commit()
             return album
 
