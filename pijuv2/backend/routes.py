@@ -278,10 +278,13 @@ def update_player_play():
         queue_pos = extract_id(data.get('queuepos'))
         trackid = extract_id(data.get('track'))
         radioid = extract_id(data.get('radio'))
+        disk_nr = data.get('disk')
+        if disk_nr:
+            disk_nr = int(disk_nr)
         youtubeurl = data.get('url')
 
         # Valid requests:
-        #   album with or without track
+        #   album with at most one of track or disk number
         #   playlist with or without track
         #   queuepos with or without track
         #   track on its own
@@ -307,7 +310,7 @@ def update_player_play():
             update_player_play_from_radio(db, radioid)
 
         else:
-            update_player_play_from_local(db, albumid, playlistid, queue_pos, trackid)
+            update_player_play_from_local(db, albumid, playlistid, queue_pos, trackid, disk_nr)
 
     return ('', HTTPStatus.NO_CONTENT)
 

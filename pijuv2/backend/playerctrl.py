@@ -2,7 +2,7 @@
 Player control functionality for the backend: an API-aware wrapper around ..player.*
 """
 
-from typing import Iterable
+from typing import Iterable, Optional
 
 from flask import current_app, url_for
 from werkzeug.exceptions import BadRequest, Conflict, NotFound
@@ -78,7 +78,7 @@ def update_player_play_track_list(tracks: Iterable[Track], identifier: str, star
     current_app.current_player.play_from_real_queue_index(play_from_index)
 
 
-def update_player_play_album(db, albumid, trackid):
+def update_player_play_album(db: Database, albumid: int, trackid: int, disk_nr: Optional[int]):
     try:
         album = db.get_album_by_id(albumid)
     except NotFoundException as exc:
@@ -87,15 +87,23 @@ def update_player_play_album(db, albumid, trackid):
     def track_sort_order(track):
         return (track.VolumeNumber if track.VolumeNumber else 0,
                 track.TrackNumber if track.TrackNumber else 0)
+
     tracks = list(sorted(album.Tracks, key=track_sort_order))
+    if disk_nr is not None:
+        tracks = [track for track in tracks if track.VolumeNumber == disk_nr]
     update_player_play_track_list(tracks, url_for('routes.get_album', albumid=albumid), trackid)
 
 
-def update_player_play_from_local(db: Database, albumid: int, playlistid: int, queue_pos: int, trackid: int):
+def update_player_play_from_local(db: Database,
+                                  albumid: int,
+                                  playlistid: int,
+                                  queue_pos: int,
+                                  trackid: int,
+                                  disk_nr: Optional[int]):
     select_player(current_app, current_app.file_player)
 
     if albumid is not None:
-        update_player_play_album(db, albumid, trackid)
+        update_player_play_album(db, albumid, trackid, disk_nr)
 
     elif playlistid is not None:
         update_player_play_playlist(db, playlistid, trackid)
