@@ -71,12 +71,12 @@ def get_image_tag_value(mp3):
     return val.data if val else None
 
 
-def scan_mp3(absolute_path: Path) -> Tuple[Track, Artwork, Optional[Album]]:
+def scan_mp3(absolute_path: Path) -> Tuple[Track, Album, Optional[Artwork]]:
     logging.debug(f"Scanning MP3: {absolute_path}")
     mp3 = mutagen.mp3.MP3(absolute_path)
     if not mp3.tags:
         logging.warning(f"{absolute_path}: no MP3 tags found. Skipping file.")
-        return None, None
+        return None, None, None
 
     artwork_path = find_coverart_file(absolute_path)
     artwork_blob = None if artwork_path else get_image_tag_value(mp3)

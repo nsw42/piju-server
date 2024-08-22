@@ -236,6 +236,7 @@ class Database():
         if trackref.Id is None:
             # creating track
             res = Database.db.session.query(Track).filter(
+                Track.Album == trackref.Album,
                 Track.Title == trackref.Title,
                 Track.Duration == trackref.Duration,
                 Track.Artist == trackref.Artist,
@@ -269,7 +270,7 @@ class Database():
 
         for attr in ['Filepath', 'Title', 'Duration', 'Composer', 'Artist', 'Genre',
                      'VolumeNumber', 'TrackCount', 'TrackNumber', 'ReleaseDate',
-                     'MusicBrainzTrackId', 'MusicBrainzArtistId', 'Artwork']:
+                     'MusicBrainzTrackId', 'MusicBrainzArtistId', 'Album', 'Artwork']:
             old_val = getattr(track, attr)
             new_val = getattr(trackref, attr)
             if old_val != new_val:
