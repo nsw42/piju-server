@@ -122,6 +122,21 @@ def get_album(albumid):
         return gzippable_jsonify(json_album(album, include_tracks=track_info))
 
 
+@routes.put("/albums/<albumid>")
+def edit_album(albumid):
+    data = request.get_json()
+    if not data:
+        raise BadRequest()
+    with DatabaseAccess() as db:
+        try:
+            album = db.get_album_by_id(albumid)
+        except NotFoundException as exc:
+            raise NotFound(ERR_MSG_UNKNOWN_ALBUM_ID) from exc
+        if year := int(data.get('releasedate', 0)):
+            album.ReleaseYear = year
+        return ('', HTTPStatus.NO_CONTENT)
+
+
 # Pretend artist is a full-path, so we correctly handle bands like 'AC/DC'
 @routes.get("/artists/<path:artist>")
 def get_artist(artist):
