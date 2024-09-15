@@ -1,7 +1,8 @@
-Flask==3.0.0
+Flask==3.0.3
 Pillow==8.4.0
 SQLAlchemy==2.0.23
 Flask-SQLAlchemy==3.1.1
+flask-sock==0.7.0
 alembic==1.12.0
 flake8==4.0.1
 json5==0.9.6
@@ -24,8 +25,6 @@ cyclonedx-python-lib==4.2.3
 Cython==0.29.35
 defusedxml==0.7.1
 filelock==3.13.1
-Flask-SocketIO==5.3.6
-gevent==24.2.1
 greenlet==3.0.3
 h11==0.14.0
 html5lib==1.1
@@ -79,3 +78,5 @@ youtube.py==2.1.0
 zipp==3.17.0
 zope.event==5.0
 zope.interface==6.2
+dnspython==2.6.1
+eventlet==0.35.2
