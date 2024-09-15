@@ -9,6 +9,7 @@ import time
 from typing import List
 
 from flask import Blueprint, current_app, jsonify, make_response, request, Response, url_for
+from flask_sock import Sock
 from werkzeug.exceptions import BadRequest, BadRequestKeyError, Conflict, InternalServerError, NotFound
 
 from ..database.database import DatabaseAccess, NotFoundException
@@ -25,6 +26,7 @@ from .serialize import json_album, json_radio_station, json_track
 from .workrequests import WorkRequests
 
 routes = Blueprint('routes', __name__, url_prefix='')
+sock = Sock()
 
 ERR_MSG_UNKNOWN_ALBUM_ID = 'Unknown album id'
 ERR_MSG_UNKNOWN_GENRE_ID = 'Unknown genre id'
@@ -673,3 +675,13 @@ def get_track(trackid):
         except NotFoundException as exc:
             raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
         return gzippable_jsonify(json_track(track, include_debuginfo=include_debuginfo))
+
+
+@sock.route('/ws', routes)
+def websocket_client(ws):
+    sock.app.websocket_clients.append(ws)
+    data = get_current_status()
+    ws.send(json.dumps(data))
+    while True:
+        _ = ws.receive()
+        # discard incoming requests on the websocket for now

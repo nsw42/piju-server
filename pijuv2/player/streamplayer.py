@@ -2,6 +2,7 @@ from collections import defaultdict
 import json
 import logging
 import subprocess
+from threading import Thread
 import time
 from typing import Optional
 
@@ -57,10 +58,11 @@ def jq(data: str, jq_filter: str) -> Optional[str]:
     return value
 
 
-class NowPlayingUpdater:
-    def __init__(self, parent: 'StreamPlayer', start_background_task):
+class NowPlayingUpdater(Thread):
+    def __init__(self, parent: 'StreamPlayer'):
+        super().__init__(name="Now Playing Updater thread", target=self.run, daemon=True)
         self.parent = parent
-        start_background_task(self.run)
+        self.start()
 
     def run(self):
         next_fetch = time.monotonic()  # fetch as soon as we start playing
@@ -95,7 +97,7 @@ class NowPlayingUpdater:
 
 
 class StreamPlayer(PlayerInterface):
-    def __init__(self, start_background_task):
+    def __init__(self):
         super().__init__()
         self.currently_playing_name = None
         self.currently_playing_url = None
@@ -106,7 +108,7 @@ class StreamPlayer(PlayerInterface):
         self.player_subprocess = None
         self.now_playing_artist = None  # updated by the NowPlayingUpdater
         self.now_playing_track = None  # updated by the NowPlayingUpdater
-        self.update_now_playing_thread = NowPlayingUpdater(self, start_background_task)
+        self.update_now_playing_thread = NowPlayingUpdater(self)
 
     def _stop(self):
         """
@@ -149,6 +151,7 @@ class StreamPlayer(PlayerInterface):
         self.dynamic_info[get_artwork_url].append((get_artwork_jq, self.set_artwork))
         self.now_playing_artist = self.now_playing_track = None
         self._play()
+        self.send_now_playing_update()
 
     def set_track_info(self, track_info):
         if track_info is None:
@@ -158,6 +161,7 @@ class StreamPlayer(PlayerInterface):
             track_info = {}
         self.now_playing_artist = track_info.get('artist')
         self.now_playing_track = track_info.get('track')
+        self.send_now_playing_update()
         if self.now_playing_artist and self.now_playing_track:
             return 60
         return 30
@@ -168,10 +172,12 @@ class StreamPlayer(PlayerInterface):
             artwork_url = None
         if artwork_url:
             self.currently_playing_artwork = artwork_url
-            return 60
+            next_call = 60
         else:
             self.currently_playing_artwork = self.station_artwork
-            return 30
+            next_call = 30
+        self.send_now_playing_update()
+        return next_call
 
     def pause(self):
         """
@@ -181,6 +187,7 @@ class StreamPlayer(PlayerInterface):
         self._stop()
         self.current_status = CurrentStatusStrings.PAUSED
         self.currently_playing_artwork = self.station_artwork
+        self.send_now_playing_update()
 
     def resume(self):
         """
@@ -189,6 +196,7 @@ class StreamPlayer(PlayerInterface):
         """
         if self.currently_playing_name:
             self._play()
+            self.send_now_playing_update()
 
     def stop(self):
         self._stop()
@@ -197,6 +205,8 @@ class StreamPlayer(PlayerInterface):
         self.current_track_index = self.number_of_tracks = None
         self.now_playing_artist = self.now_playing_track = None
         self.dynamic_info = {}
+        self.send_now_playing_update()
 
     def set_volume(self, volume):
         self.current_volume = volume
+        self.send_now_playing_update()

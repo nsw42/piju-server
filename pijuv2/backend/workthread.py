@@ -1,6 +1,7 @@
 import logging
 import pathlib
 from queue import Queue
+import threading
 
 from ..database.database import DatabaseAccess
 from ..database.tidy import delete_missing_tracks, delete_albums_without_tracks
@@ -9,15 +10,15 @@ from .workrequests import WorkRequests
 from .ytdlp import fetch_audio
 
 
-class WorkerThread:
+class WorkerThread(threading.Thread):
     def __init__(self, app, work_queue: Queue):
-        self.name = 'WorkerThread'
+        super().__init__(name='WorkerThread', daemon=True)
         self.app = app
         self.work_queue = work_queue
         self.current_status = 'Not started'
 
-    def task(self):
-        print("Worker background task running")
+    def run(self):
+        print(f"WorkerThread: id={threading.get_native_id()} ident={threading.current_thread().ident}")
         while True:
             self.current_status = 'Idle'
             request = self.work_queue.get()

@@ -34,11 +34,11 @@ def main():
 
     logging.basicConfig(level=logging.DEBUG)
     app = create_app(args.database)
-    app.socketio.start_background_task(app.worker.task)
+    app.worker.start()
     mimetypes.init()
     # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work
     # see https://developer.apple.com/forums/thread/682332
-    app.socketio.run(app, use_reloader=False, host='0.0.0.0')
+    app.run(use_reloader=False, host='0.0.0.0', threaded=True)
 
 
 if __name__ == '__main__':
