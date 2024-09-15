@@ -16,7 +16,7 @@ class PlayerInterface:
         self.current_volume = 100
         self.current_track_index = None  # 0-based
         self.state_change_callback = None
-        # self.number_of_tracks = None  # must be available, but can be a property
+        # self.number_of_tracks must be available, but can be a property
 
     def set_state_change_callback(self, state_change_callback):
         self.state_change_callback = state_change_callback
