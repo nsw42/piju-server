@@ -15,7 +15,15 @@ class PlayerInterface:
         self.current_status = CurrentStatusStrings.STOPPED
         self.current_volume = 100
         self.current_track_index = None  # 0-based
-        # self.number_of_tracks = None  # must be available, but can be a property
+        self.state_change_callback = None
+        # self.number_of_tracks must be available, but can be a property
+
+    def set_state_change_callback(self, state_change_callback):
+        self.state_change_callback = state_change_callback
+
+    def send_now_playing_update(self):
+        if self.state_change_callback:
+            self.state_change_callback()
 
     def pause(self):
         raise NotImplementedError()

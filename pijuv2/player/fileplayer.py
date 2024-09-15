@@ -173,6 +173,7 @@ class FilePlayer(PlayerInterface):
             index += 1
         if started:
             self.current_track_index = index
+            self.send_now_playing_update()
             return True
         else:
             self.stop()
@@ -199,12 +200,14 @@ class FilePlayer(PlayerInterface):
         if self.current_player:
             self.current_player.pause()
         self.current_status = CurrentStatusStrings.PAUSED
+        self.send_now_playing_update()
 
     def resume(self):
         logging.debug(f"FilePlayer.resume ({self.current_player})")
         if self.current_player:
             self.current_player.resume()
         self.current_status = CurrentStatusStrings.PLAYING
+        self.send_now_playing_update()
 
     def set_volume(self, volume: int):
         logging.debug(f"FilePlayer.set_volume {volume}")
@@ -218,6 +221,7 @@ class FilePlayer(PlayerInterface):
         self.current_tracklist_identifier = ''
         self.current_status = CurrentStatusStrings.STOPPED
         self.current_track_index = None
+        self.send_now_playing_update()
 
     # callbacks
     def on_music_end(self):

@@ -151,6 +151,7 @@ class StreamPlayer(PlayerInterface):
         self.dynamic_info[get_artwork_url].append((get_artwork_jq, self.set_artwork))
         self.now_playing_artist = self.now_playing_track = None
         self._play()
+        self.send_now_playing_update()
 
     def set_track_info(self, track_info):
         if track_info is None:
@@ -160,6 +161,7 @@ class StreamPlayer(PlayerInterface):
             track_info = {}
         self.now_playing_artist = track_info.get('artist')
         self.now_playing_track = track_info.get('track')
+        self.send_now_playing_update()
         if self.now_playing_artist and self.now_playing_track:
             return 60
         return 30
@@ -170,10 +172,12 @@ class StreamPlayer(PlayerInterface):
             artwork_url = None
         if artwork_url:
             self.currently_playing_artwork = artwork_url
-            return 60
+            next_call = 60
         else:
             self.currently_playing_artwork = self.station_artwork
-            return 30
+            next_call = 30
+        self.send_now_playing_update()
+        return next_call
 
     def pause(self):
         """
@@ -183,6 +187,7 @@ class StreamPlayer(PlayerInterface):
         self._stop()
         self.current_status = CurrentStatusStrings.PAUSED
         self.currently_playing_artwork = self.station_artwork
+        self.send_now_playing_update()
 
     def resume(self):
         """
@@ -191,6 +196,7 @@ class StreamPlayer(PlayerInterface):
         """
         if self.currently_playing_name:
             self._play()
+            self.send_now_playing_update()
 
     def stop(self):
         self._stop()
@@ -199,6 +205,8 @@ class StreamPlayer(PlayerInterface):
         self.current_track_index = self.number_of_tracks = None
         self.now_playing_artist = self.now_playing_track = None
         self.dynamic_info = {}
+        self.send_now_playing_update()
 
     def set_volume(self, volume):
         self.current_volume = volume
+        self.send_now_playing_update()
