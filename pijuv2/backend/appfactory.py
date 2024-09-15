@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 from queue import Queue
+import socket
 
 from flask import Flask, has_app_context
 from flask_sock import ConnectionClosed
@@ -26,7 +27,7 @@ def create_app(db_path: str, create_db=False) -> Flask:
     app.piju_config = Config(config_file)
     app.work_queue = Queue()
     app.worker = WorkerThread(app, app.work_queue)
-    app.config['SERVER_NAME'] = 'localhost:5000'  # TODO
+    app.config['SERVER_NAME'] = f'{socket.gethostname()}:5000'
     app.config['SECRET_KEY'] = 'piju-server-key'
     app.file_player = FilePlayer()
     app.stream_player = StreamPlayer()
@@ -39,7 +40,6 @@ def create_app(db_path: str, create_db=False) -> Flask:
         update_now_playing(app)
     app.file_player.set_state_change_callback(state_change_callback)
     app.stream_player.set_state_change_callback(state_change_callback)
-
 
     app.register_blueprint(routes)
     sock.init_app(app)
