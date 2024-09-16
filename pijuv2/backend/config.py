@@ -1,4 +1,5 @@
 from pathlib import Path
+import socket
 import json5
 
 
@@ -9,20 +10,19 @@ class ConfigException(Exception):
 
 
 class Config:
-    @staticmethod
-    def default_filepath():
-        return Path.home() / '.pijudrc'
-
-    @staticmethod
-    def default_musicdir():
-        return Path.home() / 'Music'
+    class Defaults:
+        DOWNLOAD_DIR = Path('/tmp')
+        FILEPATH = Path.home() / '.pijudrc'
+        MUSIC_DIR = Path.home() / 'Music'
+        SERVER_NAME = socket.gethostname()
 
     def __init__(self, config_filepath):
         if config_filepath:
             self._init_from_file(config_filepath)
         else:
-            self.music_dir = Path.home() / 'Music'
-            self.download_dir = Path('/tmp')
+            self.music_dir = Config.Defaults.MUSIC_DIR
+            self.download_dir = Config.Defaults.DOWNLOAD_DIR
+            self.server_name = Config.Defaults.SERVER_NAME
 
         if not self.music_dir or not self.music_dir.is_dir():
             raise ConfigException(f"Music directory {self.music_dir} not found")
@@ -32,9 +32,6 @@ class Config:
     def _init_from_file(self, filepath):
         with filepath.open('r') as handle:
             data = json5.load(handle)
-            self.music_dir = data.get('music_dir')
-            self.music_dir = Path(self.music_dir) if self.music_dir else Config.default_musicdir()
-
-            default_download_dir = '/tmp'
-            self.download_dir = data.get('download_dir', default_download_dir)
-            self.download_dir = Path(self.download_dir)
+            self.music_dir = Path(data.get('music_dir', Config.Defaults.MUSIC_DIR))
+            self.download_dir = Path(data.get('download_dir', Config.Defaults.DOWNLOAD_DIR))
+            self.server_name = data.get('server_name', Config.Defaults.SERVER_NAME)

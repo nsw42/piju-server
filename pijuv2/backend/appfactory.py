@@ -3,7 +3,6 @@ import json
 import os
 from pathlib import Path
 from queue import Queue
-import socket
 
 from flask import Flask, has_app_context
 from flask_sock import ConnectionClosed
@@ -21,13 +20,13 @@ from .workthread import WorkerThread
 def create_app(db_path: str, create_db=False) -> Flask:
     app = Flask(__name__)
     Database.init_db(app, db_path, create_db)
-    config_file = Path(os.environ.get('PIJU_CONFIG', Config.default_filepath()))
+    config_file = Path(os.environ.get('PIJU_CONFIG', Config.Defaults.FILEPATH))
     if not config_file.is_file():
         raise Exception(f"Config file {config_file} not found")
     app.piju_config = Config(config_file)
     app.work_queue = Queue()
     app.worker = WorkerThread(app, app.work_queue)
-    app.config['SERVER_NAME'] = f'{socket.gethostname()}:5000'
+    app.config['SERVER_NAME'] = f'{app.piju_config.server_name}:5000'
     app.config['SECRET_KEY'] = 'piju-server-key'
     app.file_player = FilePlayer()
     app.stream_player = StreamPlayer()
