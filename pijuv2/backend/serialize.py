@@ -6,7 +6,7 @@ an over-the-wire representation
 from functools import lru_cache
 import os.path
 
-from flask import url_for
+from .routeconsts import RouteConstants, url_for
 
 from ..database.schema import Album, Genre, Playlist, RadioStation, Track
 
@@ -38,13 +38,13 @@ def json_album(album: Album, include_tracks: InformationLevel):
     tracks = sorted(tracks, key=lambda track: (track.VolumeNumber or 0, track.TrackNumber or 0))
     for track in tracks:
         if bool(track.Artwork):
-            artwork_uri = url_for('routes.get_artwork', artworkid=track.Artwork)
+            artwork_uri = url_for(RouteConstants.GET_ARTWORK, artworkid=track.Artwork)
             break
     else:
         artwork_uri = None
 
     rtn = {
-        'link': url_for('routes.get_album', albumid=album.Id),
+        'link': url_for(RouteConstants.GET_ALBUM, albumid=album.Id),
         'artist': album.Artist,
         'title': album.Title,
         'releasedate': album.ReleaseYear,
@@ -53,10 +53,10 @@ def json_album(album: Album, include_tracks: InformationLevel):
         'artwork': {
             'link': artwork_uri,
         },
-        'genres': [url_for('routes.get_genre', genreid=genre.Id) for genre in album.Genres],
+        'genres': [url_for(RouteConstants.GET_GENRE, genreid=genre.Id) for genre in album.Genres],
     }
     if include_tracks == InformationLevel.Links:
-        rtn['tracks'] = [url_for('routes.get_track', trackid=track.Id) for track in tracks]
+        rtn['tracks'] = [url_for(RouteConstants.GET_TRACK, trackid=track.Id) for track in tracks]
     elif include_tracks in (InformationLevel.AllInfo, InformationLevel.DebugInfo):
         include_debuginfo = (include_tracks == InformationLevel.DebugInfo)
         rtn['tracks'] = [json_track(track, include_debuginfo=include_debuginfo) for track in tracks]
@@ -66,15 +66,15 @@ def json_album(album: Album, include_tracks: InformationLevel):
 @lru_cache(maxsize=32)
 def json_genre(genre: Genre, include_albums: InformationLevel, include_playlists: InformationLevel):
     rtn = {
-        'link': url_for('routes.get_genre', genreid=genre.Id),
+        'link': url_for(RouteConstants.GET_GENRE, genreid=genre.Id),
         'name': genre.Name,
     }
     if include_albums == InformationLevel.Links:
-        rtn['albums'] = [url_for('routes.get_album', albumid=album.Id) for album in genre.Albums]
+        rtn['albums'] = [url_for(RouteConstants.GET_ALBUM, albumid=album.Id) for album in genre.Albums]
     elif include_albums in (InformationLevel.AllInfo, InformationLevel.DebugInfo):
         rtn['albums'] = [json_album(album, include_tracks=include_albums) for album in genre.Albums]
     if include_playlists == InformationLevel.Links:
-        rtn['playlists'] = [url_for('routes.get_one_playlist', playlistid=playlist.Id) for playlist in genre.Playlists]
+        rtn['playlists'] = [url_for(RouteConstants.GET_ONE_PLAYLIST, playlistid=playlist.Id) for playlist in genre.Playlists]
     elif include_playlists in (InformationLevel.AllInfo, InformationLevel.DebugInfo):
         rtn['playlists'] = [json_playlist(playlist,
                                           include_genres=InformationLevel.NoInfo,
@@ -87,17 +87,17 @@ def json_genre(genre: Genre, include_albums: InformationLevel, include_playlists
 def json_playlist(playlist: Playlist, include_genres: InformationLevel, include_tracks: InformationLevel):
     entries = list(playlist.Entries)
     rtn = {
-        'link': url_for('routes.get_one_playlist', playlistid=playlist.Id),
+        'link': url_for(RouteConstants.GET_ONE_PLAYLIST, playlistid=playlist.Id),
         'title': playlist.Title,
     }
     if include_genres == InformationLevel.Links:
-        rtn['genres'] = [url_for('routes.get_genre', genreid=genre.Id) for genre in playlist.Genres]
+        rtn['genres'] = [url_for(RouteConstants.GET_GENRE, genreid=genre.Id) for genre in playlist.Genres]
     elif include_genres in (InformationLevel.AllInfo, InformationLevel.DebugInfo):
         rtn['genres'] = [json_genre(genre,
                                     include_albums=InformationLevel.NoInfo,
                                     include_playlists=InformationLevel.NoInfo) for genre in playlist.Genres]
     if include_tracks == InformationLevel.Links:
-        rtn['tracks'] = [url_for('routes.get_track', trackid=entry.TrackId) for entry in entries]
+        rtn['tracks'] = [url_for(RouteConstants.GET_TRACK, trackid=entry.TrackId) for entry in entries]
     elif include_tracks in (InformationLevel.AllInfo, InformationLevel.DebugInfo):
         include_debuginfo = (include_tracks == InformationLevel.DebugInfo)
         rtn['tracks'] = [json_track(entry.Track, include_debuginfo=include_debuginfo) for entry in entries]
@@ -107,7 +107,7 @@ def json_playlist(playlist: Playlist, include_genres: InformationLevel, include_
 @lru_cache(maxsize=32)
 def json_radio_station(station: RadioStation, include_urls: bool = False):
     rtn = {
-        'link': url_for('routes.get_one_radio_station', stationid=station.Id),
+        'link': url_for(RouteConstants.GET_ONE_RADIO_STATION, stationid=station.Id),
         'name': station.Name,
         'artwork': station.ArtworkUrl
     }
@@ -126,7 +126,7 @@ def json_track(track: Track, include_debuginfo: bool = False):
         return {}
     has_artwork = bool(track.Artwork)
     rtn = {
-        'link': url_for('routes.get_track', trackid=track.Id),
+        'link': url_for(RouteConstants.GET_TRACK, trackid=track.Id),
         'artist': track.Artist,
         'title': track.Title,
         'genre': track.Genre,
@@ -134,9 +134,9 @@ def json_track(track: Track, include_debuginfo: bool = False):
         'tracknumber': track.TrackNumber,
         'trackcount': track.TrackCount,
         'fileformat': os.path.splitext(track.Filepath)[1],
-        'album': url_for('routes.get_album', albumid=track.Album) if track.Album else '',
-        'artwork': url_for('routes.get_artwork', artworkid=track.Artwork) if has_artwork else None,
-        'artworkinfo': url_for('routes.get_artwork_info', artworkid=track.Artwork) if has_artwork else None,
+        'album': url_for(RouteConstants.GET_ALBUM, albumid=track.Album) if track.Album else '',
+        'artwork': url_for(RouteConstants.GET_ARTWORK, artworkid=track.Artwork) if has_artwork else None,
+        'artworkinfo': url_for(RouteConstants.GET_ARTWORK_INFO, artworkid=track.Artwork) if has_artwork else None,
     }
     if include_debuginfo:
         rtn['filepath'] = track.Filepath
@@ -152,7 +152,7 @@ def json_track_or_file(db, queued_track, include_debuginfo: bool = False):
     else:
         # A fake track
         rtn = {
-            'link': url_for('routes.get_track', trackid=queued_track.trackid),
+            'link': url_for(RouteConstants.GET_TRACK, trackid=queued_track.trackid),
             'artist': queued_track.artist,
             'title': queued_track.title,
             'genre': None,

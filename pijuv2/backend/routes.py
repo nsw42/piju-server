@@ -8,7 +8,7 @@ from pathlib import Path
 import time
 from typing import List
 
-from flask import Blueprint, current_app, jsonify, make_response, request, Response, url_for
+from flask import Blueprint, current_app, jsonify, make_response, request, Response
 from flask_sock import Sock
 from werkzeug.exceptions import BadRequest, BadRequestKeyError, Conflict, InternalServerError, NotFound
 
@@ -20,6 +20,7 @@ from .nowplaying import get_current_status
 from .playerctrl import add_track_to_queue, queue_downloaded_files, select_player
 from .playerctrl import update_player_play_from_local, update_player_play_from_radio, update_player_play_from_youtube
 from .playerctrl import update_player_streaming_prevnext
+from .routeconsts import RouteConstants, url_for
 from .serialize import json_genre, json_playlist, json_track_or_file
 from .serialize import InformationLevel
 from .serialize import json_album, json_radio_station, json_track
@@ -84,7 +85,7 @@ def get_all_albums():
         return gzippable_jsonify(rtn)
 
 
-@routes.get("/albums/<albumid>")
+@routes.get(RouteConstants.GET_ALBUM)
 def get_album(albumid):
     track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
     with DatabaseAccess() as db:
@@ -111,7 +112,7 @@ def edit_album(albumid):
 
 
 # Pretend artist is a full-path, so we correctly handle bands like 'AC/DC'
-@routes.get("/artists/<path:artist>")
+@routes.get(RouteConstants.GET_ARTIST)
 def get_artist(artist):
     track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
     exact = parse_bool(request.args.get('exact', 'True'))
@@ -133,7 +134,7 @@ def get_artist(artist):
     return gzippable_jsonify(result)
 
 
-@routes.get("/artwork/<artworkid>")
+@routes.get(RouteConstants.GET_ARTWORK)
 def get_artwork(artworkid):
     with DatabaseAccess() as db:
         try:
@@ -165,7 +166,7 @@ def get_artwork(artworkid):
             raise NotFound("Unknown artwork id")
 
 
-@routes.get("/artworkinfo/<artworkid>")
+@routes.get(RouteConstants.GET_ARTWORK_INFO)
 def get_artwork_info(artworkid):
     with DatabaseAccess() as db:
         try:
@@ -177,7 +178,7 @@ def get_artwork_info(artworkid):
         rtn = {
             "width": artwork.Width,
             "height": artwork.Height,
-            "image": url_for('routes.get_artwork', artworkid=artworkid) if has_artwork else None,
+            "image": url_for(RouteConstants.GET_ARTWORK, artworkid=artworkid) if has_artwork else None,
         }
         return gzippable_jsonify(rtn)
 
@@ -212,7 +213,7 @@ def get_all_genres():
         return gzippable_jsonify(rtn)
 
 
-@routes.get("/genres/<genreid>")
+@routes.get(RouteConstants.GET_GENRE)
 def get_genre(genreid):
     album_info = InformationLevel.from_string(request.args.get('albums', ''))
     playlist_info = InformationLevel.from_string(request.args.get('playlists', ''))
@@ -388,7 +389,7 @@ def delete_playlist(playlistid):
         return ('', HTTPStatus.NO_CONTENT)
 
 
-@routes.get("/playlists/<playlistid>")
+@routes.get(RouteConstants.GET_ONE_PLAYLIST)
 def get_one_playlist(playlistid):
     genre_info = InformationLevel.from_string(request.args.get('genres', ''), InformationLevel.NoInfo)
     track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
@@ -589,7 +590,7 @@ def delete_one_radio_station(stationid):
         return ('', HTTPStatus.NO_CONTENT)
 
 
-@routes.get("/radio/<stationid>")
+@routes.get(RouteConstants.GET_ONE_RADIO_STATION)
 def get_one_radio_station(stationid):
     infolevel = InformationLevel.from_string(request.args.get('urls', ''), InformationLevel.Links)
     include_urls = (infolevel in (InformationLevel.AllInfo, InformationLevel.DebugInfo))
@@ -643,7 +644,7 @@ def search(search_string):
         if do_search_artists:
             artist_albums = db.search_for_artist(search_words)
             artists = set(album.Artist for album in artist_albums if album.Artist)
-            rtn['artists'] = [{"name": artist, "link": url_for('routes.get_artist', artist=artist)}
+            rtn['artists'] = [{"name": artist, "link": url_for(RouteConstants.GET_ARTIST, artist=artist)}
                               for artist in artists]
         if do_search_tracks:
             tracks = db.search_for_tracks(search_words)
@@ -665,7 +666,7 @@ def get_all_tracks():
         return gzippable_jsonify(rtn)
 
 
-@routes.get("/tracks/<trackid>")
+@routes.get(RouteConstants.GET_TRACK)
 def get_track(trackid):
     infolevel = InformationLevel.from_string(request.args.get('infolevel', ''), InformationLevel.AllInfo)
     include_debuginfo = (infolevel == InformationLevel.DebugInfo)
