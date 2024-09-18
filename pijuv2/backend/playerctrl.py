@@ -4,13 +4,14 @@ Player control functionality for the backend: an API-aware wrapper around ..play
 
 from typing import Iterable, Optional
 
-from flask import current_app, url_for
+from flask import current_app
 from werkzeug.exceptions import BadRequest, Conflict, NotFound
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
 from ..database.schema import Track
 from ..player.playerinterface import CurrentStatusStrings
 from .downloadinfo import DownloadInfo
+from .routeconsts import RouteConstants, url_for
 from .workrequests import WorkRequests
 
 
@@ -20,7 +21,7 @@ def add_track_to_queue(track: Track):
     is a queueing-capable player (ie the file_player)
     """
     has_artwork = bool(track.Artwork)
-    artwork_uri = url_for('routes.get_artwork', artworkid=track.Artwork) if has_artwork else None
+    artwork_uri = url_for(RouteConstants.GET_ARTWORK, artworkid=track.Artwork) if has_artwork else None
     current_app.current_player.add_to_queue(track.Filepath, track.Id, track.Artist, track.Title, artwork_uri)
 
 
@@ -91,7 +92,7 @@ def update_player_play_album(db: Database, albumid: int, trackid: int, disk_nr: 
     tracks = list(sorted(album.Tracks, key=track_sort_order))
     if disk_nr is not None:
         tracks = [track for track in tracks if track.VolumeNumber == disk_nr]
-    update_player_play_track_list(tracks, url_for('routes.get_album', albumid=albumid), trackid)
+    update_player_play_track_list(tracks, url_for(RouteConstants.GET_ALBUM, albumid=albumid), trackid)
 
 
 def update_player_play_from_local(db: Database,
@@ -166,7 +167,7 @@ def update_player_play_playlist(db: Database, playlistid, trackid):
     except NotFoundException as exc:
         raise NotFound("Unknown playlist id") from exc
     update_player_play_track_list([entry.Track for entry in playlist.Entries],
-                                  url_for('routes.get_one_playlist', playlistid=playlistid),
+                                  url_for(RouteConstants.GET_ONE_PLAYLIST, playlistid=playlistid),
                                   trackid)
 
 
