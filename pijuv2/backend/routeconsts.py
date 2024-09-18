@@ -7,6 +7,8 @@
 import re
 from urllib.parse import quote
 
+from flask import current_app, has_request_context
+
 
 class RouteConstants:
     GET_ALBUM = '/albums/<albumid>'
@@ -24,4 +26,5 @@ def url_for(route, **kwargs) -> str:
         if not isinstance(val, str):
             val = str(val)
         route = re.sub(r'<([^>:]*:)?' + kwarg + '>', val, route)
-    return quote(route)
+
+    return quote(route) if has_request_context() else current_app.server_address + quote(route)
