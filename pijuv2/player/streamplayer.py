@@ -159,9 +159,12 @@ class StreamPlayer(PlayerInterface):
         if not isinstance(track_info, dict):
             logging.debug("Data in wrong format. Discarding")
             track_info = {}
+        old_artist = self.now_playing_artist
+        old_track = self.now_playing_track
         self.now_playing_artist = track_info.get('artist')
         self.now_playing_track = track_info.get('track')
-        self.send_now_playing_update()
+        if (self.now_playing_artist != old_artist) or (self.now_playing_track != old_track):
+            self.send_now_playing_update()
         if self.now_playing_artist and self.now_playing_track:
             return 60
         return 30
@@ -170,13 +173,15 @@ class StreamPlayer(PlayerInterface):
         if artwork_url and not isinstance(artwork_url, str):
             logging.debug("Data in wrong format. Discarding")
             artwork_url = None
+        old_val = self.currently_playing_artwork
         if artwork_url:
             self.currently_playing_artwork = artwork_url
             next_call = 60
         else:
             self.currently_playing_artwork = self.station_artwork
             next_call = 30
-        self.send_now_playing_update()
+        if self.currently_playing_artwork != old_val:
+            self.send_now_playing_update()
         return next_call
 
     def pause(self):
