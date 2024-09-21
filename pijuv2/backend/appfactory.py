@@ -34,9 +34,10 @@ def create_app(db_path: str, create_db=False) -> Flask:
     app.api_version_string = '7.0'
     app.download_history = DownloadHistory()
     app.websocket_clients = []
+    app.update_now_playing = lambda: update_now_playing(app)
 
     def state_change_callback():
-        update_now_playing(app)
+        app.update_now_playing()
     app.file_player.set_state_change_callback(state_change_callback)
     app.stream_player.set_state_change_callback(state_change_callback)
 

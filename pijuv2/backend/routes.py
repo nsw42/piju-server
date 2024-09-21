@@ -490,8 +490,8 @@ def queue_put_album(albumid: int, disknr: int):
         tracks = [track for track in album.Tracks if track.VolumeNumber == disknr]
         tracks.sort(key=lambda track: (track.VolumeNumber, track.TrackNumber))
         for track in tracks:
-            print("Queuing track", track.Title)
             add_track_to_queue(track)
+        current_app.update_now_playing()
     return ('', HTTPStatus.NO_CONTENT)
 
 
@@ -501,6 +501,7 @@ def queue_put_track(trackid: int):
             add_track_to_queue(db.get_track_by_id(trackid))
         except NotFoundException as exc:
             raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
+    current_app.update_now_playing()
     return ('', HTTPStatus.NO_CONTENT)
 
 
@@ -528,6 +529,7 @@ def queue_put_reorder(new_queue_order: List[any]):
         except ValueError as exc:
             raise BadRequest("Unrecognised track id") from exc
         current_app.current_player.set_queue(new_queue, "/queue/")
+    current_app.update_now_playing()
     return ('', HTTPStatus.NO_CONTENT)
 
 

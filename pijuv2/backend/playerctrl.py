@@ -47,6 +47,7 @@ def queue_downloaded_files(app, url, download_info: Iterable[DownloadInfo]):
                                         one_download.fake_trackid,
                                         one_download.artist, one_download.title,
                                         one_download.artwork)
+    current_app.update_now_playing()
 
 
 def select_player(app, desired_player) -> bool:
