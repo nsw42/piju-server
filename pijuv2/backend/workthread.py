@@ -15,7 +15,7 @@ class WorkerThread(threading.Thread):
         super().__init__(name='WorkerThread', daemon=True)
         self.app = app
         self.work_queue = work_queue
-        self.set_current_status('Not started')
+        self.current_status = 'Not started'
 
     def run(self):
         print(f"WorkerThread: id={threading.get_native_id()} ident={threading.current_thread().ident}")
