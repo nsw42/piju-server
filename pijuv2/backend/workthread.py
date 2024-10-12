@@ -15,33 +15,33 @@ class WorkerThread(threading.Thread):
         super().__init__(name='WorkerThread', daemon=True)
         self.app = app
         self.work_queue = work_queue
-        self.current_status = 'Not started'
+        self.set_current_status('Not started')
 
     def run(self):
         print(f"WorkerThread: id={threading.get_native_id()} ident={threading.current_thread().ident}")
         while True:
-            self.current_status = 'Idle'
+            self.set_current_status('Idle')
             request = self.work_queue.get()
 
             with self.app.app_context():
                 with DatabaseAccess() as db:
                     if request[0] == WorkRequests.SCAN_DIRECTORY:
                         dir_to_scan = pathlib.Path(request[1])
-                        self.current_status = f'Scanning {dir_to_scan}'
+                        self.set_current_status(f'Scanning {dir_to_scan}')
                         scan_directory(dir_to_scan, db)
 
                     elif request[0] == WorkRequests.DELETE_MISSING_TRACKS:
-                        self.current_status = 'Deleting missing tracks'
+                        self.set_current_status('Deleting missing tracks')
                         delete_missing_tracks(db)
 
                     elif request[0] == WorkRequests.DELETE_ALBUMS_WITHOUT_TRACKS:
-                        self.current_status = 'Deleting albums without tracks'
+                        self.set_current_status('Deleting albums without tracks')
                         delete_albums_without_tracks(db)
 
                     elif request[0] == WorkRequests.FETCH_FROM_YOUTUBE:
                         url = request[1]
                         download_dir = request[2]
-                        self.current_status = f'Fetching {url} to {download_dir}'
+                        self.set_current_status(f'Fetching {url} to {download_dir}')
                         local_files = fetch_audio(url=url, download_dir=download_dir)
                         callback = request[3]
                         if callback:
@@ -49,3 +49,7 @@ class WorkerThread(threading.Thread):
 
                     else:
                         logging.error(f"Unrecognised request: {request[0]}")
+
+    def set_current_status(self, status: str):
+        self.current_status = status
+        self.app.update_now_playing()
