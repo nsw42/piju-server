@@ -23,7 +23,17 @@ while getopts :c arg; do
 done
 
 shift $(( OPTIND - 1 ))
-DB_FILE=$1
+
+if [ "$1" ]; then
+  DB_FILE=$1
+else
+  for f in "$SCRIPT_DIR/piju.db" "$SCRIPT_DIR/file.db"; do
+    if [ -f "$f" ]; then
+      DB_FILE=$f
+      break
+    fi
+  done
+fi
 
 if [ -z "$DB_FILE" ]; then usage; fi
 
