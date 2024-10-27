@@ -60,4 +60,11 @@ $ALEMBIC current 2> /dev/null | grep -q head && { echo Database schema is up-to-
 cd $SCRIPT_DIR
 
 # Now run the server
-exec python3 -m pijuv2.backend -d "$DB_FILE"
+if [ -x $SCRIPT_DIR/bin/python3 ]; then
+  PYTHON=$SCRIPT_DIR/bin/python3
+else
+  # let's hope $PATH is set
+  PYTHON=python3
+fi
+
+exec $PYTHON -m pijuv2.backend -d "$DB_FILE"

@@ -1,0 +1,12 @@
+/var/log/piju-server/piju-server.log /var/log/piju-server/piju-server.err
+/var/log/piju-touchscreen/piju-touchscreen.log /var/log/piju-touchscreen/piju-touchscreen.err
+/var/log/piju-webui/piju-webui.log /var/log/piju-webui/piju-webui.err
+{
+    su piju piju
+    daily
+    missingok
+    notifempty
+    compress
+    copytruncate
+}
+
