@@ -19,6 +19,8 @@ Logged in as piju:
 ```sh
 git clone https://github.com/nsw42/piju-server.git
 cd piju-server
+python3 -m venv --system-site-packages .
+. bin/activate
 pip install -r requirements.txt
 ```
 
@@ -55,76 +57,33 @@ cd piju-server
 
 Ctrl-C to exit
 
-### Configure the server to start automatically
+### Configure the server to start automatically and rotate logs
 
-* Copy the script to the Pi:
+* Logged in as piju, add the service and set up log rotation:
 
-    ```sh
-    scp init.d/piju-server to /etc/init.d/piju-server
-    ```
+  ```sh
+  cd piju-server/deploy/
+  ./install.sh
+  ```
 
-* Make the script executable:
+* Start the service and check it started successfully:
 
-    ```sh
-    sudo chown root:root /etc/init.d/piju-server
-    sudo chmod 755 /etc/init.d/piju-server
-    ```
-
-* Create relevant log directory and add it as a service:
-
-    ```sh
-    sudo mkdir /var/log/piju-server
-    sudo chmod 777 /var/log/piju-server
-    sudo rc-update add piju-server default
-    ```
-
-* Start the service:
-
-    ```sh
-    sudo /etc/init.d/piju-server start
-    ```
-
-* Check that it started successfully:
-
-    ```sh
-    sudo /etc/init.d/piju-server status
-    ```
+  ```sh
+  sudo /etc/init.d/piju-server start
+  sudo /etc/init.d/piju-server status
+  ```
 
 * Check the log files as necessary:
 
-    ```sh
-    less /var/log/piju-server/piju-server.err
-    less /var/log/piju-server/piju-server.log
-    ```
+  ```sh
+  less /var/log/piju-server/piju-server.err
+  less /var/log/piju-server/piju-server.log
+  ```
 
-### Set up log rotation
-
-Install logrotate:
-
-```sh
-apk add logrotate
-```
-
-Write a logrotate configuration file (`/etc/logrotate.d/piju`):
-
-```text
-/var/log/piju-server/piju-server.log /var/log/piju-server/piju-server.err
-/var/log/piju-touchscreen/piju-touchscreen.log /var/log/piju-touchscreen/piju-touchscreen.err
-/var/log/piju-webui/pijuwebui.log /var/log/piju-webui/pijuwebui.err
-{
-    su piju piju
-    daily
-    missingok
-    notifempty
-    compress
-    copytruncate
-}
-```
-
-(Note that this also sets up log rotation for the touchscreen and webui piju
-components, on the assumption that you're going to install them. The
-`missingok` config line means that it's not a problem if you choose not to run
-these.)
+(Note that the logrotate configuration file also sets up log rotation for the touchscreen
+and webui piju components, on the assumption that you're going to install them. The file
+contains a `missingok` line that means that it's not a problem if you choose not to run
+them.)
 
 Installing logrotate automatically causes it to run daily. It shouldn't be
 necessary to perform any further configuration.
@@ -133,4 +92,4 @@ necessary to perform any further configuration.
 
 Before using the service for the first time, and any time that music is added
 to the system, it's necessary to update the piju database.  See
-<update_database.md>
+[update_database.md](update_database.md).
