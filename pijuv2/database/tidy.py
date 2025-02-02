@@ -26,3 +26,9 @@ def delete_albums_without_tracks(db: Database):
     # but this is quick enough
     for album in to_delete:
         db.delete_album(album.Id)
+
+
+def delete_empty_genres(db: Database):
+    to_delete = db.get_empty_genres()
+    for genre in to_delete:
+        db.delete_genre(genre.Id)

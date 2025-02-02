@@ -629,6 +629,7 @@ def start_scan():
 def start_tidy():
     current_app.work_queue.put((WorkRequests.DELETE_MISSING_TRACKS, ))
     current_app.work_queue.put((WorkRequests.DELETE_ALBUMS_WITHOUT_TRACKS, ))
+    current_app.work_queue.put((WorkRequests.DELETE_EMPTY_GENRES, ))
     return ('', HTTPStatus.NO_CONTENT)
 
 

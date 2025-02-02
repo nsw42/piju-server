@@ -125,6 +125,11 @@ class Database():
         Database.db.session.delete(album)
         Database.db.session.commit()
 
+    def delete_genre(self, genreid: int):
+        genre = self.get_genre_by_id(genreid)  # raises NotFoundException if necessary
+        Database.db.session.delete(genre)
+        Database.db.session.commit()
+
     def delete_playlist(self, playlistid: int):
         playlist = self.get_playlist_by_id(playlistid)  # raises NotFoundException if necessary
         Database.db.session.delete(playlist)
@@ -393,6 +398,12 @@ class Database():
             .limit(limit)
         )
         return result.scalars().all()
+
+    def get_empty_genres(self) -> List[Genre]:
+        """
+        Return a list of Genre objects that contain neither albums nor playlists
+        """
+        return Database.db.session.query(Genre).filter(~Genre.Albums.any()).filter(~Genre.Playlists.any()).all()
 
     def get_x_by_id(self, x_type: Any, x_id: int) -> Any:
         """
