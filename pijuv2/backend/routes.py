@@ -159,7 +159,11 @@ def get_artist(artist):
             for album in albums:
                 result[artist].append(json_album(album, include_tracks=track_info))
         else:
-            albums = db.get_artist(artist, substring=not exact)
+            aliases = db.get_artist_aliases(artist)
+            albums = []
+            for lookup_artist in [artist] + aliases:
+                search_albums = db.get_artist(lookup_artist, substring=not exact)
+                albums.extend(search_albums)
             if not albums:
                 raise NotFound("No matching artist found")
             result = defaultdict(list)
