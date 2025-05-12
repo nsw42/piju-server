@@ -207,3 +207,34 @@ def test_delete_track_deletes_artwork(db_in_app_context):
     # Check
     assert len(db_in_app_context.get_all_artworks()) == 0
     assert len(db_in_app_context.get_all_tracks()) == 0
+
+
+def test_get_unknown_artist_alias_gives_empty_list(db_in_app_context):
+    # Setup
+    # Act
+    res = db_in_app_context.get_artist_aliases('Mononym')
+
+    # Check
+    assert res == []
+
+
+def test_add_artist_alias(db_in_app_context):
+    # Setup
+    # Act
+    db_in_app_context.add_artist_alias('Sea Power', 'British Sea Power')
+
+    # Check
+    res = db_in_app_context.get_artist_aliases('Sea Power')
+    assert res == ['British Sea Power']
+
+
+def test_multiple_artist_aliases(db_in_app_context):
+    # Setup
+    db_in_app_context.add_artist_alias('Bill', 'Bob')
+
+    # Act
+    db_in_app_context.add_artist_alias('Bill', 'Ben')
+
+    # Check
+    res = db_in_app_context.get_artist_aliases('Bill')
+    assert set(res) == {'Bob', 'Ben'}

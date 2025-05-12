@@ -8,7 +8,7 @@ from sqlalchemy import func, select, or_
 from sqlalchemy.sql.expression import true
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 
-from .schema import Base, Album, Artwork, Genre, Playlist, RadioStation, Track
+from .schema import Base, Album, ArtistAlias, Artwork, Genre, Playlist, RadioStation, Track
 
 func: Callable  # fixes false positives from pylint
 
@@ -78,6 +78,28 @@ class Database():
 
     def commit(self):
         Database.db.session.commit()
+
+    def _get_artist_alias_object(self, artist: str) -> ArtistAlias | None:
+        res = Database.db.session.query(ArtistAlias).filter(ArtistAlias.Artist == artist)
+        try:
+            return res.one()
+        except NoResultFound:
+            return None
+
+    def add_artist_alias(self, artist: str, also_known_as: str):
+        # NB Caller is responsible for adding the reverse alias
+        alias_obj = self._get_artist_alias_object(artist)
+        if alias_obj:
+            # We're adding to an existing list
+            alias_obj.AlternativeNames = alias_obj.AlternativeNames + [also_known_as]
+        else:
+            alias_obj = ArtistAlias(Artist=artist, AlternativeNames=[also_known_as])
+            Database.db.session.add(alias_obj)
+        Database.db.session.commit()
+
+    def get_artist_aliases(self, artist: str) -> List[str]:
+        alias_obj = self._get_artist_alias_object(artist)
+        return list(alias_obj.AlternativeNames) if alias_obj else []
 
     def add_radio_station(self, station: RadioStation):
         Database.db.session.add(station)

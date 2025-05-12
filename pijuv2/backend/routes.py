@@ -111,7 +111,28 @@ def edit_album(albumid):
         return ('', HTTPStatus.NO_CONTENT)
 
 
-# Pretend artist is a full-path, so we correctly handle bands like 'AC/DC'
+@routes.get('/artistaliases/<path:artist>')
+def get_artist_aliases(artist):
+    with DatabaseAccess() as db:
+        aliases = db.get_artist_aliases(artist)
+    if not aliases:
+        raise NotFound(f"No aliases found for {artist}")
+    return gzippable_jsonify(aliases)
+
+
+@routes.post('/artistaliases/<path:artist>')
+def add_artist_alias(artist):
+    # The 'also known as' is in the body
+    also_known_as = request.get_json()
+    if (not also_known_as) or (not isinstance(also_known_as, str)):
+        raise BadRequest()
+    with DatabaseAccess() as db:
+        db.add_artist_alias(artist, also_known_as)
+        # And add the reverse mapping, too
+        db.add_artist_alias(also_known_as, artist)
+    return ('', HTTPStatus.NO_CONTENT)
+
+
 @routes.get(RouteConstants.GET_ARTIST)
 def get_artist(artist):
     track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)

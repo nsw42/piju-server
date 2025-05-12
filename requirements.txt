@@ -8,4 +8,4 @@ mutagen
 Pillow
 pexpect
 requests
-SQLAlchemy
+SQLAlchemy>=2.0
