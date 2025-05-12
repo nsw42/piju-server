@@ -101,6 +101,29 @@ class Database():
         alias_obj = self._get_artist_alias_object(artist)
         return list(alias_obj.AlternativeNames) if alias_obj else []
 
+    def delete_artist_aliases(self, artist: str) -> List[str]:
+        # Returns the list of alternative names that had been set for the artist
+        alias_obj = self._get_artist_alias_object(artist)
+        alternatives = list(alias_obj.AlternativeNames)
+        if not alias_obj:
+            raise NotFoundException()
+        Database.db.session.delete(alias_obj)
+        Database.db.session.commit()
+        return alternatives
+
+    def remove_one_artist_alias(self, artist: str, also_known_as: str):
+        alias_obj = self._get_artist_alias_object(artist)
+        if not alias_obj:
+            raise NotFoundException()
+        alternatives = list(alias_obj.AlternativeNames)
+        try:
+            # Note that alias_obj.AlternativeNames is a transient value, so must be assigned to
+            alternatives.remove(also_known_as)
+        except ValueError as exc:
+            raise NotFoundException() from exc
+        alias_obj.AlternativeNames = alternatives
+        Database.db.session.commit()
+
     def add_radio_station(self, station: RadioStation):
         Database.db.session.add(station)
         Database.db.session.commit()

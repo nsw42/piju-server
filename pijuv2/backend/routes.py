@@ -129,7 +129,20 @@ def add_artist_alias(artist):
     with DatabaseAccess() as db:
         db.add_artist_alias(artist, also_known_as)
         # And add the reverse mapping, too
-        db.add_artist_alias(also_known_as, artist)
+        db.add_artist_alias(also_known_as, artist)  # pylint: disable=arguments-out-of-order
+    return ('', HTTPStatus.NO_CONTENT)
+
+
+@routes.delete('/artistaliases/<path:artist>')
+def delete_artist_aliases(artist):
+    with DatabaseAccess() as db:
+        try:
+            old_alternatives = db.delete_artist_aliases(artist)
+            # Delete the reverse mappings, too
+            for alternative in old_alternatives:
+                db.remove_one_artist_alias(alternative, artist)
+        except NotFoundException as exc:
+            raise NotFound(f"No aliases found for artist {artist}") from exc
     return ('', HTTPStatus.NO_CONTENT)
 
 
