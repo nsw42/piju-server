@@ -150,6 +150,7 @@ def delete_artist_aliases(artist):
 def get_artist(artist):
     track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
     exact = parse_bool(request.args.get('exact', 'True'))
+    include_aliases = parse_bool(request.args.get('aliases', 'True'))
     with DatabaseAccess() as db:
         if artist.lower() == 'various artists':
             albums = db.get_compilations()
@@ -159,7 +160,7 @@ def get_artist(artist):
             for album in albums:
                 result[artist].append(json_album(album, include_tracks=track_info))
         else:
-            aliases = db.get_artist_aliases(artist)
+            aliases = db.get_artist_aliases(artist) if include_aliases else []
             albums = []
             for lookup_artist in [artist] + aliases:
                 search_albums = db.get_artist(lookup_artist, substring=not exact)
