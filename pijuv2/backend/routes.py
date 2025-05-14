@@ -149,28 +149,39 @@ def delete_artist_aliases(artist):
 @routes.get(RouteConstants.GET_ARTIST)
 def get_artist(artist):
     track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
-    exact = parse_bool(request.args.get('exact', 'True'))
     include_aliases = parse_bool(request.args.get('aliases', 'True'))
-    with DatabaseAccess() as db:
-        if artist.lower() == 'various artists':
-            albums = db.get_compilations()
-            if not albums:
-                raise NotFound("No compilation albums found")
-            result = defaultdict(list)
-            for album in albums:
-                result[artist].append(json_album(album, include_tracks=track_info))
-        else:
-            aliases = db.get_artist_aliases(artist) if include_aliases else []
-            albums = []
-            for lookup_artist in [artist] + aliases:
-                search_albums = db.get_artist(lookup_artist, substring=not exact)
-                albums.extend(search_albums)
-            if not albums:
-                raise NotFound("No matching artist found")
-            result = defaultdict(list)
-            for album in albums:
-                result[album.Artist].append(json_album(album, include_tracks=track_info))
+    exact = parse_bool(request.args.get('exact', 'True'))
+    if artist.lower() == 'various artists':
+        result = _get_artist_various_artists(artist, track_info)
+    else:
+        result = _get_artist_real_artist(artist, include_aliases, exact, track_info)
     return gzippable_jsonify(result)
+
+
+def _get_artist_various_artists(artist: str, track_info: InformationLevel):
+    with DatabaseAccess() as db:
+        albums = db.get_compilations()
+        if not albums:
+            raise NotFound("No compilation albums found")
+        result = defaultdict(list)
+        for album in albums:
+            result[artist].append(json_album(album, include_tracks=track_info))
+    return result
+
+
+def _get_artist_real_artist(artist: str, include_aliases: bool, exact: bool, track_info: InformationLevel):
+    with DatabaseAccess() as db:
+        aliases = db.get_artist_aliases(artist) if include_aliases else []
+        albums = {}  # use a dictionary to avoid duplicates if using both inexact searching and aliases
+        for lookup_artist in [artist] + aliases:
+            artist_albums = db.get_artist(lookup_artist, substring=not exact)
+            albums.update((album.Id, album) for album in artist_albums)
+        if not albums:
+            raise NotFound("No matching artist found")
+        result = defaultdict(list)
+        for album in albums.values():
+            result[album.Artist].append(json_album(album, include_tracks=track_info))
+    return result
 
 
 @routes.get(RouteConstants.GET_ARTWORK)
