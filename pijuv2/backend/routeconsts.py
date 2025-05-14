@@ -12,7 +12,7 @@ from flask import current_app, has_request_context
 
 class RouteConstants:
     GET_ALBUM = '/albums/<albumid>'
-    GET_ARTIST = '/artists/<path:artist>'
+    GET_ARTIST = '/artists/<path:artist>'  # Pretend artist is a full-path, so we correctly handle bands like 'AC/DC'
     GET_ARTWORK = '/artwork/<artworkid>'
     GET_ARTWORK_INFO = '/artworkinfo/<artworkid>'
     GET_GENRE = '/genres/<genreid>'

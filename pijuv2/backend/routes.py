@@ -111,27 +111,77 @@ def edit_album(albumid):
         return ('', HTTPStatus.NO_CONTENT)
 
 
-# Pretend artist is a full-path, so we correctly handle bands like 'AC/DC'
+@routes.get('/artistaliases/<path:artist>')
+def get_artist_aliases(artist):
+    with DatabaseAccess() as db:
+        aliases = db.get_artist_aliases(artist)
+    if not aliases:
+        raise NotFound(f"No aliases found for {artist}")
+    return gzippable_jsonify(aliases)
+
+
+@routes.post('/artistaliases/<path:artist>')
+def add_artist_alias(artist):
+    # The 'also known as' is in the body
+    also_known_as = request.get_json()
+    if (not also_known_as) or (not isinstance(also_known_as, str)):
+        raise BadRequest()
+    with DatabaseAccess() as db:
+        db.add_artist_alias(artist, also_known_as)
+        # And add the reverse mapping, too
+        db.add_artist_alias(also_known_as, artist)  # pylint: disable=arguments-out-of-order
+    return ('', HTTPStatus.NO_CONTENT)
+
+
+@routes.delete('/artistaliases/<path:artist>')
+def delete_artist_aliases(artist):
+    with DatabaseAccess() as db:
+        try:
+            old_alternatives = db.delete_artist_aliases(artist)
+            # Delete the reverse mappings, too
+            for alternative in old_alternatives:
+                db.remove_one_artist_alias(alternative, artist)
+        except NotFoundException as exc:
+            raise NotFound(f"No aliases found for artist {artist}") from exc
+    return ('', HTTPStatus.NO_CONTENT)
+
+
 @routes.get(RouteConstants.GET_ARTIST)
 def get_artist(artist):
     track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
+    include_aliases = parse_bool(request.args.get('aliases', 'True'))
     exact = parse_bool(request.args.get('exact', 'True'))
-    with DatabaseAccess() as db:
-        if artist.lower() == 'various artists':
-            albums = db.get_compilations()
-            if not albums:
-                raise NotFound("No compilation albums found")
-            result = defaultdict(list)
-            for album in albums:
-                result[artist].append(json_album(album, include_tracks=track_info))
-        else:
-            albums = db.get_artist(artist, substring=not exact)
-            if not albums:
-                raise NotFound("No matching artist found")
-            result = defaultdict(list)
-            for album in albums:
-                result[album.Artist].append(json_album(album, include_tracks=track_info))
+    if artist.lower() == 'various artists':
+        result = _get_artist_various_artists(artist, track_info)
+    else:
+        result = _get_artist_real_artist(artist, include_aliases, exact, track_info)
     return gzippable_jsonify(result)
+
+
+def _get_artist_various_artists(artist: str, track_info: InformationLevel):
+    with DatabaseAccess() as db:
+        albums = db.get_compilations()
+        if not albums:
+            raise NotFound("No compilation albums found")
+        result = defaultdict(list)
+        for album in albums:
+            result[artist].append(json_album(album, include_tracks=track_info))
+    return result
+
+
+def _get_artist_real_artist(artist: str, include_aliases: bool, exact: bool, track_info: InformationLevel):
+    with DatabaseAccess() as db:
+        aliases = db.get_artist_aliases(artist) if include_aliases else []
+        albums = {}  # use a dictionary to avoid duplicates if using both inexact searching and aliases
+        for lookup_artist in [artist] + aliases:
+            artist_albums = db.get_artist(lookup_artist, substring=not exact)
+            albums.update((album.Id, album) for album in artist_albums)
+        if not albums:
+            raise NotFound("No matching artist found")
+        result = defaultdict(list)
+        for album in albums.values():
+            result[album.Artist].append(json_album(album, include_tracks=track_info))
+    return result
 
 
 @routes.get(RouteConstants.GET_ARTWORK)

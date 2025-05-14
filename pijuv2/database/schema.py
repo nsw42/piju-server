@@ -1,12 +1,15 @@
+import json
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, LargeBinary, String, Table
 from sqlalchemy import event
-from sqlalchemy.orm import declarative_base, relationship, Session
+from sqlalchemy.orm import DeclarativeBase, relationship, Session
 
 # IMPORTANT: If changing the schema, be sure to create the alembic revision to support the migration of data
 # Run:
 #   $ DB_FILE=file.db alembic revision -m "One line description of change" --autogenerate
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    pass
 
 
 album_genre_association_table = Table('association', Base.metadata,
@@ -20,6 +23,7 @@ playlist_genre_association_table = Table('playlist_to_genres', Base.metadata,
 
 
 class PlaylistEntry(Base):
+    "A single item in a playlist"
     __tablename__ = 'playlist_to_track'
 
     Id = Column(Integer, primary_key=True)
@@ -30,6 +34,7 @@ class PlaylistEntry(Base):
 
 
 class Genre(Base):
+    "A collection of albums and playlists that contain items of the same genre"
     __tablename__ = 'Genres'
 
     Id = Column(Integer, primary_key=True)
@@ -43,6 +48,7 @@ class Genre(Base):
 
 
 class Album(Base):
+    "A collection of tracks released by an artist"
     __tablename__ = 'Albums'
 
     Id = Column(Integer, primary_key=True)
@@ -59,7 +65,24 @@ class Album(Base):
                           back_populates="Albums")
 
 
+class ArtistAlias(Base):
+    "A list of alternative names by which an artist may be known"
+    __tablename__ = 'ArtistAliases'
+
+    Artist = Column(String, primary_key=True)
+    _AlternativeNames = Column(String, default='[]')
+
+    @property
+    def AlternativeNames(self):
+        return json.loads(self._AlternativeNames)
+
+    @AlternativeNames.setter
+    def AlternativeNames(self, value):
+        self._AlternativeNames = json.dumps(value)
+
+
 class Playlist(Base):
+    "A custom collection of tracks"
     __tablename__ = 'Playlists'
 
     Id = Column(Integer, primary_key=True)
@@ -72,6 +95,7 @@ class Playlist(Base):
 
 
 class RadioStation(Base):
+    "A streaming radio station"
     __tablename__ = 'RadioStations'
 
     Id = Column(Integer, primary_key=True)
@@ -86,6 +110,7 @@ class RadioStation(Base):
 
 
 class Track(Base):
+    "A single track"
     __tablename__ = 'Tracks'
 
     Id = Column(Integer, primary_key=True)
