@@ -511,12 +511,14 @@ def queue_put():
     if not data:
         raise BadRequest()
 
-    # there are four different possibilities here:
+    # there are five different possibilities here:
     #   album: albumid  disk: disknr  # add the tracks from the given disk to queue
+    #   album: albumid                # add the given album to queue
     #   track: trackid                # add the given track to queue
     #   url: url                      # add the audio from the given URL to queue
     #   queue: [trackid_or_url]       # reorder the queue
-    if (albumid := extract_id(data.get('album', ''))) and (disknr := extract_id(data.get('disk', ''))):
+    if albumid := extract_id(data.get('album', '')):
+        disknr = extract_id(data.get('disk', ''))
         return queue_put_album(albumid, disknr)
 
     if trackid := extract_id(data.get('track', '')):
@@ -531,13 +533,15 @@ def queue_put():
     raise BadRequest("No album+disk id, track id, url or new queue order specified")
 
 
-def queue_put_album(albumid: int, disknr: int):
+def queue_put_album(albumid: int, disknr: int | None):
     with DatabaseAccess() as db:
         try:
             album = db.get_album_by_id(albumid)
         except NotFoundException as exc:
             raise NotFound(ERR_MSG_UNKNOWN_ALBUM_ID) from exc
-        tracks = [track for track in album.Tracks if track.VolumeNumber == disknr]
+        tracks = list(album.Tracks)
+        if disknr is not None:
+            tracks = [track for track in album.Tracks if track.VolumeNumber == disknr]
         tracks.sort(key=lambda track: (track.VolumeNumber, track.TrackNumber))
         for track in tracks:
             add_track_to_queue(track)
