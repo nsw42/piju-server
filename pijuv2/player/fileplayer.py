@@ -199,14 +199,18 @@ class FilePlayer(PlayerInterface):
         logging.debug(f"FilePlayer.pause ({self.current_player})")
         if self.current_player:
             self.current_player.pause()
-        self.current_status = CurrentStatusStrings.PAUSED
+            self.current_status = CurrentStatusStrings.PAUSED
+        else:
+            self.current_status = CurrentStatusStrings.STOPPED
         self.send_now_playing_update()
 
     def resume(self):
         logging.debug(f"FilePlayer.resume ({self.current_player})")
         if self.current_player:
             self.current_player.resume()
-        self.current_status = CurrentStatusStrings.PLAYING
+            self.current_status = CurrentStatusStrings.PLAYING
+        else:
+            self.current_status = CurrentStatusStrings.STOPPED
         self.send_now_playing_update()
 
     def set_volume(self, volume: int):
