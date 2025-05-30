@@ -1,6 +1,7 @@
 from collections import defaultdict
 import json
 import logging
+import math
 import subprocess
 from threading import Thread
 import time
@@ -58,42 +59,58 @@ def jq(data: str, jq_filter: str) -> Optional[str]:
     return value
 
 
+class MinimumSeen:
+    def __init__(self):
+        self.value = None
+
+    def update(self, v):
+        self.value = v if (self.value is None) else min(v, self.value)
+
+
 class NowPlayingUpdater(Thread):
     def __init__(self, parent: 'StreamPlayer'):
         super().__init__(name="Now Playing Updater thread", target=self.run, daemon=True)
         self.parent = parent
+        self.next_fetch = time.monotonic()
         self.start()
 
-    def run(self):
-        next_fetch = time.monotonic()  # fetch as soon as we start playing
-        while True:
-            now = time.monotonic()
-            if self.parent.current_status != CurrentStatusStrings.PLAYING:
-                for _, updates in self.parent.dynamic_info.items():
-                    for _, save_results in updates:
-                        save_results(None)
-                time.sleep(10)
-                continue
+    def show_not_playing(self):
+        for _, updates in self.parent.dynamic_info.items():
+            for _, save_results in updates:
+                save_results(None)
 
-            if now < next_fetch:
-                time.sleep(10)
-                continue
-
-            min_delta = None
-            for url, updates in self.parent.dynamic_info.items():
-                data = fetch(url)
-                if not data:
-                    # ensure we don't show out-of-date information, but try again soon
-                    for _, save_results in updates:
-                        save_results(None)
-                    min_delta = min(min_delta, 10) if min_delta else 10
-                    continue
+    def do_all_fetches(self):
+        # Return the amount of time until we need to fetch again
+        min_delta = MinimumSeen()
+        for url, updates in self.parent.dynamic_info.items():
+            data = fetch(url)
+            if data:
                 for jq_filter, save_results in updates:
                     filtered_data = jq(data, jq_filter) if jq_filter else data
                     delta = save_results(filtered_data)
-                    min_delta = min(min_delta, delta) if min_delta else delta
-            next_fetch = now + min_delta
-            time.sleep(min_delta)
+                    min_delta.update(delta)
+            else:
+                # ensure we don't show out-of-date information, but try again soon
+                for _, save_results in updates:
+                    save_results(None)
+                min_delta.update(10)
+        return min_delta.value or 10
+
+    def state_change(self, new_status):
+        if new_status == CurrentStatusStrings.PLAYING:
+            self.next_fetch = time.monotonic()  # fetch as soon as the thread updates
+        else:
+            self.show_not_playing()
+            self.next_fetch = math.inf
+
+    def run(self):
+        while True:
+            now = time.monotonic()
+
+            if now >= self.next_fetch:
+                self.next_fetch = now + self.do_all_fetches()
+
+            time.sleep(3)
 
 
 class StreamPlayer(PlayerInterface):
@@ -152,6 +169,7 @@ class StreamPlayer(PlayerInterface):
         self.now_playing_artist = self.now_playing_track = None
         self._play()
         self.send_now_playing_update()
+        self.update_now_playing_thread.state_change(self.current_status)
 
     def set_track_info(self, track_info):
         if track_info is None:
@@ -193,6 +211,7 @@ class StreamPlayer(PlayerInterface):
         self.current_status = CurrentStatusStrings.PAUSED
         self.currently_playing_artwork = self.station_artwork
         self.send_now_playing_update()
+        self.update_now_playing_thread.state_change(self.current_status)
 
     def resume(self):
         """
@@ -202,6 +221,7 @@ class StreamPlayer(PlayerInterface):
         if self.currently_playing_name:
             self._play()
             self.send_now_playing_update()
+            self.update_now_playing_thread.state_change(self.current_status)
 
     def stop(self):
         self._stop()
@@ -211,7 +231,10 @@ class StreamPlayer(PlayerInterface):
         self.now_playing_artist = self.now_playing_track = None
         self.dynamic_info = {}
         self.send_now_playing_update()
+        self.update_now_playing_thread.state_change(self.current_status)
 
     def set_volume(self, volume):
+        # Cannot (yet?) change the volume of a running player, but we can at least
+        # save the correct volume in case we pause/resume
         self.current_volume = volume
         self.send_now_playing_update()
