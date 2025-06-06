@@ -518,7 +518,7 @@ class Database():
         for word in search_words:
             pattern = '%' + word + '%'
             query = query.filter(or_(Album.Title.ilike(pattern), Album.Artist.ilike(pattern)))
-        query = query.order_by(Album.Artist).limit(limit)
+        query = query.order_by(Album.Artist, Album.ReleaseYear).limit(limit)
         return query.all()
 
     def search_for_artist(self, search_words: Iterable[str], limit=100) -> List[Album]:

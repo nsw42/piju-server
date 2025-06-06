@@ -698,6 +698,7 @@ def search(search_string):
         if do_search_albums:
             albums = db.search_for_albums(search_words)
             rtn['albums'] = [json_album(album, include_tracks=InformationLevel.NoInfo) for album in albums]
+
         if do_search_artists:
             artist_albums = db.search_for_artist(search_words)
             artists = set(album.Artist for album in artist_albums if album.Artist)
