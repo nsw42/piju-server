@@ -491,11 +491,12 @@ def queue_get():
 
 @routes.route("/queue/", methods=['OPTIONS'], provide_automatic_options=False)
 def queue_options():
-    if current_app.current_player != current_app.file_player:
-        raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
-
     # the request to add to queue looks like a cross-domain request to Chrome,
     # so it sends OPTIONS before the PUT. Hence we need to support this.
+
+    if current_app.current_player != current_app.file_player:
+        select_player(current_app, current_app.file_player)
+
     response = make_response('', HTTPStatus.NO_CONTENT)
     response.headers['Access-Control-Allow-Headers'] = '*'  # Maybe tighten this up?
     response.headers['Access-Control-Allow-Methods'] = ', '.join(['DELETE', 'GET', 'OPTIONS', 'PUT'])
@@ -504,12 +505,12 @@ def queue_options():
 
 @routes.put("/queue/", provide_automatic_options=False)
 def queue_put():
-    if current_app.current_player != current_app.file_player:
-        raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
-
     data = request.get_json()
     if not data:
         raise BadRequest()
+
+    if current_app.current_player != current_app.file_player:
+        select_player(current_app, current_app.file_player)
 
     # there are five different possibilities here:
     #   album: albumid  disk: disknr  # add the tracks from the given disk to queue
