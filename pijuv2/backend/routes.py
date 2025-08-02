@@ -64,6 +64,16 @@ def response_for_import_playlist(playlist: Playlist, missing_tracks: List[str]):
     return gzippable_jsonify(response)
 
 
+def make_options_response(methods):
+    response = make_response('', HTTPStatus.NO_CONTENT)
+    response.headers['Access-Control-Allow-Headers'] = ', '.join(['Content-Type',
+                                                                  'Access-Control-Allow-Headers',
+                                                                  'Access-Control-Allow-Methods',
+                                                                  'Access-Control-Allow-Origin'])
+    response.headers['Access-Control-Allow-Methods'] = ', '.join(methods)
+    return response
+
+
 @routes.after_request
 def add_security_headers(resp):
     resp.headers['Access-Control-Allow-Origin'] = '*'
@@ -390,12 +400,17 @@ def update_player_stop():
     return ('', HTTPStatus.NO_CONTENT)
 
 
-@routes.get("/player/volume")
+@routes.route("/player/volume", methods=['OPTIONS'], provide_automatic_options=False)
+def volume_options():
+    return make_options_response(['GET', 'OPTIONS', 'POST'])
+
+
+@routes.get("/player/volume", provide_automatic_options=False)
 def player_get_volume():
     return {"volume": current_app.current_player.current_volume}
 
 
-@routes.post("/player/volume")
+@routes.post("/player/volume", provide_automatic_options=False)
 def player_set_volume():
     data = request.get_json()
     if not data:
@@ -497,10 +512,7 @@ def queue_options():
     if current_app.current_player != current_app.file_player:
         select_player(current_app, current_app.file_player)
 
-    response = make_response('', HTTPStatus.NO_CONTENT)
-    response.headers['Access-Control-Allow-Headers'] = '*'  # Maybe tighten this up?
-    response.headers['Access-Control-Allow-Methods'] = ', '.join(['DELETE', 'GET', 'OPTIONS', 'PUT'])
-    return response
+    return make_options_response(['DELETE', 'GET', 'OPTIONS', 'PUT'])
 
 
 @routes.put("/queue/", provide_automatic_options=False)
@@ -599,13 +611,7 @@ def get_radio_stations():
 
 @routes.route("/radio/", methods=['OPTIONS'], provide_automatic_options=False)
 def radio_stations_options():
-    response = make_response('', HTTPStatus.NO_CONTENT)
-    response.headers['Access-Control-Allow-Headers'] = ', '.join(['Content-Type',
-                                                                  'Access-Control-Allow-Headers',
-                                                                  'Access-Control-Allow-Methods',
-                                                                  'Access-Control-Allow-Origin'])
-    response.headers['Access-Control-Allow-Methods'] = ', '.join(['GET', 'OPTIONS', 'POST', 'PUT'])
-    return response
+    return make_options_response(['GET', 'OPTIONS', 'POST', 'PUT'])
 
 
 @routes.post("/radio/", provide_automatic_options=False)
