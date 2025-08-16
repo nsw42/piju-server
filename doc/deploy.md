@@ -59,21 +59,21 @@ Ctrl-C to exit
 
 ### Configure the server to start automatically and rotate logs
 
-* Logged in as piju, add the service and set up log rotation:
+- Logged in as piju, add the service and set up log rotation:
 
   ```sh
   cd piju-server/deploy/
   ./install.sh
   ```
 
-* Start the service and check it started successfully:
+- Start the service and check it started successfully:
 
   ```sh
   sudo /etc/init.d/piju-server start
   sudo /etc/init.d/piju-server status
   ```
 
-* Check the log files as necessary:
+- Check the log files as necessary:
 
   ```sh
   less /var/log/piju-server/piju-server.err
@@ -93,3 +93,26 @@ necessary to perform any further configuration.
 Before using the service for the first time, and any time that music is added
 to the system, it's necessary to update the piju database.  See
 [update_database.md](update_database.md).
+
+### Use cookies to authenticate YouTube downloads
+
+YouTube blocks attempts to download audio for some videos unless the request
+is authenticated by a user account. To do this, you will need to use the
+yt-dlp cookie support:
+
+- (recommended but not essential) create a dedicated YouTube account, in case YouTube
+  blocks your account
+- follow the
+  [yt-dlp instructions](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies)
+  to save the cookies for that account to a cookies.txt file
+- copy that cookies.txt file to your Pi
+- update your piju configuration file:
+
+  ```json
+  {
+    "cookies": "/path/to/cookies.txt",
+    ...
+  }
+  ```
+
+- restart piju, to get it to reload your configuration file
