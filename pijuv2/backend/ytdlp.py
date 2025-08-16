@@ -1,7 +1,10 @@
 import json
+import logging
 from pathlib import Path
 from typing import Iterable
 import subprocess
+
+from flask import current_app
 
 from .downloadinfo import DownloadInfo, DownloadInfoDatabaseSingleton
 
@@ -17,17 +20,20 @@ def select_thumbnail(thumbnails):
 
 def fetch_audio(url, download_dir) -> Iterable[DownloadInfo]:
     cmd = ['yt-dlp',
+           '--ignore-config',
            '-x',
-           '--audio-format', 'mp3',
            '-f', 'ba',
            '--no-download-archive',
            url,
            '-o', '%(id)s.%(ext)s',
            '--print', 'after_move:filepath',
            '--write-info-json']
+    if current_app.piju_config.cookies_file:
+        cmd += ['--cookies', current_app.piju_config.cookies_file]
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True, cwd=download_dir)
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as ex:
+        logging.debug('ytdlp failed:\nstdout:%s\nstderr:%s\n', ex.stdout, ex.stderr)
         return []
     local_files = result.stdout.splitlines()
     all_download_info = []
