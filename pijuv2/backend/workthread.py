@@ -41,12 +41,15 @@ class WorkerThread(threading.Thread):
 
                         case WorkRequests.FETCH_FROM_YOUTUBE:
                             url = request[1]
-                            download_dir = request[2]
-                            self.set_current_status(f'Fetching {url} to {download_dir}')
-                            local_files = fetch_audio(url=url, download_dir=download_dir)
+                            download_info = self.app.download_history.get_info(url)
+                            if (not download_info) or (not all(dl.filepath.is_file() for dl in download_info)):
+                                download_dir = request[2]
+                                self.set_current_status(f'Fetching {url} to {download_dir}')
+                                download_info = fetch_audio(url=url, download_dir=download_dir)
+                                self.app.download_history.set_info(url, download_info)
                             callback = request[3]
                             if callback:
-                                callback(self.app, url, local_files)
+                                callback(self.app, download_info)
 
                         case WorkRequests.DELETE_EMPTY_GENRES:
                             self.set_current_status('Deleting genres without albums/playlists')

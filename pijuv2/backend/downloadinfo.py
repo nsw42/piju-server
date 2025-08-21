@@ -1,12 +1,16 @@
-from collections import namedtuple
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Union
 
 
-DownloadInfo = namedtuple('DownloadInfo', 'filepath, artist, title, artwork, url, fake_trackid')
-# filepath: Path
-# artist: str
-# title: str
+@dataclass
+class DownloadInfo:
+    filepath: Path
+    artist: str
+    title: str
+    artwork: str  # link to the artwork, not the artwork itself
+    url: str
+    fake_trackid: int
 
 
 class DownloadInfoDatabase:
@@ -28,7 +32,7 @@ class DownloadInfoDatabase:
     def add_download_info(self, fakeid: int, download_info: DownloadInfo):
         self._id_to_download_info[fakeid] = download_info
 
-    def get_download_info(self, fakeid: int) -> DownloadInfo:
+    def get_download_info(self, fakeid: int) -> DownloadInfo | None:
         return self._id_to_download_info.get(fakeid)
 
 

@@ -25,23 +25,23 @@ def add_track_to_queue(track: Track):
     current_app.current_player.add_to_queue(track.Filepath, track.Id, track.Artist, track.Title, artwork_uri)
 
 
-def play_downloaded_files(app, url, download_info: Iterable[DownloadInfo]):
+def play_downloaded_files(app, download_info: Iterable[DownloadInfo]):
     """
     A callback after an audio URL has been downloaded - executed within the
     context of WorkerThread, so cannot rely on accessing current_app
     """
     select_player(app, app.file_player)
     app.current_player.clear_queue()
-    queue_downloaded_files(app, url, download_info)
+    queue_downloaded_files(app, download_info)
 
 
-def queue_downloaded_files(app, url, download_info: Iterable[DownloadInfo]):
+def queue_downloaded_files(app, download_info: Iterable[DownloadInfo]):
     """
     A callback after an audio URL has been downloaded - executed within the
     context of WorkerThread, so cannot rely on accessing current_app
     """
     select_player(app, app.file_player)
-    app.download_history.set_info(url, download_info)
+
     for one_download in download_info:
         app.current_player.add_to_queue(str(one_download.filepath),
                                         one_download.fake_trackid,
@@ -90,7 +90,7 @@ def update_player_play_album(db: Database, albumid: int, trackid: int, disk_nr: 
         return (track.VolumeNumber if track.VolumeNumber else 0,
                 track.TrackNumber if track.TrackNumber else 0)
 
-    tracks = list(sorted(album.Tracks, key=track_sort_order))
+    tracks = sorted(album.Tracks, key=track_sort_order)
     if disk_nr is not None:
         tracks = [track for track in tracks if track.VolumeNumber == disk_nr]
     update_player_play_track_list(tracks, url_for(RouteConstants.GET_ALBUM, albumid=albumid), trackid)

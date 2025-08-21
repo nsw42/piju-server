@@ -1,7 +1,6 @@
 import json
 import logging
 from pathlib import Path
-from typing import Iterable
 import subprocess
 
 from flask import current_app
@@ -18,7 +17,7 @@ def select_thumbnail(thumbnails):
     return best_thumbnail['url'] if best_thumbnail else None
 
 
-def fetch_audio(url, download_dir) -> Iterable[DownloadInfo]:
+def fetch_audio(url, download_dir) -> list[DownloadInfo]:
     cmd = ['yt-dlp',
            '--ignore-config',
            '-x',
