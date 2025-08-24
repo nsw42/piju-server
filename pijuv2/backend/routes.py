@@ -183,7 +183,7 @@ def _get_artist_various_artists(artist: str, track_info: InformationLevel):
 def _get_artist_real_artist(artist: str, include_aliases: bool, exact: bool, track_info: InformationLevel):
     with DatabaseAccess() as db:
         aliases = db.get_artist_aliases(artist) if include_aliases else []
-        albums: Dict[int, Album] = {}  # use a dictionary to avoid duplicates if using both inexact searching and aliases
+        albums: Dict[int, Album] = {}  # avoid duplicates if using both inexact searching and aliases
         for lookup_artist in [artist] + aliases:
             artist_albums = db.get_artist(lookup_artist, substring=not exact)
             albums.update((album.Id, album) for album in artist_albums)
