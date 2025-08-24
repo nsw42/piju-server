@@ -8,7 +8,7 @@ class DownloadInfo:
     filepath: Path
     artist: str
     title: str
-    artwork: str  # link to the artwork, not the artwork itself
+    artwork: str | None  # link to the artwork, not the artwork itself
     url: str
     fake_trackid: int
 
