@@ -10,7 +10,10 @@ from .common import find_coverart_file, get_artwork_size, make_artwork_ref, pars
 logger = logging.getLogger(__name__)
 
 
-def scan_m4a(absolute_path: Path) -> Tuple[Track, Album, Optional[Artwork]]:
+def scan_m4a(absolute_path: Path) -> Tuple[Track | None, Album | None, Artwork | None]:
+    """
+    Album is None only if Track is also None
+    """
     logging.debug(f"Scanning M4A: {absolute_path}")
     mp4 = mutagen.mp4.MP4(absolute_path)
     if not mp4.tags:

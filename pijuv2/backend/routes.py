@@ -6,21 +6,22 @@ import mimetypes
 import os.path
 from pathlib import Path
 import time
-from typing import List
+from typing import Any, Dict, List
 
-from flask import Blueprint, current_app, jsonify, make_response, request, Response
+from flask import Blueprint, jsonify, make_response, request, Response
 from flask_sock import Sock
 from werkzeug.exceptions import BadRequest, BadRequestKeyError, Conflict, InternalServerError, NotFound
 
 from ..database.database import DatabaseAccess, NotFoundException
-from ..database.schema import Playlist
+from ..database.schema import Album, Playlist
+from .appwrapper import current_piju_app
 from .downloadinfo import DownloadInfoDatabaseSingleton
 from .deserialize import build_playlist_from_api_data, build_radio_station_from_api_data, extract_id, parse_bool
 from .nowplaying import get_current_status
 from .playerctrl import add_track_to_queue, queue_downloaded_files, select_player
 from .playerctrl import update_player_play_from_local, update_player_play_from_radio, update_player_play_from_youtube
 from .playerctrl import update_player_streaming_prevnext
-from .routeconsts import RouteConstants, url_for
+from .routeconsts import RouteConstants
 from .serialize import json_genre, json_playlist, json_track_or_file
 from .serialize import InformationLevel
 from .serialize import json_album, json_radio_station, json_track
@@ -91,13 +92,13 @@ def get_all_albums():
     with DatabaseAccess() as db:
         rtn = []
         for album in db.get_all_albums():
-            rtn.append(json_album(album, include_tracks=InformationLevel.NoInfo))
+            rtn.append(json_album(album, include_tracks=InformationLevel.NO_INFO))
         return gzippable_jsonify(rtn)
 
 
 @routes.get(RouteConstants.GET_ALBUM)
 def get_album(albumid):
-    track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
+    track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.LINKS)
     with DatabaseAccess() as db:
         try:
             album = db.get_album_by_id(albumid)
@@ -158,7 +159,7 @@ def delete_artist_aliases(artist):
 
 @routes.get(RouteConstants.GET_ARTIST)
 def get_artist(artist):
-    track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
+    track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.LINKS)
     include_aliases = parse_bool(request.args.get('aliases', 'True'))
     exact = parse_bool(request.args.get('exact', 'True'))
     if artist.lower() == 'various artists':
@@ -182,7 +183,7 @@ def _get_artist_various_artists(artist: str, track_info: InformationLevel):
 def _get_artist_real_artist(artist: str, include_aliases: bool, exact: bool, track_info: InformationLevel):
     with DatabaseAccess() as db:
         aliases = db.get_artist_aliases(artist) if include_aliases else []
-        albums = {}  # use a dictionary to avoid duplicates if using both inexact searching and aliases
+        albums: Dict[int, Album] = {}  # use a dictionary to avoid duplicates if using both inexact searching and aliases
         for lookup_artist in [artist] + aliases:
             artist_albums = db.get_artist(lookup_artist, substring=not exact)
             albums.update((album.Id, album) for album in artist_albums)
@@ -238,7 +239,7 @@ def get_artwork_info(artworkid):
         rtn = {
             "width": artwork.Width,
             "height": artwork.Height,
-            "image": url_for(RouteConstants.GET_ARTWORK, artworkid=artworkid) if has_artwork else None,
+            "image": RouteConstants.url_for_get_artwork(artworkid) if has_artwork else None,
         }
         return gzippable_jsonify(rtn)
 
@@ -246,8 +247,8 @@ def get_artwork_info(artworkid):
 @routes.get("/downloadhistory")
 def get_download_history():
     rtn = []
-    for url in current_app.download_history.entries:
-        files = current_app.download_history.get_info(url)
+    for url in current_piju_app.download_history.entries:
+        files = current_piju_app.download_history.get_info(url)
         if files:
             # reverse the playlist so most recent is first in the list
             for download_info in reversed(files):
@@ -268,8 +269,8 @@ def get_all_genres():
         rtn = []
         for genre in db.get_all_genres():
             rtn.append(json_genre(genre,
-                                  include_albums=InformationLevel.NoInfo,
-                                  include_playlists=InformationLevel.NoInfo))
+                                  include_albums=InformationLevel.NO_INFO,
+                                  include_playlists=InformationLevel.NO_INFO))
         return gzippable_jsonify(rtn)
 
 
@@ -303,8 +304,8 @@ def get_mp3(trackid):
 
 @routes.post("/player/next")
 def update_player_next():
-    if current_app.current_player == current_app.file_player:
-        current_app.current_player.next()
+    if current_piju_app.current_player == current_piju_app.file_player:
+        current_piju_app.current_player.next()
     else:
         update_player_streaming_prevnext(1)
     return ('', HTTPStatus.NO_CONTENT)
@@ -312,7 +313,7 @@ def update_player_next():
 
 @routes.post("/player/pause")
 def update_player_pause():
-    current_app.current_player.pause()
+    current_piju_app.current_player.pause()
     return ('', HTTPStatus.NO_CONTENT)
 
 
@@ -366,8 +367,8 @@ def update_player_play():
 
 @routes.post("/player/previous")
 def update_player_prev():
-    if current_app.current_player == current_app.file_player:
-        current_app.current_player.prev()
+    if current_piju_app.current_player == current_piju_app.file_player:
+        current_piju_app.current_player.prev()
     else:
         update_player_streaming_prevnext(-1)
     return ('', HTTPStatus.NO_CONTENT)
@@ -382,21 +383,21 @@ def update_player_resume():
         except (AttributeError, KeyError):
             player_type = None
         if player_type == "radio":
-            desired_player = current_app.stream_player
+            desired_player = current_piju_app.stream_player
         elif player_type == "local":
-            desired_player = current_app.file_player
+            desired_player = current_piju_app.file_player
         else:
             raise BadRequest('Request data must be a json object, containing a player key with value radio or local')
-        was_playing = select_player(current_app, desired_player)
+        was_playing = select_player(current_piju_app, desired_player)
         if was_playing:
             time.sleep(1)
-    current_app.current_player.resume()
+    current_piju_app.current_player.resume()
     return ('', HTTPStatus.NO_CONTENT)
 
 
 @routes.post("/player/stop")
 def update_player_stop():
-    current_app.current_player.stop()
+    current_piju_app.current_player.stop()
     return ('', HTTPStatus.NO_CONTENT)
 
 
@@ -407,7 +408,7 @@ def volume_options():
 
 @routes.get("/player/volume", provide_automatic_options=False)
 def player_get_volume():
-    return {"volume": current_app.current_player.current_volume}
+    return {"volume": current_piju_app.current_player.current_volume}
 
 
 @routes.post("/player/volume", provide_automatic_options=False)
@@ -418,7 +419,7 @@ def player_set_volume():
     try:
         volume = data.get('volume')
         volume = int(volume)
-        for player in (current_app.file_player, current_app.stream_player):
+        for player in (current_piju_app.file_player, current_piju_app.stream_player):
             player.set_volume(volume)
         return ('', HTTPStatus.NO_CONTENT)
     except (AttributeError, KeyError, ValueError) as exc:
@@ -427,8 +428,8 @@ def player_set_volume():
 
 @routes.get("/playlists/")
 def get_playlists():
-    genre_info = InformationLevel.from_string(request.args.get('genres', ''), InformationLevel.NoInfo)
-    tracks_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.NoInfo)
+    genre_info = InformationLevel.from_string(request.args.get('genres', ''), InformationLevel.NO_INFO)
+    tracks_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.NO_INFO)
     with DatabaseAccess() as db:
         rtn = []
         for playlist in db.get_all_playlists():
@@ -456,8 +457,8 @@ def delete_playlist(playlistid):
 
 @routes.get(RouteConstants.GET_ONE_PLAYLIST)
 def get_one_playlist(playlistid):
-    genre_info = InformationLevel.from_string(request.args.get('genres', ''), InformationLevel.NoInfo)
-    track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.Links)
+    genre_info = InformationLevel.from_string(request.args.get('genres', ''), InformationLevel.NO_INFO)
+    track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.LINKS)
     with DatabaseAccess() as db:
         try:
             playlist = db.get_playlist_by_id(playlistid)
@@ -476,7 +477,7 @@ def edit_playlist(playlistid):
 
 @routes.delete("/queue/", provide_automatic_options=False)
 def queue_delete():
-    if current_app.current_player != current_app.file_player:
+    if current_piju_app.current_player != current_piju_app.file_player:
         raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
     data = request.get_json()
     if not data:
@@ -488,7 +489,7 @@ def queue_delete():
         raise BadRequestKeyError() from exc
     except ValueError as exc:
         raise BadRequest() from exc
-    if not current_app.current_player.remove_from_queue(index, trackid):
+    if not current_piju_app.current_player.remove_from_queue(index, trackid):
         # index or trackid mismatch
         raise BadRequest('Track id did not match at given index')
     return ('', HTTPStatus.NO_CONTENT)
@@ -496,11 +497,11 @@ def queue_delete():
 
 @routes.get("/queue/", provide_automatic_options=False)
 def queue_get():
-    if current_app.current_player != current_app.file_player:
+    if current_piju_app.current_player != current_piju_app.file_player:
         raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
     with DatabaseAccess() as db:
         queue_data = [json_track_or_file(db, queued_track) for
-                      queued_track in current_app.current_player.visible_queue]
+                      queued_track in current_piju_app.current_player.visible_queue]
     return gzippable_jsonify(queue_data)
 
 
@@ -509,8 +510,8 @@ def queue_options():
     # the request to add to queue looks like a cross-domain request to Chrome,
     # so it sends OPTIONS before the PUT. Hence we need to support this.
 
-    if current_app.current_player != current_app.file_player:
-        select_player(current_app, current_app.file_player)
+    if current_piju_app.current_player != current_piju_app.file_player:
+        select_player(current_piju_app, current_piju_app.file_player)
 
     return make_options_response(['DELETE', 'GET', 'OPTIONS', 'PUT'])
 
@@ -521,8 +522,8 @@ def queue_put():
     if not data:
         raise BadRequest()
 
-    if current_app.current_player != current_app.file_player:
-        select_player(current_app, current_app.file_player)
+    if current_piju_app.current_player != current_piju_app.file_player:
+        select_player(current_piju_app, current_piju_app.file_player)
 
     # there are five different possibilities here:
     #   album: albumid  disk: disknr  # add the tracks from the given disk to queue
@@ -558,7 +559,7 @@ def queue_put_album(albumid: int, disknr: int | None):
         tracks.sort(key=lambda track: (track.VolumeNumber, track.TrackNumber))
         for track in tracks:
             add_track_to_queue(track)
-        current_app.update_now_playing()
+        current_piju_app.update_now_playing()
     return ('', HTTPStatus.NO_CONTENT)
 
 
@@ -568,20 +569,20 @@ def queue_put_track(trackid: int):
             add_track_to_queue(db.get_track_by_id(trackid))
         except NotFoundException as exc:
             raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
-    current_app.update_now_playing()
+    current_piju_app.update_now_playing()
     return ('', HTTPStatus.NO_CONTENT)
 
 
 def queue_put_youtube(youtubeurl: str):
-    current_app.download_history.add(youtubeurl)
-    current_app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE,
-                                youtubeurl,
-                                current_app.piju_config.download_dir,
-                                queue_downloaded_files))
+    current_piju_app.download_history.add(youtubeurl)
+    current_piju_app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE,
+                                    youtubeurl,
+                                    current_piju_app.piju_config.download_dir,
+                                    queue_downloaded_files))
     return ('', HTTPStatus.NO_CONTENT)
 
 
-def queue_put_reorder(new_queue_order: List[any]):
+def queue_put_reorder(new_queue_order: List[Any]):
     new_queue = []
     with DatabaseAccess() as db:
         try:
@@ -595,8 +596,8 @@ def queue_put_reorder(new_queue_order: List[any]):
             raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
         except ValueError as exc:
             raise BadRequest("Unrecognised track id") from exc
-        current_app.current_player.set_queue(new_queue, "/queue/")
-    current_app.update_now_playing()
+        current_piju_app.current_player.set_queue(new_queue, "/queue/")
+    current_piju_app.update_now_playing()
     return ('', HTTPStatus.NO_CONTENT)
 
 
@@ -655,8 +656,8 @@ def delete_one_radio_station(stationid):
 
 @routes.get(RouteConstants.GET_ONE_RADIO_STATION)
 def get_one_radio_station(stationid):
-    infolevel = InformationLevel.from_string(request.args.get('urls', ''), InformationLevel.Links)
-    include_urls = (infolevel in (InformationLevel.AllInfo, InformationLevel.DebugInfo))
+    infolevel = InformationLevel.from_string(request.args.get('urls', ''), InformationLevel.LINKS)
+    include_urls = (infolevel in (InformationLevel.ALL_INFO, InformationLevel.DEBUG_INFO))
     with DatabaseAccess() as db:
         try:
             station = db.get_radio_station_by_id(stationid)
@@ -679,18 +680,18 @@ def start_scan():
     if data is None:
         raise BadRequest()
     subdir = data.get('dir')
-    scandir = os.path.join(current_app.piju_config.music_dir, subdir if subdir else '')
+    scandir = os.path.join(current_piju_app.piju_config.music_dir, subdir if subdir else '')
     if not os.path.isdir(scandir):
         raise BadRequest(f"Directory {subdir} does not exist")
-    current_app.work_queue.put((WorkRequests.SCAN_DIRECTORY, scandir))
+    current_piju_app.work_queue.put((WorkRequests.SCAN_DIRECTORY, scandir))
     return ('', HTTPStatus.NO_CONTENT)
 
 
 @routes.post("/scanner/tidy")
 def start_tidy():
-    current_app.work_queue.put((WorkRequests.DELETE_MISSING_TRACKS, ))
-    current_app.work_queue.put((WorkRequests.DELETE_ALBUMS_WITHOUT_TRACKS, ))
-    current_app.work_queue.put((WorkRequests.DELETE_EMPTY_GENRES, ))
+    current_piju_app.work_queue.put((WorkRequests.DELETE_MISSING_TRACKS, ))
+    current_piju_app.work_queue.put((WorkRequests.DELETE_ALBUMS_WITHOUT_TRACKS, ))
+    current_piju_app.work_queue.put((WorkRequests.DELETE_EMPTY_GENRES, ))
     return ('', HTTPStatus.NO_CONTENT)
 
 
@@ -704,12 +705,12 @@ def search(search_string):
         rtn = {}
         if do_search_albums:
             albums = db.search_for_albums(search_words)
-            rtn['albums'] = [json_album(album, include_tracks=InformationLevel.NoInfo) for album in albums]
+            rtn['albums'] = [json_album(album, include_tracks=InformationLevel.NO_INFO) for album in albums]
 
         if do_search_artists:
             artist_albums = db.search_for_artist(search_words)
-            artists = set(album.Artist for album in artist_albums if album.Artist)
-            rtn['artists'] = [{"name": artist, "link": url_for(RouteConstants.GET_ARTIST, artist=artist)}
+            artists = {album.Artist for album in artist_albums if album.Artist}
+            rtn['artists'] = [{"name": artist, "link": RouteConstants.url_for_get_artist(artist)}
                               for artist in artists]
         if do_search_tracks:
             tracks = db.search_for_tracks(search_words)
@@ -733,8 +734,8 @@ def get_all_tracks():
 
 @routes.get(RouteConstants.GET_TRACK)
 def get_track(trackid):
-    infolevel = InformationLevel.from_string(request.args.get('infolevel', ''), InformationLevel.AllInfo)
-    include_debuginfo = (infolevel == InformationLevel.DebugInfo)
+    infolevel = InformationLevel.from_string(request.args.get('infolevel', ''), InformationLevel.ALL_INFO)
+    include_debuginfo = (infolevel == InformationLevel.DEBUG_INFO)
     with DatabaseAccess() as db:
         try:
             track = db.get_track_by_id(trackid)
@@ -745,7 +746,8 @@ def get_track(trackid):
 
 @sock.route('/ws', routes)
 def websocket_client(ws):
-    sock.app.websocket_clients.append(ws)
+    if sock.app:
+        sock.app.websocket_clients.append(ws)
     data = get_current_status()
     ws.send(json.dumps(data))
     while True:

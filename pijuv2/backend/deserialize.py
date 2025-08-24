@@ -5,12 +5,13 @@ over-the-wire representation to an in-memory object
 
 from typing import List, Tuple
 
-from flask import current_app, request
+from flask import request
 from werkzeug.exceptions import BadRequest, NotFound
 
 from ..database.database import Database, NotFoundException
-from ..database.schema import Playlist, PlaylistEntry, RadioStation
+from ..database.schema import Playlist, PlaylistEntry, RadioStation, Track
 from ..scan.common import normalize_filepath
+from .appwrapper import current_piju_app
 
 
 def build_playlist_from_api_data(db: Database) -> Tuple[Playlist, List[str]]:
@@ -35,17 +36,17 @@ def build_playlist_from_api_data(db: Database) -> Tuple[Playlist, List[str]]:
     playlist_entries = []
     for index, track in enumerate(tracks):
         playlist_entries.append(PlaylistEntry(PlaylistIndex=index, TrackId=track.Id))
-    genres = set(track.Genre for track in tracks if track.Genre is not None)
-    genres = list(genres)
+    unique_genres = {track.Genre for track in tracks if track.Genre is not None}
+    genres = list(unique_genres)
     genres = [db.get_genre_by_id(genre) for genre in genres]
     return Playlist(Title=title, Entries=playlist_entries, Genres=genres), missing
 
 
-def build_playlist_from_api_data_files(db: Database, files: List[str]):
+def build_playlist_from_api_data_files(db: Database, files: List[str]) -> Tuple[List[Track], List[str]]:
     tracks = []
     missing = []
     for filepath in files:
-        fullpath = current_app.piju_config.music_dir / filepath
+        fullpath = current_piju_app.piju_config.music_dir / filepath
         track = db.get_track_by_filepath(normalize_filepath(fullpath))
         if track:
             tracks.append(track)
@@ -55,15 +56,14 @@ def build_playlist_from_api_data_files(db: Database, files: List[str]):
     return tracks, missing
 
 
-def build_playlist_from_api_data_trackids(db: Database, trackids: List[int]):
-    missing = []
+def build_playlist_from_api_data_trackids(db: Database, trackids: List[int | None]) -> Tuple[List[Track], List[str]]:
     if None in trackids:
         raise BadRequest("Invalid track reference")
     try:
-        tracks = [db.get_track_by_id(trackid) for trackid in trackids]
+        tracks = [db.get_track_by_id(trackid) for trackid in trackids if trackid]
     except NotFoundException as exc:
         raise NotFound("Unknown track id") from exc
-    return tracks, missing
+    return tracks, []
 
 
 def build_radio_station_from_api_data() -> RadioStation:

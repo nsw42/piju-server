@@ -3,7 +3,6 @@ from datetime import datetime
 import io
 import logging
 import pathlib
-from typing import Optional, Union
 import unicodedata
 
 from PIL import Image, UnidentifiedImageError
@@ -25,16 +24,16 @@ def parse_datetime_str(datestr: str):
         yyyymmdd, hhmmss = datestr, ''
     # step 2: parse yyyy-mm-dd
     if '-' in yyyymmdd:
-        yyyymmdd = yyyymmdd.split('-')
+        yyyymmdd_l_str = yyyymmdd.split('-')
     else:
-        yyyymmdd = [yyyymmdd]
-    while len(yyyymmdd) < 3:
-        yyyymmdd.append('')
-    if len(yyyymmdd) > 3:
+        yyyymmdd_l_str = [yyyymmdd]
+    while len(yyyymmdd_l_str) < 3:
+        yyyymmdd_l_str.append('')
+    if len(yyyymmdd_l_str) > 3:
         raise ValueError(f'malformed date: {datestr}')
-    if not all(field == '' or field.isdigit() for field in yyyymmdd):
+    if not all(field == '' or field.isdigit() for field in yyyymmdd_l_str):
         raise ValueError(f'malformed date: {datestr}')
-    yyyymmdd = [1 if (field == '') else int(field) for field in yyyymmdd]
+    yyyymmdd_l_int = [1 if (field == '') else int(field) for field in yyyymmdd_l_str]
     # step 3: parse hh:mm:ss[TZ]
     if hhmmss and not any(c.isdigit() for c in hhmmss):
         raise ValueError(f'malformed date: {datestr}')
@@ -45,31 +44,32 @@ def parse_datetime_str(datestr: str):
     while hhmmss and not hhmmss[-1].isdigit():
         hhmmss = hhmmss[:-1]
     if ':' in hhmmss:
-        hhmmss = hhmmss.split(':')
+        hhmmss_l_str = hhmmss.split(':')
     else:
-        hhmmss = [hhmmss]
-    while len(hhmmss) < 3:
-        hhmmss.append('')
-    if len(hhmmss) > 3:
+        hhmmss_l_str = [hhmmss]
+    while len(hhmmss_l_str) < 3:
+        hhmmss_l_str.append('')
+    if len(hhmmss_l_str) > 3:
         raise ValueError(f'malformed date: {datestr}')
     if not all(field == '' or field.isdigit() for field in hhmmss):
         raise ValueError(f'malformed date: {datestr}')
-    hhmmss = [0 if (field == '') else int(field) for field in hhmmss]
+    hhmmss_l_int = [0 if (field == '') else int(field) for field in hhmmss_l_str]
     # recombine and construct a datetime
-    dtvalues = yyyymmdd + hhmmss
+    dtvalues = yyyymmdd_l_int + hhmmss_l_int
     return datetime(*dtvalues)
 
 
-def find_coverart_file(music_absolutepath: pathlib.Path):
+def find_coverart_file(music_absolutepath: pathlib.Path) -> pathlib.Path | None:
     directory = music_absolutepath.parent
     for leaf in 'cover.jpg', 'cover.png', 'cover.webp':
         artwork_path = directory / leaf
         if artwork_path.is_file():
-            return str(artwork_path)
+            return artwork_path
     return None
 
 
-def get_artwork_size(artwork_path: pathlib.Path, artwork_blob: bytes) -> Optional[ArtworkSize]:
+def get_artwork_size(artwork_path: pathlib.Path | None,
+                     artwork_blob: bytes | None) -> ArtworkSize | None:
     try:
         if artwork_path:
             img = Image.open(artwork_path)
@@ -84,10 +84,12 @@ def get_artwork_size(artwork_path: pathlib.Path, artwork_blob: bytes) -> Optiona
     return ArtworkSize(img.width, img.height)
 
 
-def make_artwork_ref(artwork_path: str, artwork_blob: bytes, artwork_size: Optional[ArtworkSize]):
+def make_artwork_ref(artwork_path: str | pathlib.Path,
+                     artwork_blob: bytes | None,
+                     artwork_size: ArtworkSize | None):
     if artwork_path or artwork_blob:
         return Artwork(
-            Path=artwork_path,
+            Path=str(artwork_path),
             Blob=artwork_blob,
             Width=artwork_size.width if artwork_size else None,
             Height=artwork_size.height if artwork_size else None,
@@ -96,7 +98,7 @@ def make_artwork_ref(artwork_path: str, artwork_blob: bytes, artwork_size: Optio
         return None
 
 
-def normalize_filepath(path: Union[pathlib.Path, str]) -> str:
+def normalize_filepath(path: pathlib.Path | str) -> str:
     if not isinstance(path, str):
         path = str(path)
 

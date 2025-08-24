@@ -1,16 +1,17 @@
 import hashlib
 import logging
-from typing import Any, Callable, Iterable, List, Optional
+from typing import Any, Callable, Iterable, List, Optional, Sequence, TYPE_CHECKING
 
 from flask_sqlalchemy import SQLAlchemy
 
 from sqlalchemy import func, select, or_
 from sqlalchemy.sql.expression import true
-from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
+from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 
 from .schema import Base, Album, ArtistAlias, Artwork, Genre, Playlist, RadioStation, Track
 
-func: Callable  # fixes false positives from pylint
+if not TYPE_CHECKING:
+    func: Callable  # fixes false positives from pylint
 
 
 class PijuDatabaseException(Exception):
@@ -104,9 +105,9 @@ class Database():
     def delete_artist_aliases(self, artist: str) -> List[str]:
         # Returns the list of alternative names that had been set for the artist
         alias_obj = self._get_artist_alias_object(artist)
-        alternatives = list(alias_obj.AlternativeNames)
         if not alias_obj:
             raise NotFoundException()
+        alternatives = list(alias_obj.AlternativeNames)
         Database.db.session.delete(alias_obj)
         Database.db.session.commit()
         return alternatives
@@ -130,7 +131,7 @@ class Database():
         Database.db.session.refresh(station)
         return station
 
-    def get_all_radio_stations(self) -> List[RadioStation]:
+    def get_all_radio_stations(self) -> Sequence[RadioStation]:
         result = Database.db.session.execute(select(RadioStation).order_by(RadioStation.SortOrder))
         return result.scalars().all()
 
@@ -313,6 +314,7 @@ class Database():
 
             logging.debug(f"ensure_track_exists: track already existed: {trackref.Filepath}")
             track = res.first()
+            assert track
         else:
             # we know we're updating a track
             track = self.get_track_by_id(trackref.Id)
@@ -346,41 +348,41 @@ class Database():
         """
         return self.get_x_by_id(Artwork, artworkid)
 
-    def get_albums_without_tracks(self) -> List[Album]:
+    def get_albums_without_tracks(self) -> Sequence[Album]:
         """
         Return a list of Album objects where the album contains no Tracks
         """
         return Database.db.session.query(Album).filter(~Album.Tracks.any()).all()
 
-    def get_all_albums(self) -> List[Album]:
+    def get_all_albums(self) -> Sequence[Album]:
         """
         Primarily for debugging
         """
         result = Database.db.session.execute(select(Album).order_by(Album.Artist, Album.Title))
         return result.scalars().all()
 
-    def get_all_artworks(self) -> List[Artwork]:
+    def get_all_artworks(self) -> Sequence[Artwork]:
         """
         Primarily for debugging
         """
         result = Database.db.session.execute(select(Artwork).order_by(Artwork.Id))
         return result.scalars().all()
 
-    def get_all_genres(self) -> List[Genre]:
+    def get_all_genres(self) -> Sequence[Genre]:
         """
         Primarily for debugging
         """
         result = Database.db.session.execute(select(Genre).order_by(Genre.Name))
         return result.scalars().all()
 
-    def get_all_playlists(self) -> List[Playlist]:
+    def get_all_playlists(self) -> Sequence[Playlist]:
         """
         Primarily for debugging
         """
         result = Database.db.session.execute(select(Playlist).order_by(Playlist.Title))
         return result.scalars().all()
 
-    def get_all_tracks(self, limit=None) -> List[Track]:
+    def get_all_tracks(self, limit=None) -> Sequence[Track]:
         """
         Primarily for debugging
         """
@@ -389,7 +391,7 @@ class Database():
             query = query.limit(limit)
         return query.all()
 
-    def get_all_tracks_paged(self, start_id, limit) -> Optional[List[Track]]:
+    def get_all_tracks_paged(self, start_id, limit) -> Optional[Sequence[Track]]:
         """
         Calling get_all_tracks() can exceed available memory.
         get_all_tracks_paged() therefore allows stepping through all tracks in bite-size chunks.
@@ -415,7 +417,7 @@ class Database():
             return []
         return result
 
-    def get_artist(self, search_string: str, substring: bool, limit=100) -> List[Album]:
+    def get_artist(self, search_string: str, substring: bool, limit=100) -> Sequence[Album]:
         """
         Return a list of Album objects where the artist
         matches the given name.
@@ -432,7 +434,7 @@ class Database():
                 .limit(limit)
                 .all())
 
-    def get_compilations(self, limit=100) -> List[Album]:
+    def get_compilations(self, limit=100) -> Sequence[Album]:
         """
         Return a list of Album objects where the IsCompilation flag is set to True
         """
@@ -444,7 +446,7 @@ class Database():
         )
         return result.scalars().all()
 
-    def get_empty_genres(self) -> List[Genre]:
+    def get_empty_genres(self) -> Sequence[Genre]:
         """
         Return a list of Genre objects that contain neither albums nor playlists
         """
@@ -487,7 +489,7 @@ class Database():
         """
         return self.get_x_by_id(Track, trackid)
 
-    def get_track_by_filepath(self, path: str) -> Track:
+    def get_track_by_filepath(self, path: str) -> Track | None:
         """
         Return the Track object for a given file path,
         or None if there is no match in the database.

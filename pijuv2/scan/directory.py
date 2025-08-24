@@ -1,5 +1,4 @@
 import pathlib
-from typing import Optional
 
 from ..database.database import Database
 from ..database.schema import Album, Artwork, Track
@@ -9,7 +8,10 @@ from .mp3 import scan_mp3
 
 
 # TODO: This is starting to feel like it belongs in the database class
-def set_cross_refs(db: Database, track: Track, albumref: Album, artworkref: Optional[Artwork]):
+def set_cross_refs(db: Database,
+                   track: Track,
+                   albumref: Album,
+                   artworkref: Artwork | None):
     album = db.ensure_album_exists(albumref)
     track.Album = album.Id
     editing_track = (track.Id is not None)
@@ -39,7 +41,9 @@ def set_cross_refs(db: Database, track: Track, albumref: Album, artworkref: Opti
             album.Genres.append(genre)
 
 
-def scan_directory(basedir: pathlib.Path, db: Database, limit: int = None):
+def scan_directory(basedir: pathlib.Path,
+                   db: Database,
+                   limit: int | None = None):
     count = 0
     for (pattern, scanner) in [('*.mp3', scan_mp3),
                                ('*.m4a', scan_m4a)]:
@@ -49,6 +53,7 @@ def scan_directory(basedir: pathlib.Path, db: Database, limit: int = None):
             if track:
                 if existing_track is not None:
                     track.Id = existing_track.Id
+                assert albumref
                 set_cross_refs(db, track, albumref, artworkref)
             count += 1
             if (limit is not None) and (count >= limit):

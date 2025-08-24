@@ -1,7 +1,6 @@
 import json
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, LargeBinary, String, Table
-from sqlalchemy import event
-from sqlalchemy.orm import DeclarativeBase, relationship, Session
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, LargeBinary, String, Table, event
+from sqlalchemy.orm import DeclarativeBase, mapped_column, relationship, Session
 
 # IMPORTANT: If changing the schema, be sure to create the alembic revision to support the migration of data
 # Run:
@@ -26,10 +25,10 @@ class PlaylistEntry(Base):
     "A single item in a playlist"
     __tablename__ = 'playlist_to_track'
 
-    Id = Column(Integer, primary_key=True)
-    PlaylistId = Column(ForeignKey('Playlists.Id'))
-    TrackId = Column(ForeignKey('Tracks.Id'))
-    PlaylistIndex = Column(Integer)
+    Id = mapped_column(Integer, primary_key=True)
+    PlaylistId = mapped_column(ForeignKey('Playlists.Id'))
+    TrackId = mapped_column(ForeignKey('Tracks.Id'))
+    PlaylistIndex = mapped_column(Integer)
     Track = relationship("Track")
 
 
@@ -37,8 +36,8 @@ class Genre(Base):
     "A collection of albums and playlists that contain items of the same genre"
     __tablename__ = 'Genres'
 
-    Id = Column(Integer, primary_key=True)
-    Name = Column(String)
+    Id = mapped_column(Integer, primary_key=True)
+    Name = mapped_column(String)
     Albums = relationship("Album",
                           secondary=album_genre_association_table,
                           back_populates="Genres")
@@ -51,14 +50,14 @@ class Album(Base):
     "A collection of tracks released by an artist"
     __tablename__ = 'Albums'
 
-    Id = Column(Integer, primary_key=True)
-    Artist = Column(String)
-    Title = Column(String)
-    VolumeCount = Column(Integer)
-    MusicBrainzAlbumId = Column(String)
-    MusicBrainzAlbumArtistId = Column(String)
-    ReleaseYear = Column(Integer)
-    IsCompilation = Column(Boolean)
+    Id = mapped_column(Integer, primary_key=True)
+    Artist = mapped_column(String)
+    Title = mapped_column(String)
+    VolumeCount = mapped_column(Integer)
+    MusicBrainzAlbumId = mapped_column(String)
+    MusicBrainzAlbumArtistId = mapped_column(String)
+    ReleaseYear = mapped_column(Integer)
+    IsCompilation = mapped_column(Boolean)
     Tracks = relationship("Track")
     Genres = relationship("Genre",
                           secondary=album_genre_association_table,
@@ -69,8 +68,8 @@ class ArtistAlias(Base):
     "A list of alternative names by which an artist may be known"
     __tablename__ = 'ArtistAliases'
 
-    Artist = Column(String, primary_key=True)
-    _AlternativeNames = Column(String, default='[]')
+    Artist = mapped_column(String, primary_key=True)
+    _AlternativeNames = mapped_column(String, default='[]')
 
     @property
     def AlternativeNames(self):
@@ -85,8 +84,8 @@ class Playlist(Base):
     "A custom collection of tracks"
     __tablename__ = 'Playlists'
 
-    Id = Column(Integer, primary_key=True)
-    Title = Column(String)
+    Id = mapped_column(Integer, primary_key=True)
+    Title = mapped_column(String)
     Entries = relationship("PlaylistEntry",
                            order_by=PlaylistEntry.__table__.c.PlaylistIndex)
     Genres = relationship("Genre",
@@ -98,48 +97,48 @@ class RadioStation(Base):
     "A streaming radio station"
     __tablename__ = 'RadioStations'
 
-    Id = Column(Integer, primary_key=True)
-    Name = Column(String)
-    Url = Column(String)
-    ArtworkUrl = Column(String)
-    NowPlayingUrl = Column(String)
-    NowPlayingJq = Column(String)
-    NowPlayingArtworkUrl = Column(String)
-    NowPlayingArtworkJq = Column(String)
-    SortOrder = Column(Integer)
+    Id = mapped_column(Integer, primary_key=True)
+    Name = mapped_column(String)
+    Url = mapped_column(String)
+    ArtworkUrl = mapped_column(String)
+    NowPlayingUrl = mapped_column(String)
+    NowPlayingJq = mapped_column(String)
+    NowPlayingArtworkUrl = mapped_column(String)
+    NowPlayingArtworkJq = mapped_column(String)
+    SortOrder = mapped_column(Integer)
 
 
 class Track(Base):
     "A single track"
     __tablename__ = 'Tracks'
 
-    Id = Column(Integer, primary_key=True)
-    Filepath = Column(String)
-    Title = Column(String)
-    Duration = Column(Integer)
-    Composer = Column(String)
-    Artist = Column(String)
-    Genre = Column(Integer, ForeignKey("Genres.Id"))
-    VolumeNumber = Column(Integer)
-    TrackCount = Column(Integer)
-    TrackNumber = Column(Integer)
-    ReleaseDate = Column(DateTime)
-    MusicBrainzTrackId = Column(String)
-    MusicBrainzArtistId = Column(String)
-    Album = Column(Integer, ForeignKey("Albums.Id"))
-    Artwork = Column(Integer, ForeignKey("Artwork.Id"))
+    Id = mapped_column(Integer, primary_key=True)
+    Filepath = mapped_column(String)
+    Title = mapped_column(String)
+    Duration = mapped_column(Integer)
+    Composer = mapped_column(String)
+    Artist = mapped_column(String)
+    Genre = mapped_column(Integer, ForeignKey("Genres.Id"))
+    VolumeNumber = mapped_column(Integer)
+    TrackCount = mapped_column(Integer)
+    TrackNumber = mapped_column(Integer)
+    ReleaseDate = mapped_column(DateTime)
+    MusicBrainzTrackId = mapped_column(String)
+    MusicBrainzArtistId = mapped_column(String)
+    Album = mapped_column(Integer, ForeignKey("Albums.Id"))
+    Artwork = mapped_column(Integer, ForeignKey("Artwork.Id"))
     ArtworkObject = relationship("Artwork", back_populates="Tracks")
 
 
 class Artwork(Base):
     __tablename__ = 'Artwork'
 
-    Id = Column(Integer, primary_key=True)
-    Path = Column(String)  # either this or the next will be populated
-    Blob = Column(LargeBinary)
-    BlobHash = Column(String)
-    Width = Column(Integer)
-    Height = Column(Integer)
+    Id = mapped_column(Integer, primary_key=True)
+    Path = mapped_column(String)  # either this or the next will be populated
+    Blob = mapped_column(LargeBinary)
+    BlobHash = mapped_column(String)
+    Width = mapped_column(Integer)
+    Height = mapped_column(Integer)
     Tracks = relationship("Track", back_populates="ArtworkObject", cascade="all, delete")
 
 
