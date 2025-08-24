@@ -567,9 +567,9 @@ class Database():
                 else:
                     score += 1
             return score
-        tracks = [(score_track(track), track) for track in tracks]
-        tracks.sort(key=lambda s_t: s_t[0], reverse=True)  # best matches (== biggest score) at the top
-        return [track for (score, track) in tracks][:return_limit]
+        scored_tracks = [(score_track(track), track) for track in tracks]
+        scored_tracks.sort(key=lambda s_t: s_t[0], reverse=True)  # best matches (== biggest score) at the top
+        return [track for (_, track) in scored_tracks][:return_limit]
 
 
 class DatabaseAccess:
