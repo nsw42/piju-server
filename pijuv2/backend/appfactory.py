@@ -23,7 +23,7 @@ class PijuApp(Flask):
         Database.init_db(self, db_path, create_db)
         config_file = Path(os.environ.get('PIJU_CONFIG', Config.Defaults.FILEPATH))
         if not config_file.is_file():
-            raise Exception(f"Config file {config_file} not found")
+            raise FileNotFoundError(f"Config file {config_file} not found")
         self.piju_config = Config(config_file)
         self.work_queue = Queue()
         self.worker = WorkerThread(self, self.work_queue)
@@ -48,7 +48,7 @@ class PijuApp(Flask):
         context_manager = nullcontext if has_app_context() else self.app_context
         with context_manager():
             data = json.dumps(get_current_status())
-            for ws in list(self.websocket_clients):
+            for ws in self.websocket_clients[:]:
                 try:
                     ws.send(data)
                 except ConnectionClosed:
