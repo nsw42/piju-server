@@ -1,8 +1,8 @@
-from collections import namedtuple
+from dataclasses import dataclass
 import logging
 import os.path
 import time
-from typing import List, Union
+from typing import Iterable, List
 
 from .mp3player import MP3MusicPlayer
 from .mpvmusicplayer import MPVMusicPlayer
@@ -12,28 +12,31 @@ from ..backend.downloadinfo import DownloadInfo
 from ..database.schema import Track
 
 
-QueuedTrack = namedtuple('QueuedTrack', 'filepath, trackid, artist, title, artwork')
-# filepath: str
-# trackid: int - negative for YouTube files; non-negative for Tracks from the database
-# artist: str
-# title: str
-# artwork: str - only for YouTube files (and even then may be unknown); is always None for Tracks from the database
+@dataclass(frozen=True)
+class QueuedTrack:
+    filepath: str
+    trackid: int  # negative for YouTube files; non-negative for Tracks from the database
+    artist: str
+    title: str
+    artwork: str | None
 
 
 class FilePlayer(PlayerInterface):
-    def __init__(self, queue: List[Track] = None, identifier: str = ''):
+    def __init__(self,
+                 queue: List[Track] | None = None,
+                 identifier: str = ''):
         super().__init__()
-        self.queue = []  # list of QueuedTrack
+        self.queue: List[QueuedTrack] = []
         self.current_tracklist_identifier = identifier
-        self.current_player = None
+        self.current_player: MP3MusicPlayer | MPVMusicPlayer | None = None
         self.set_queue(queue, identifier)
 
     @property
-    def current_track(self) -> QueuedTrack:
+    def current_track(self) -> QueuedTrack | None:
         return None if self.current_track_index is None else self.queue[self.current_track_index]
 
     @property
-    def number_of_tracks(self) -> int:
+    def number_of_tracks(self) -> int | None:
         return len(self.queue) if self.queue else None
 
     @property
@@ -85,7 +88,9 @@ class FilePlayer(PlayerInterface):
         self.queue = []  # list of QueuedTrack
         self.current_track_index = None
 
-    def set_queue(self, new_queue: List[Union[DownloadInfo, Track]], identifier: str, start_playing: bool = True):
+    def set_queue(self,
+                  new_queue: Iterable[DownloadInfo | Track] | None,
+                  identifier: str, start_playing: bool = True):
         if new_queue:
             currently_playing = None if (self.current_track_index is None) else self.queue[self.current_track_index]
             self.queue = []
@@ -110,7 +115,7 @@ class FilePlayer(PlayerInterface):
             self.clear_queue()
         self.current_tracklist_identifier = identifier
 
-    def add_to_queue(self, filepath: str, track_id: int, artist: str, title: str, artwork_uri: str):
+    def add_to_queue(self, filepath: str, track_id: int, artist: str, title: str, artwork_uri: str | None):
         self.queue.append(QueuedTrack(filepath, track_id, artist, title, artwork_uri))
         self.current_tracklist_identifier = "/queue/"
         # If this is the first item in the queue, start playing
@@ -138,7 +143,9 @@ class FilePlayer(PlayerInterface):
             return True
         return False
 
-    def play_from_apparent_queue_index(self, index, trackid: int = None):
+    def play_from_apparent_queue_index(self,
+                                       index,
+                                       trackid: int | None = None):
         """
         Play from the *apparent* queue index, which is not necessarily the same as the real
         queue index. The real queue index is the list of files, eg tracks of an album.
@@ -148,7 +155,9 @@ class FilePlayer(PlayerInterface):
             index += self.current_track_index
         return self.play_from_real_queue_index(index, trackid)
 
-    def play_from_real_queue_index(self, index, trackid: int = None):
+    def play_from_real_queue_index(self,
+                                   index,
+                                   trackid: int | None = None):
         """
         Play from the given index
         trackid, if given, acts as a sanity check that the desired track is going to be played.

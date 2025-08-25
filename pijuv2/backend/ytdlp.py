@@ -3,8 +3,7 @@ import logging
 from pathlib import Path
 import subprocess
 
-from flask import current_app
-
+from .appwrapper import current_piju_app
 from .downloadinfo import DownloadInfo, DownloadInfoDatabaseSingleton
 
 
@@ -27,8 +26,8 @@ def fetch_audio(url, download_dir) -> list[DownloadInfo]:
            '-o', '%(id)s.%(ext)s',
            '--print', 'after_move:filepath',
            '--write-info-json']
-    if current_app.piju_config.cookies_file:
-        cmd += ['--cookies', current_app.piju_config.cookies_file]
+    if current_piju_app.piju_config.cookies_file:
+        cmd += ['--cookies', current_piju_app.piju_config.cookies_file]
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True, cwd=download_dir)
     except subprocess.CalledProcessError as ex:

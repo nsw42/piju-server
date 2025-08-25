@@ -2,16 +2,17 @@
 Player control functionality for the backend: an API-aware wrapper around ..player.*
 """
 
-from typing import Iterable, Optional
+from typing import Iterable, Optional, cast
 
-from flask import current_app
 from werkzeug.exceptions import BadRequest, Conflict, NotFound
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
 from ..database.schema import Track
 from ..player.playerinterface import CurrentStatusStrings
+from ..player.streamplayer import StreamPlayer
+from .appwrapper import current_piju_app
 from .downloadinfo import DownloadInfo
-from .routeconsts import RouteConstants, url_for
+from .routeconsts import RouteConstants
 from .workrequests import WorkRequests
 
 
@@ -21,8 +22,8 @@ def add_track_to_queue(track: Track):
     is a queueing-capable player (ie the file_player)
     """
     has_artwork = bool(track.Artwork)
-    artwork_uri = url_for(RouteConstants.GET_ARTWORK, artworkid=track.Artwork) if has_artwork else None
-    current_app.current_player.add_to_queue(track.Filepath, track.Id, track.Artist, track.Title, artwork_uri)
+    artwork_uri = RouteConstants.url_for_get_artwork(track.Artwork) if has_artwork else None
+    current_piju_app.current_player.add_to_queue(track.Filepath, track.Id, track.Artist, track.Title, artwork_uri)
 
 
 def play_downloaded_files(app, download_info: Iterable[DownloadInfo]):
@@ -47,7 +48,7 @@ def queue_downloaded_files(app, download_info: Iterable[DownloadInfo]):
                                         one_download.fake_trackid,
                                         one_download.artist, one_download.title,
                                         one_download.artwork)
-    current_app.update_now_playing()
+    current_piju_app.update_now_playing()
 
 
 def select_player(app, desired_player) -> bool:
@@ -66,7 +67,7 @@ def select_player(app, desired_player) -> bool:
     return was_playing
 
 
-def update_player_play_track_list(tracks: Iterable[Track], identifier: str, start_at_track_id: int):
+def update_player_play_track_list(tracks: Iterable[Track], identifier: str, start_at_track_id: int | None):
     if start_at_track_id is None:
         play_from_index = 0
     else:
@@ -75,12 +76,12 @@ def update_player_play_track_list(tracks: Iterable[Track], identifier: str, star
             play_from_index = track_ids.index(start_at_track_id)
         except ValueError as exc:
             raise BadRequest("Requested track is not in the specified album") from exc
-    select_player(current_app, current_app.file_player)
-    current_app.current_player.set_queue(tracks, identifier, start_playing=False)
-    current_app.current_player.play_from_real_queue_index(play_from_index)
+    select_player(current_piju_app, current_piju_app.file_player)
+    current_piju_app.current_player.set_queue(tracks, identifier, start_playing=False)
+    current_piju_app.current_player.play_from_real_queue_index(play_from_index)
 
 
-def update_player_play_album(db: Database, albumid: int, trackid: int, disk_nr: Optional[int]):
+def update_player_play_album(db: Database, albumid: int, trackid: int | None, disk_nr: Optional[int]):
     try:
         album = db.get_album_by_id(albumid)
     except NotFoundException as exc:
@@ -93,16 +94,16 @@ def update_player_play_album(db: Database, albumid: int, trackid: int, disk_nr: 
     tracks = sorted(album.Tracks, key=track_sort_order)
     if disk_nr is not None:
         tracks = [track for track in tracks if track.VolumeNumber == disk_nr]
-    update_player_play_track_list(tracks, url_for(RouteConstants.GET_ALBUM, albumid=albumid), trackid)
+    update_player_play_track_list(tracks, RouteConstants.url_for_get_album(albumid), trackid)
 
 
 def update_player_play_from_local(db: Database,
-                                  albumid: int,
-                                  playlistid: int,
-                                  queue_pos: int,
-                                  trackid: int,
+                                  albumid: int | None,
+                                  playlistid: int | None,
+                                  queue_pos: int | None,
+                                  trackid: int | None,
                                   disk_nr: Optional[int]):
-    select_player(current_app, current_app.file_player)
+    select_player(current_piju_app, current_piju_app.file_player)
 
     if albumid is not None:
         update_player_play_album(db, albumid, trackid, disk_nr)
@@ -122,7 +123,7 @@ def update_player_play_from_local(db: Database,
 
 def update_player_play_from_queue(queue_pos, trackid):
     # update_player_play has already ensured we're set up for file playback
-    if not current_app.current_player.play_from_apparent_queue_index(queue_pos, trackid=trackid):
+    if not current_piju_app.current_player.play_from_apparent_queue_index(queue_pos, trackid=trackid):
         raise Conflict("Track index not found")
 
 
@@ -132,23 +133,25 @@ def update_player_play_from_radio(db: Database, stationid: int):
     if index == -1:
         raise NotFound("Requested station id not found")
     station = stations[index]
-    select_player(current_app, current_app.stream_player)
-    current_app.current_player.play(station.Name, station.Url, station.ArtworkUrl,
-                                    index, len(stations),
-                                    station.NowPlayingUrl, station.NowPlayingJq,
-                                    station.NowPlayingArtworkUrl, station.NowPlayingArtworkJq)
+    select_player(current_piju_app, current_piju_app.stream_player)
+    stream_player = cast(StreamPlayer, current_piju_app.current_player)
+    stream_player.play(station.Name, station.Url, station.ArtworkUrl,
+                       index, len(stations),
+                       station.NowPlayingUrl, station.NowPlayingJq,
+                       station.NowPlayingArtworkUrl, station.NowPlayingArtworkJq)
 
 
 def update_player_play_from_youtube(url):
-    current_app.download_history.add(url)
-    current_app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE,
-                                url,
-                                current_app.piju_config.download_dir,
-                                play_downloaded_files))
+    current_piju_app.download_history.add(url)
+    current_piju_app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE,
+                                    url,
+                                    current_piju_app.piju_config.download_dir,
+                                    play_downloaded_files))
 
 
 def update_player_streaming_prevnext(delta):
-    current_url = current_app.current_player.currently_playing_url
+    stream_player = cast(StreamPlayer, current_piju_app.current_player)
+    current_url = stream_player.currently_playing_url
     with DatabaseAccess() as db:
         stations = db.get_all_radio_stations()
         current_index = next((i for i, station in enumerate(stations) if station.Url == current_url), -1)
@@ -156,10 +159,10 @@ def update_player_streaming_prevnext(delta):
             new_index = current_index + delta
             if 0 <= new_index < len(stations):
                 new_station = stations[new_index]
-                current_app.current_player.play(new_station.Name, new_station.Url, new_station.ArtworkUrl,
-                                                new_index, len(stations),
-                                                new_station.NowPlayingUrl, new_station.NowPlayingJq,
-                                                new_station.NowPlayingArtworkUrl, new_station.NowPlayingArtworkJq)
+                stream_player.play(new_station.Name, new_station.Url, new_station.ArtworkUrl,
+                                   new_index, len(stations),
+                                   new_station.NowPlayingUrl, new_station.NowPlayingJq,
+                                   new_station.NowPlayingArtworkUrl, new_station.NowPlayingArtworkJq)
 
 
 def update_player_play_playlist(db: Database, playlistid, trackid):
@@ -168,7 +171,7 @@ def update_player_play_playlist(db: Database, playlistid, trackid):
     except NotFoundException as exc:
         raise NotFound("Unknown playlist id") from exc
     update_player_play_track_list([entry.Track for entry in playlist.Entries],
-                                  url_for(RouteConstants.GET_ONE_PLAYLIST, playlistid=playlistid),
+                                  RouteConstants.url_for_get_one_playlist(playlistid),
                                   trackid)
 
 
@@ -178,5 +181,5 @@ def update_player_play_track(db: Database, trackid):
         track = db.get_track_by_id(trackid)
     except NotFoundException as exc:
         raise NotFound("Unknown track id") from exc
-    current_app.current_player.clear_queue()
+    current_piju_app.current_player.clear_queue()
     add_track_to_queue(track)
