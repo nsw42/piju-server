@@ -9,15 +9,15 @@ from .mp3 import scan_mp3
 
 # TODO: This is starting to feel like it belongs in the database class
 def set_cross_refs(db: Database,
-                   track: Track,
+                   trackref: Track,
                    albumref: Album,
                    artworkref: Artwork | None):
     album = db.ensure_album_exists(albumref)
-    track.Album = album.Id
-    editing_track = (track.Id is not None)
+    trackref.Album = album.Id
+    editing_track = (trackref.Id is not None)
     artwork = db.ensure_artwork_exists(artworkref) if artworkref else None
-    track.Artwork = artwork.Id if artwork else None
-    track = db.ensure_track_exists(track)
+    trackref.Artwork = artwork.Id if artwork else None
+    track = db.ensure_track_exists(trackref)
     # ensure_track_exists() ensures that track.Genre is either None or a genre id
     previous_album_id = track.Album
     # setting track.Album automatically creates the back-reference in album.Tracks,
@@ -28,7 +28,7 @@ def set_cross_refs(db: Database,
     # Similarly, it's possible to end up with empty albums, if all tracks for an
     # album change in the same way.
     if editing_track:
-        genre_ids = set([track.Genre for track in album.Tracks])
+        genre_ids = {track.Genre for track in album.Tracks}
         genres = [db.get_genre_by_id(genreid) for genreid in genre_ids if genreid]
         album.Genres = genres
         if (previous_album_id is not None) and (previous_album_id != album.Id):

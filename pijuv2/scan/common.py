@@ -109,12 +109,12 @@ def get_artwork_size(artwork_path: pathlib.Path | None,
     return ArtworkSize(img.width, img.height)
 
 
-def make_artwork_ref(artwork_path: str | pathlib.Path,
+def make_artwork_ref(artwork_path: str | pathlib.Path | None,
                      artwork_blob: bytes | None,
                      artwork_size: ArtworkSize | None):
     if artwork_path or artwork_blob:
         return Artwork(
-            Path=str(artwork_path),
+            Path=str(artwork_path) if artwork_path else None,
             Blob=artwork_blob,
             Width=artwork_size.width if artwork_size else None,
             Height=artwork_size.height if artwork_size else None,
