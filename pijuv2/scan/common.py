@@ -58,7 +58,7 @@ def parse_datetime_str__hhmmss(datestr: str, hhmmss: str) -> list[int]:
         hhmmss_l_str.append('')
     if len(hhmmss_l_str) > 3:
         raise ValueError(f'malformed date: {datestr}')
-    if not all(field == '' or field.isdigit() for field in hhmmss):
+    if not all(field == '' or field.isdigit() for field in hhmmss_l_str):
         raise ValueError(f'malformed date: {datestr}')
     hhmmss_l_int = [0 if (field == '') else int(field) for field in hhmmss_l_str]
     return hhmmss_l_int
@@ -67,6 +67,11 @@ def parse_datetime_str__hhmmss(datestr: str, hhmmss: str) -> list[int]:
 def parse_datetime_str(datestr: str):
     # Previously tried dateutil.parser, but if given '1994' it would return
     # a datetime equal to datetime.date.today(), with the year changed to 1994.
+    '''
+    Note that repr(datetime) doesn't include the seconds if they're zero
+    >>> parse_datetime_str('2014-06-09T07:00:00Z')
+    datetime.datetime(2014, 6, 9, 7, 0)
+    '''
 
     yyyymmdd, hhmmss = parse_datetime_str__split_yyyymmdd_hhmmss(datestr)  # split yyyy-mm-dd from hh:mm:ss
 
