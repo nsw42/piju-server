@@ -3,6 +3,7 @@ from datetime import datetime
 import io
 import logging
 import pathlib
+from typing import Tuple
 import unicodedata
 
 from PIL import Image, UnidentifiedImageError
@@ -12,17 +13,19 @@ from ..database.schema import Artwork
 ArtworkSize = namedtuple('ArtworkSize', 'width height')
 
 
-def parse_datetime_str(datestr: str):
-    # Previously tried dateutil.parser, but if given '1994' it would return
-    # a datetime equal to datetime.date.today(), with the year changed to 1994.
-    # step 1: split yyyy-mm-dd from hh:mm:ss
+def parse_datetime_str__split_yyyymmdd_hhmmss(datestr: str) -> Tuple[str, str]:
+    "Given a datestring, split it into its yyyymmdd and hhmmss constituents"
     if 'T' in datestr:
         yyyymmdd, hhmmss = datestr.split('T', 1)
     elif ' ' in datestr:
         yyyymmdd, hhmmss = datestr.split(' ', 1)
     else:
         yyyymmdd, hhmmss = datestr, ''
-    # step 2: parse yyyy-mm-dd
+    return yyyymmdd, hhmmss
+
+
+def parse_datetime_str__yyyymmdd(datestr: str, yyyymmdd: str) -> list[int]:
+    "Given the yyyymmdd from a datestring, split it into a list of ints"
     if '-' in yyyymmdd:
         yyyymmdd_l_str = yyyymmdd.split('-')
     else:
@@ -34,7 +37,11 @@ def parse_datetime_str(datestr: str):
     if not all(field == '' or field.isdigit() for field in yyyymmdd_l_str):
         raise ValueError(f'malformed date: {datestr}')
     yyyymmdd_l_int = [1 if (field == '') else int(field) for field in yyyymmdd_l_str]
-    # step 3: parse hh:mm:ss[TZ]
+    return yyyymmdd_l_int
+
+
+def parse_datetime_str__hhmmss(datestr: str, hhmmss: str) -> list[int]:
+    "Given the hhmmss from a datestring, split it into a list of ints"
     if hhmmss and not any(c.isdigit() for c in hhmmss):
         raise ValueError(f'malformed date: {datestr}')
     if '+' in hhmmss:
@@ -54,9 +61,22 @@ def parse_datetime_str(datestr: str):
     if not all(field == '' or field.isdigit() for field in hhmmss):
         raise ValueError(f'malformed date: {datestr}')
     hhmmss_l_int = [0 if (field == '') else int(field) for field in hhmmss_l_str]
+    return hhmmss_l_int
+
+
+def parse_datetime_str(datestr: str):
+    # Previously tried dateutil.parser, but if given '1994' it would return
+    # a datetime equal to datetime.date.today(), with the year changed to 1994.
+
+    yyyymmdd, hhmmss = parse_datetime_str__split_yyyymmdd_hhmmss(datestr)  # split yyyy-mm-dd from hh:mm:ss
+
+    yyyymmdd_l_int = parse_datetime_str__yyyymmdd(datestr, yyyymmdd)  # parse yyyy-mm-dd
+
+    hhmmss_l_int = parse_datetime_str__hhmmss(datestr, hhmmss)  # parse hh:mm:ss[TZ]
+
     # recombine and construct a datetime
     dtvalues = yyyymmdd_l_int + hhmmss_l_int
-    return datetime(*dtvalues)
+    return datetime(*dtvalues)  # type: ignore
 
 
 def find_coverart_file(music_absolutepath: pathlib.Path) -> pathlib.Path | None:
