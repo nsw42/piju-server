@@ -6,7 +6,7 @@ an over-the-wire representation
 import enum
 from functools import lru_cache
 import os.path
-from typing import Callable
+from typing import overload
 
 from .routeconsts import RouteConstants
 from ..database.database import Database
@@ -20,7 +20,15 @@ class InformationLevel(enum.Enum):
     ALL_INFO = 2
     DEBUG_INFO = 3  # All Info plus information that's not normally exposed via the API (eg file paths)
 
-    from_string: Callable[[str, 'InformationLevel'], 'InformationLevel']
+    @overload
+    @staticmethod
+    def from_string(info: str) -> 'InformationLevel':  # type: ignore
+        ...
+
+    @overload
+    @staticmethod
+    def from_string(info: str, default: 'InformationLevel') -> 'InformationLevel':
+        ...
 
 
 def information_level_from_string(info: str,
