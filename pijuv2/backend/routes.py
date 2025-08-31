@@ -208,7 +208,7 @@ def get_artwork(artworkid):
             mime = mimetypes.types_map.get(path.suffix)
             if mime is None:
                 mime = mimetypes.common_types.get(path.suffix)
-            with open(artwork.Path, 'rb') as handle:
+            with path.open('rb') as handle:
                 data = handle.read()
 
             return Response(data, headers={'Cache-Control': 'max-age=300'}, mimetype=mime)
