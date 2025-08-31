@@ -4,6 +4,7 @@ from sqlalchemy.orm import DeclarativeBase, mapped_column, relationship, Session
 
 # IMPORTANT: If changing the schema, be sure to create the alembic revision to support the migration of data
 # Run:
+#   $ cd pijuv2/database
 #   $ DB_FILE=file.db alembic revision -m "One line description of change" --autogenerate
 
 
@@ -113,7 +114,7 @@ class Track(Base):
     __tablename__ = 'Tracks'
 
     Id = mapped_column(Integer, primary_key=True)
-    Filepath = mapped_column(String)
+    Filepath = mapped_column(String, index=True)
     Title = mapped_column(String)
     Duration = mapped_column(Integer)
     Composer = mapped_column(String)
