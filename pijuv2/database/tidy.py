@@ -16,7 +16,7 @@ def delete_missing_tracks(db: Database):
                 to_delete.append(track.Id)
         start_id += query_size
     for track_id in to_delete:
-        logging.debug(f"Deleting {track_id}")
+        logging.debug(f"Deleting track {track_id}")
         db.delete_track(track_id)
 
 
@@ -25,10 +25,19 @@ def delete_albums_without_tracks(db: Database):
     # There are optimisations possible, taking advantage of pushing the query into the db and avoiding the iteration,
     # but this is quick enough
     for album in to_delete:
+        logging.debug(f'Deleting album {album.Id}')
         db.delete_album(album.Id)
+
+
+def delete_artwork_without_tracks(db: Database):
+    to_delete = db.get_artwork_without_tracks()
+    for artwork in to_delete:
+        logging.debug(f'Deleting artwork {artwork.Id}')
+        db.delete_artwork(artwork.Id)
 
 
 def delete_empty_genres(db: Database):
     to_delete = db.get_empty_genres()
     for genre in to_delete:
+        logging.debug(f'Deleting genre {genre.Id}')
         db.delete_genre(genre.Id)

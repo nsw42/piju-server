@@ -171,6 +171,11 @@ class Database():
         Database.db.session.delete(album)
         Database.db.session.commit()
 
+    def delete_artwork(self, artworkid: int):
+        artwork = self.get_artwork_by_id(artworkid)  # raises NotFoundException if necessary
+        Database.db.session.delete(artwork)
+        Database.db.session.commit()
+
     def delete_genre(self, genreid: int):
         genre = self.get_genre_by_id(genreid)  # raises NotFoundException if necessary
         Database.db.session.delete(genre)
@@ -433,6 +438,13 @@ class Database():
                 .order_by(Album.Artist)
                 .limit(limit)
                 .all())
+
+    def get_artwork_without_tracks(self) -> Sequence[Artwork]:
+        """
+        Return a list of Artwork objects where the artwork is not referenced by
+        any tracks
+        """
+        return Database.db.session.query(Artwork).filter(~Artwork.Tracks.any()).all()
 
     def get_compilations(self, limit=100) -> Sequence[Album]:
         """

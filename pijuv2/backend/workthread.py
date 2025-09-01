@@ -4,7 +4,10 @@ from queue import Queue
 import threading
 
 from ..database.database import DatabaseAccess
-from ..database.tidy import delete_missing_tracks, delete_albums_without_tracks, delete_empty_genres
+from ..database.tidy import (delete_albums_without_tracks,
+                             delete_artwork_without_tracks,
+                             delete_empty_genres,
+                             delete_missing_tracks)
 from ..scan.directory import scan_directory
 from .workrequests import WorkRequests
 from .ytdlp import fetch_audio
@@ -38,6 +41,10 @@ class WorkerThread(threading.Thread):
                         case WorkRequests.DELETE_ALBUMS_WITHOUT_TRACKS:
                             self.set_current_status('Deleting albums without tracks')
                             delete_albums_without_tracks(db)
+
+                        case WorkRequests.DELETE_ARTWORK_WITHOUT_TRACKS:
+                            self.set_current_status('Deleting artwork without tracks')
+                            delete_artwork_without_tracks(db)
 
                         case WorkRequests.FETCH_FROM_YOUTUBE:
                             url = request[1]

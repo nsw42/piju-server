@@ -692,6 +692,7 @@ def start_tidy():
     current_piju_app.work_queue.put((WorkRequests.DELETE_MISSING_TRACKS, ))
     current_piju_app.work_queue.put((WorkRequests.DELETE_ALBUMS_WITHOUT_TRACKS, ))
     current_piju_app.work_queue.put((WorkRequests.DELETE_EMPTY_GENRES, ))
+    current_piju_app.work_queue.put((WorkRequests.DELETE_ARTWORK_WITHOUT_TRACKS, ))
     return ('', HTTPStatus.NO_CONTENT)
 
 
