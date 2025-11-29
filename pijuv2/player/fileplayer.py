@@ -90,7 +90,8 @@ class FilePlayer(PlayerInterface):
 
     def set_queue(self,
                   new_queue: Iterable[DownloadInfo | Track] | None,
-                  identifier: str, start_playing: bool = True):
+                  identifier: str | None,
+                  start_playing: bool = True):
         if new_queue:
             currently_playing = None if (self.current_track_index is None) else self.queue[self.current_track_index]
             self.queue = []
