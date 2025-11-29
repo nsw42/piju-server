@@ -96,7 +96,7 @@ def get_all_albums():
         return gzippable_jsonify(rtn)
 
 
-@routes.get(RouteConstants.GET_ALBUM)
+@routes.get(RouteConstants.ONE_ALBUM)
 def get_album(albumid):
     track_info = InformationLevel.from_string(request.args.get('tracks', ''), InformationLevel.LINKS)
     with DatabaseAccess() as db:
@@ -107,7 +107,7 @@ def get_album(albumid):
         return gzippable_jsonify(json_album(album, include_tracks=track_info))
 
 
-@routes.put("/albums/<albumid>")
+@routes.put(RouteConstants.ONE_ALBUM)
 def edit_album(albumid):
     data = request.get_json()
     if not data:

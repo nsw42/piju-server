@@ -13,7 +13,7 @@ from .appwrapper import current_piju_app
 
 
 class RouteConstants:
-    GET_ALBUM = '/albums/<albumid>'
+    ONE_ALBUM = '/albums/<albumid>'
     GET_ARTIST = '/artists/<path:artist>'  # Pretend artist is a full-path, so we correctly handle bands like 'AC/DC'
     GET_ARTWORK = '/artwork/<artworkid>'
     GET_ARTWORK_INFO = '/artworkinfo/<artworkid>'
@@ -33,7 +33,7 @@ class RouteConstants:
 
     @staticmethod
     def url_for_get_album(albumid):
-        return RouteConstants.url_for(RouteConstants.GET_ALBUM, albumid=albumid)
+        return RouteConstants.url_for(RouteConstants.ONE_ALBUM, albumid=albumid)
 
     @staticmethod
     def url_for_get_artist(artist):
