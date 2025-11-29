@@ -200,6 +200,8 @@ class FilePlayer(PlayerInterface):
             self.clear_queue()
 
     def prev(self):
+        if self.current_track_index is None:
+            return
         self.play_from_real_queue_index(max(0, self.current_track_index - 1))
 
     # Wrapper over the lower-layer interface
