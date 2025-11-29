@@ -10,17 +10,18 @@ import urllib.parse
 from flask import abort, Blueprint, Flask, has_app_context, redirect, request
 from flask_sock import Sock, ConnectionClosed
 import requests
+from werkzeug.exceptions import BadRequest, BadRequestKeyError, Conflict, ServiceUnavailable
 
 from pijuv2.backend.routeconsts import RouteConstants
 
 from ..backend.downloadinfo import DownloadInfo
 from ..backend.deserialize import extract_id
-from ..backend.routes import gzippable_jsonify, make_options_response
+from ..backend.routes import gzippable_jsonify, make_options_response, ERR_MSG_NO_QUEUE_WHEN_STREAMING
 from ..player.fileplayer import FilePlayer
 from ..player.streamplayer import StreamPlayer
 
 
-APP_NOT_INIT_ERROR = "App not initialised"
+ERR_MSG_APP_NOT_INITIALISED = "App not initialised"
 
 REQUEST_TIMEOUT = 300  # timeout, in seconds, for requests.get()
 
@@ -36,21 +37,13 @@ class ReplicaApp(Flask):
         self.stream_player = StreamPlayer()
         self.current_player = self.file_player
         self.api_version_string = '7.0'
-        self.current_track_info = None  # a cache of http://primary/tracks/trackid
-        self.current_track_id = None  # id for current_track_info
+        self.track_info: dict[int, dict] = {}  # map track_id to track info json
         self.websocket_clients = []
 
         def state_change_callback():
             self.update_now_playing()
         self.file_player.set_state_change_callback(state_change_callback)
         self.stream_player.set_state_change_callback(state_change_callback)
-
-    def fetch_track_info(self, trackid):
-        response = requests.get(f'{self.primary}/tracks/{trackid}', timeout=REQUEST_TIMEOUT)
-        if not response.ok:
-            return None
-        self.current_track_id = trackid
-        self.current_track_info = response.json()
 
     def update_now_playing(self):
         context_manager = nullcontext if has_app_context() else self.app_context
@@ -86,7 +79,7 @@ def add_security_headers(resp):
 @routes.route("/")
 def current_status():
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
     rtn = get_current_status()
 
     return gzippable_jsonify(rtn)
@@ -106,11 +99,8 @@ def get_current_status():
     if c_p == app.file_player:
         rtn['CurrentTracklistUri'] = c_p.current_tracklist_identifier
         if c_p.current_track:
-            if c_p.current_track.trackid != app.current_track_id:
-                app.fetch_track_info(c_p.current_track.trackid)
-
-            rtn['CurrentTrack'] = app.current_track_info
-            rtn['CurrentArtwork'] = app.current_track_info['artwork'] if app.current_track_info else None
+            rtn['CurrentTrack'] = app.track_info[c_p.current_track.trackid]
+            rtn['CurrentArtwork'] = app.track_info[c_p.current_track.trackid]['artwork']
 
     return rtn
 
@@ -118,21 +108,21 @@ def get_current_status():
 @routes.get(RouteConstants.ONE_ALBUM)
 def get_album(albumid):
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
     return add_query_string_to_redirect(f'{app.primary}/albums/{albumid}')
 
 
 @routes.get(RouteConstants.GET_ARTIST)
 def get_artist(artist):
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
     return add_query_string_to_redirect(f'{app.primary}/artists/{artist}')
 
 
 @routes.get(RouteConstants.GET_ARTWORK)
 def get_artwork(artworkid):
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
     return redirect(f'{app.primary}/artwork/{artworkid}')
 
 
@@ -146,14 +136,14 @@ def cache(trackid):
 @routes.get("/genres")
 def get_all_genres():
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
     return redirect(app.primary + '/genres')
 
 
 @routes.get(RouteConstants.GET_GENRE)
 def get_genre(genreid):
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
     redirect_to = f'{app.primary}/genres/{genreid}'
     if request.query_string:
         redirect_to += '?' + request.query_string.decode('utf-8')
@@ -163,7 +153,7 @@ def get_genre(genreid):
 @routes.route("/player/next", methods=['POST'])
 def update_player_next():
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
 
     app.current_player.next()
     return ('', HTTPStatus.NO_CONTENT)
@@ -172,7 +162,7 @@ def update_player_next():
 @routes.route("/player/pause", methods=['POST'])
 def update_player_pause():
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
 
     app.current_player.pause()
     return ('', HTTPStatus.NO_CONTENT)
@@ -181,7 +171,7 @@ def update_player_pause():
 @routes.route("/player/play", methods=['POST'])
 def update_player_play():
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
 
     data = request.get_json()
     if not data:
@@ -250,6 +240,7 @@ def get_tracks_for_album(albumid: int, disk_nr: int | None) -> List[DownloadInfo
         abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
 
     tracks = response.json()['tracks']
+
     if disk_nr is not None:
         tracks = [track for track in tracks if track['disknumber'] == disk_nr]
 
@@ -279,6 +270,7 @@ def download_info_list_from_api_list_of_tracks(tracks: List[dict]) -> List[Downl
     for track in tracks:
         track_id = extract_id(track['link'])
         if track_id:
+            app.track_info[track_id] = track
             rtn.append(DownloadInfo(filepath=cache_path(track_id),
                                     artist=track['artist'],
                                     title=track['title'],
@@ -303,7 +295,7 @@ def play_track(trackid: int):
 @routes.post("/player/previous")
 def update_player_prev():
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
 
     app.current_player.prev()
     return ('', HTTPStatus.NO_CONTENT)
@@ -312,7 +304,7 @@ def update_player_prev():
 @routes.post("/player/resume")
 def update_player_resume():
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
 
     app.current_player.resume()
     return ('', HTTPStatus.NO_CONTENT)
@@ -321,7 +313,7 @@ def update_player_resume():
 @routes.post("/player/stop")
 def update_player_stop():
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
 
     app.current_player.stop()
     return ('', HTTPStatus.NO_CONTENT)
@@ -330,7 +322,7 @@ def update_player_stop():
 @routes.get("/player/volume")
 def player_get_volume():
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
 
     return {"volume": app.current_player.current_volume}
 
@@ -338,7 +330,7 @@ def player_get_volume():
 @routes.post("/player/volume")
 def player_set_volume():
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
     data = request.get_json()
     if not data:
         abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
@@ -355,18 +347,47 @@ def player_set_volume():
 @routes.get("/playlists/")
 def get_playlists():
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
     return redirect(f'{app.primary}/playlists')
 
 
 @routes.delete("/queue/", provide_automatic_options=False)
 def queue_delete():
-    abort(HTTPStatus.NOT_IMPLEMENTED, "Not yet implemented")
+    if not app:
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
+
+    if app.current_player != app.file_player:
+        raise Conflict(description=ERR_MSG_NO_QUEUE_WHEN_STREAMING)
+
+    data = request.get_json()
+    if not data:
+        raise BadRequest()
+    try:
+        index = int(data['index'])
+        trackid = int(data['track'])
+    except KeyError as exc:
+        raise BadRequestKeyError() from exc
+    except ValueError as exc:
+        raise BadRequest() from exc
+    if not app.current_player.remove_from_queue(index, trackid):
+        # index or trackid mismatch
+        raise BadRequest('Track id did not match at given index')
+    return ('', HTTPStatus.NO_CONTENT)
 
 
 @routes.get("/queue/", provide_automatic_options=False)
 def queue_get():
-    abort(HTTPStatus.NOT_IMPLEMENTED, "Not yet implemented")
+    if not app:
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
+
+    if app.current_player != app.file_player:
+        raise Conflict(description=ERR_MSG_NO_QUEUE_WHEN_STREAMING)
+
+    rtn = []
+    for track in app.current_player.visible_queue:
+        rtn.append(app.track_info[track.trackid])
+
+    return gzippable_jsonify(rtn)
 
 
 @routes.route("/queue/", methods=['OPTIONS'], provide_automatic_options=False)
@@ -374,7 +395,7 @@ def queue_options():
     # the request to add to queue looks like a cross-domain request to Chrome,
     # so it sends OPTIONS before the PUT. Hence we need to support this.
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
 
     # TODO
     # if app.current_player != app.file_player:
@@ -386,7 +407,7 @@ def queue_options():
 @routes.put("/queue/", provide_automatic_options=False)
 def queue_put():
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
     data = request.get_json()
     if not data:
         abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
@@ -450,21 +471,21 @@ def add_tracks_to_current_player_queue(tracks: List[DownloadInfo]):
 @routes.get("/radio")
 def get_readio_stations():
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
     return redirect(f'{app.primary}/radio')
 
 
 @routes.get("/search/<search_string>")
 def search(search_string):
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
     return add_query_string_to_redirect(f'{app.primary}/search/{search_string}')
 
 
 @sock.route('/ws', routes)
 def websocket_client(ws):
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
     if sock.app:
         sock.app.websocket_clients.append(ws)
     data = get_current_status()
@@ -477,7 +498,7 @@ def websocket_client(ws):
 
 def cache_path(track_id) -> Path:
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
     info = requests.get(f'{app.primary}/tracks/{track_id}', timeout=REQUEST_TIMEOUT)
     if not info.ok:
         abort(HTTPStatus.NOT_FOUND, "Unable to find info for track " + str(track_id))
@@ -491,7 +512,7 @@ def cache_path(track_id) -> Path:
 
 def ensure_cache_exists(tracks: List[DownloadInfo]):
     if not app:
-        abort(HTTPStatus.SERVICE_UNAVAILABLE, APP_NOT_INIT_ERROR)
+        raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
     for track in tracks:
         if os.path.isfile(track.filepath):
             continue
