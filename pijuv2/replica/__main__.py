@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from contextlib import nullcontext
 from http import HTTPStatus
 import json
 import os
@@ -6,8 +7,8 @@ from pathlib import Path
 from typing import List, Optional
 import urllib.parse
 
-from flask import abort, Blueprint, Flask, redirect, request
-from flask_sock import Sock
+from flask import abort, Blueprint, Flask, has_app_context, redirect, request
+from flask_sock import Sock, ConnectionClosed
 import requests
 
 from pijuv2.backend.routeconsts import RouteConstants
@@ -37,6 +38,12 @@ class ReplicaApp(Flask):
         self.api_version_string = '7.0'
         self.current_track_info = None  # a cache of http://primary/tracks/trackid
         self.current_track_id = None  # id for current_track_info
+        self.websocket_clients = []
+
+        def state_change_callback():
+            self.update_now_playing()
+        self.file_player.set_state_change_callback(state_change_callback)
+        self.stream_player.set_state_change_callback(state_change_callback)
 
     def fetch_track_info(self, trackid):
         response = requests.get(f'{self.primary}/tracks/{trackid}', timeout=REQUEST_TIMEOUT)
@@ -44,6 +51,16 @@ class ReplicaApp(Flask):
             return None
         self.current_track_id = trackid
         self.current_track_info = response.json()
+
+    def update_now_playing(self):
+        context_manager = nullcontext if has_app_context() else self.app_context
+        with context_manager():
+            data = json.dumps(get_current_status())
+            for ws in self.websocket_clients[:]:
+                try:
+                    ws.send(data)
+                except ConnectionClosed:
+                    self.websocket_clients.remove(ws)
 
 
 app: Optional[ReplicaApp] = None
@@ -526,6 +543,7 @@ def main():
     args = parse_args()
     app = ReplicaApp(args.cache_path, args.primary)
     app.register_blueprint(routes)
+    sock.init_app(app)
     app.run(use_reloader=False, host='0.0.0.0', threaded=True)
 
 
