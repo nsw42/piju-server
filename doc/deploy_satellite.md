@@ -18,7 +18,7 @@ image, so there may be unexpected gaps.
 
 ```sh
 apt-get update
-apt-get install -y git mpg123 python3 python3.12-venv
+apt-get install -y git mpg123 mpv python3 python3.12-venv
 git clone https://github.com/nsw42/piju-server.git
 cd piju-server
 python3 -m venv .venv
