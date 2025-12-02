@@ -29,9 +29,9 @@ ERR_MSG_APP_NOT_INITIALISED = "App not initialised"
 REQUEST_TIMEOUT = 300  # timeout, in seconds, for requests.get()
 
 
-# Replica App -------------------------------------------------------------------------------------
+# Satellite App -----------------------------------------------------------------------------------
 
-class ReplicaApp(Flask):
+class SatelliteApp(Flask):
     def __init__(self, resolved_cache_path: Path, primary: str):
         super().__init__(__name__)
         self.cache_path = resolved_cache_path
@@ -59,7 +59,7 @@ class ReplicaApp(Flask):
                     self.websocket_clients.remove(ws)
 
 
-app: Optional[ReplicaApp] = None
+app: Optional[SatelliteApp] = None
 
 # ROUTES ------------------------------------------------------------------------------------------
 
@@ -190,13 +190,13 @@ def update_player_play():
         disk_nr = int(disk_nr)
     youtubeurl = data.get('url')
 
-    # Valid requests (per the API, but not necessary supported in the replica app):
+    # Valid requests (per the API, but not necessary supported in the satellite app):
     #   album with at most one of track or disk number
     #   playlist with or without track
     #   queuepos with or without track
     #   track on its own
-    #   youtubeurl (with nothing else) - not yet supported in the replica app
-    #   radio (with nothing else) - not yet supported in the replica app
+    #   youtubeurl (with nothing else) - not yet supported in the satellite app
+    #   radio (with nothing else) - not yet supported in the satellite app
 
     if not any([albumid, playlistid, queue_pos, trackid, radioid, youtubeurl]):
         raise BadRequest('Something to play must be specified')
@@ -205,10 +205,10 @@ def update_player_play():
         raise BadRequest("At most one of album, playlist and queuepos may be specified")
 
     if youtubeurl:
-        raise BadRequest("Play from YouTube not yet supported in the replica app")
+        raise BadRequest("Play from YouTube not yet supported in the satellite app")
 
     if radioid:
-        raise BadRequest("Play from radio not yet supported in the replica app")
+        raise BadRequest("Play from radio not yet supported in the satellite app")
 
     if albumid is not None:
         play_album(albumid, trackid, disk_nr)
@@ -429,7 +429,7 @@ def queue_put():
         return queue_put_track(trackid)
 
     if data.get('url'):
-        raise HTTPNotImplemented("Fetching from YouTube not currently implemented in the replica player")
+        raise HTTPNotImplemented("Fetching from YouTube not currently implemented in the satellite player")
 
     if new_queue_order := data.get('queue'):
         return queue_put_reorder(new_queue_order)
@@ -546,7 +546,8 @@ def play_track_list(tracks: List[DownloadInfo], identifier: str | None, start_at
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument('-c', '--cache-path', type=Path, metavar='DIR',
-                        help="Save local cache files to DIR")
+                        help="Save local cache files to DIR"
+                             + "Default %(default)s")
     parser.add_argument('primary',
                         help="Specify the primary server's IP address and port")
     parser.set_defaults(cache_path=Path(__file__).parent.parent.parent / 'cache')
@@ -565,7 +566,7 @@ def parse_args():
 def main():
     global app
     args = parse_args()
-    app = ReplicaApp(args.cache_path, args.primary)
+    app = SatelliteApp(args.cache_path, args.primary)
     app.register_blueprint(routes)
     sock.init_app(app)
     app.run(use_reloader=False, host='0.0.0.0', threaded=True)
