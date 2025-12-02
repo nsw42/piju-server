@@ -20,7 +20,7 @@ Logged in as piju:
 git clone https://github.com/nsw42/piju-server.git
 cd piju-server
 python3 -m venv --system-site-packages .
-. bin/activate
+source bin/activate
 pip install -r requirements.txt
 ```
 
