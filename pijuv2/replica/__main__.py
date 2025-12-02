@@ -10,13 +10,16 @@ import urllib.parse
 from flask import abort, Blueprint, Flask, has_app_context, redirect, request
 from flask_sock import Sock, ConnectionClosed
 import requests
-from werkzeug.exceptions import BadRequest, BadRequestKeyError, Conflict, ServiceUnavailable
+from werkzeug.exceptions import BadRequest, BadRequestKeyError, Conflict, NotFound, ServiceUnavailable
+from werkzeug.exceptions import NotImplemented as HTTPNotImplemented
 
 from pijuv2.backend.routeconsts import RouteConstants
 
 from ..backend.downloadinfo import DownloadInfo
 from ..backend.deserialize import extract_id
-from ..backend.routes import gzippable_jsonify, make_options_response, ERR_MSG_NO_QUEUE_WHEN_STREAMING
+from ..backend.routes import (ERR_MSG_UNKNOWN_ALBUM_ID, ERR_MSG_UNKNOWN_PLAYLIST_ID, ERR_MSG_UNKNOWN_TRACK_ID,
+                              ERR_MSG_NO_DATA, ERR_MSG_NO_QUEUE_WHEN_STREAMING,
+                              gzippable_jsonify, make_options_response)
 from ..player.fileplayer import FilePlayer
 from ..player.streamplayer import StreamPlayer
 
@@ -175,7 +178,7 @@ def update_player_play():
 
     data = request.get_json()
     if not data:
-        abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
+        raise BadRequest(ERR_MSG_NO_DATA)
 
     albumid = extract_id(data.get('album'))
     playlistid = extract_id(data.get('playlist'))
@@ -196,16 +199,16 @@ def update_player_play():
     #   radio (with nothing else) - not yet supported in the replica app
 
     if not any([albumid, playlistid, queue_pos, trackid, radioid, youtubeurl]):
-        abort(HTTPStatus.BAD_REQUEST, description='Something to play must be specified')
+        raise BadRequest('Something to play must be specified')
 
     if sum(x is not None for x in [albumid, playlistid, queue_pos]) > 1:
-        abort(HTTPStatus.BAD_REQUEST, description="At most one of album, playlist and queuepos may be specified")
+        raise BadRequest("At most one of album, playlist and queuepos may be specified")
 
     if youtubeurl:
-        abort(HTTPStatus.BAD_REQUEST, description="Play from YouTube not yet supported in the replica app")
+        raise BadRequest("Play from YouTube not yet supported in the replica app")
 
     if radioid:
-        abort(HTTPStatus.BAD_REQUEST, description="Play from radio not yet supported in the replica app")
+        raise BadRequest("Play from radio not yet supported in the replica app")
 
     if albumid is not None:
         play_album(albumid, trackid, disk_nr)
@@ -216,13 +219,13 @@ def update_player_play():
     elif queue_pos is not None:
         # We're moving within the queue: the cached versions should already exist
         if not app.current_player.play_from_apparent_queue_index(queue_pos, trackid=trackid):
-            abort(HTTPStatus.CONFLICT, "Track index not found")
+            raise Conflict("Track index not found")
 
     elif trackid:
         play_track(trackid)
 
     else:
-        abort(HTTPStatus.BAD_REQUEST, description='Album, playlist or track must be specified')
+        raise BadRequest('Album, playlist or track must be specified')
 
     return ('', HTTPStatus.NO_CONTENT)
 
@@ -237,7 +240,7 @@ def get_tracks_for_album(albumid: int, disk_nr: int | None) -> List[DownloadInfo
     assert app
     response = requests.get(f'{app.primary}/albums/{albumid}?tracks=all', timeout=REQUEST_TIMEOUT)
     if not response.ok:
-        abort(HTTPStatus.NOT_FOUND, description="Unknown album id")
+        raise NotFound(ERR_MSG_UNKNOWN_ALBUM_ID)
 
     tracks = response.json()['tracks']
 
@@ -251,7 +254,7 @@ def get_tracks_for_playlist(playlistid: int) -> List[DownloadInfo]:
     assert app
     response = requests.get(f'{app.primary}/playlists/{playlistid}?tracks=all', timeout=REQUEST_TIMEOUT)
     if not response.ok:
-        abort(HTTPStatus.NOT_FOUND, description="Unknown playlist id")
+        raise NotFound(ERR_MSG_UNKNOWN_PLAYLIST_ID)
     tracks = response.json()['tracks']
     return download_info_list_from_api_list_of_tracks(tracks)
 
@@ -260,7 +263,7 @@ def get_tracks_for_single_track(trackid: int) -> List[DownloadInfo]:
     assert app
     response = requests.get(f'{app.primary}/tracks/{trackid}', timeout=REQUEST_TIMEOUT)
     if not response.ok:
-        abort(HTTPStatus.NOT_FOUND, description="Unknown track id")
+        raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID)
     return download_info_list_from_api_list_of_tracks([response.json()])
 
 
@@ -333,15 +336,15 @@ def player_set_volume():
         raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
     data = request.get_json()
     if not data:
-        abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
+        raise BadRequest(ERR_MSG_NO_DATA)
     try:
         volume = data.get('volume')
         volume = int(volume)
         for player in (app.file_player, app.stream_player):
             player.set_volume(volume)
         return ('', HTTPStatus.NO_CONTENT)
-    except (AttributeError, KeyError, ValueError):
-        abort(HTTPStatus.BAD_REQUEST, description='Volume must be specified and numeric')
+    except (AttributeError, KeyError, ValueError) as e:
+        raise BadRequest('Volume must be specified and numeric') from e
 
 
 @routes.get("/playlists/")
@@ -410,7 +413,7 @@ def queue_put():
         raise ServiceUnavailable(ERR_MSG_APP_NOT_INITIALISED)
     data = request.get_json()
     if not data:
-        abort(HTTPStatus.BAD_REQUEST, description='No data found in request')
+        raise BadRequest(ERR_MSG_NO_DATA)
 
     # there are five different possibilities here:
     #   album: albumid  disk: disknr  # add the tracks from the given disk to queue
@@ -426,12 +429,12 @@ def queue_put():
         return queue_put_track(trackid)
 
     if data.get('url'):
-        abort(HTTPStatus.NOT_IMPLEMENTED, "Fetching from YouTube not currently implemented in the replica player")
+        raise HTTPNotImplemented("Fetching from YouTube not currently implemented in the replica player")
 
     if new_queue_order := data.get('queue'):
         return queue_put_reorder(new_queue_order)
 
-    abort(HTTPStatus.BAD_REQUEST, description="No album+disk id, track id, url or new queue order specified")
+    raise BadRequest("No album+disk id, track id, url or new queue order specified")
 
 
 def queue_put_album(albumid: int, disk_nr: int | None):

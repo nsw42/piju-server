@@ -30,6 +30,7 @@ from .workrequests import WorkRequests
 routes = Blueprint('routes', __name__, url_prefix='')
 sock = Sock()
 
+ERR_MSG_NO_DATA = "No data in request"
 ERR_MSG_UNKNOWN_ALBUM_ID = 'Unknown album id'
 ERR_MSG_UNKNOWN_GENRE_ID = 'Unknown genre id'
 ERR_MSG_UNKNOWN_TRACK_ID = 'Unknown track id'
@@ -111,7 +112,7 @@ def get_album(albumid):
 def edit_album(albumid):
     data = request.get_json()
     if not data:
-        raise BadRequest()
+        raise BadRequest(ERR_MSG_NO_DATA)
     with DatabaseAccess() as db:
         try:
             album = db.get_album_by_id(albumid)
@@ -136,7 +137,7 @@ def add_artist_alias(artist):
     # The 'also known as' is in the body
     also_known_as = request.get_json()
     if (not also_known_as) or (not isinstance(also_known_as, str)):
-        raise BadRequest()
+        raise BadRequest(ERR_MSG_NO_DATA)
     with DatabaseAccess() as db:
         db.add_artist_alias(artist, also_known_as)
         # And add the reverse mapping, too
@@ -321,7 +322,7 @@ def update_player_pause():
 def update_player_play():
     data = request.get_json()
     if not data:
-        raise BadRequest()
+        raise BadRequest(ERR_MSG_NO_DATA)
     with DatabaseAccess() as db:
         albumid = extract_id(data.get('album'))
         playlistid = extract_id(data.get('playlist'))
@@ -415,7 +416,7 @@ def player_get_volume():
 def player_set_volume():
     data = request.get_json()
     if not data:
-        raise BadRequest()
+        raise BadRequest(ERR_MSG_NO_DATA)
     try:
         volume = data.get('volume')
         volume = int(volume)
@@ -481,7 +482,7 @@ def queue_delete():
         raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
     data = request.get_json()
     if not data:
-        raise BadRequest()
+        raise BadRequest(ERR_MSG_NO_DATA)
     try:
         index = int(data['index'])
         trackid = int(data['track'])
@@ -520,7 +521,7 @@ def queue_options():
 def queue_put():
     data = request.get_json()
     if not data:
-        raise BadRequest()
+        raise BadRequest(ERR_MSG_NO_DATA)
 
     if current_piju_app.current_player != current_piju_app.file_player:
         select_player(current_piju_app, current_piju_app.file_player)
@@ -678,7 +679,7 @@ def edit_radio_station(stationid):
 def start_scan():
     data = request.get_json()
     if data is None:
-        raise BadRequest()
+        raise BadRequest(ERR_MSG_NO_DATA)
     subdir = data.get('dir')
     scandir = os.path.join(current_piju_app.piju_config.music_dir, subdir if subdir else '')
     if not os.path.isdir(scandir):
