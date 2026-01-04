@@ -47,7 +47,7 @@ def scan_directory(basedir: pathlib.Path,
     count = 0
     for (pattern, scanner) in [('*.mp3', scan_mp3),
                                ('*.m4a', scan_m4a)]:
-        for path in basedir.rglob(pattern):
+        for path in basedir.rglob(pattern, recurse_symlinks=True):
             existing_track = db.get_track_by_filepath(normalize_filepath(path))
             track, albumref, artworkref = scanner(path)
             if track:
