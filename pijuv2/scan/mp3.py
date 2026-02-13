@@ -67,8 +67,10 @@ def get_tag_datetime_value(absolute_path, mp3, keys):
 
 
 def get_image_tag_value(mp3):
-    val = mp3.tags.get('APIC:')
-    return val.data if val else None
+    for tag, val in mp3.tags.items():
+        if tag.startswith('APIC:') and val:
+            return val
+    return None
 
 
 def scan_mp3(absolute_path: Path) -> Tuple[Track | None, Album | None, Artwork | None]:
