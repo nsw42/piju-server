@@ -69,7 +69,7 @@ def get_tag_datetime_value(absolute_path, mp3, keys):
 def get_image_tag_value(mp3):
     for tag, val in mp3.tags.items():
         if tag.startswith('APIC:') and val:
-            return val
+            return val.data
     return None
 
 
