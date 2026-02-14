@@ -28,7 +28,11 @@ class PlayerInterface:
     def pause(self):
         raise NotImplementedError()
 
-    def resume(self):
+    def resume(self) -> bool:
+        """
+        Returns whether the player was able to resume - e.g. a player that
+        has never been started may have nothing to resume
+        """
         raise NotImplementedError()
 
     def stop(self):

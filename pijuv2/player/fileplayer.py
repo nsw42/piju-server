@@ -200,6 +200,8 @@ class FilePlayer(PlayerInterface):
             self.clear_queue()
 
     def prev(self):
+        if self.current_track_index is None:
+            return
         self.play_from_real_queue_index(max(0, self.current_track_index - 1))
 
     # Wrapper over the lower-layer interface
@@ -213,14 +215,17 @@ class FilePlayer(PlayerInterface):
             self.current_status = CurrentStatusStrings.STOPPED
         self.send_now_playing_update()
 
-    def resume(self):
+    def resume(self) -> bool:
         logging.debug(f"FilePlayer.resume ({self.current_player})")
         if self.current_player:
             self.current_player.resume()
             self.current_status = CurrentStatusStrings.PLAYING
+            rtn = True
         else:
             self.current_status = CurrentStatusStrings.STOPPED
+            rtn = False
         self.send_now_playing_update()
+        return rtn
 
     def set_volume(self, volume: int):
         logging.debug(f"FilePlayer.set_volume {volume}")

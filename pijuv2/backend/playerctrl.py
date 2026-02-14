@@ -2,12 +2,12 @@
 Player control functionality for the backend: an API-aware wrapper around ..player.*
 """
 
-from typing import Iterable, Optional, cast
+from typing import Iterable, Optional, Sequence, cast
 
 from werkzeug.exceptions import BadRequest, Conflict, NotFound
 
 from ..database.database import Database, DatabaseAccess, NotFoundException
-from ..database.schema import Track
+from ..database.schema import RadioStation, Track
 from ..player.playerinterface import CurrentStatusStrings
 from ..player.streamplayer import StreamPlayer
 from .appwrapper import current_piju_app
@@ -132,8 +132,12 @@ def update_player_play_from_radio(db: Database, stationid: int):
     index = next((i for i, station in enumerate(stations) if station.Id == stationid), -1)
     if index == -1:
         raise NotFound("Requested station id not found")
-    station = stations[index]
     select_player(current_piju_app, current_piju_app.stream_player)
+    update_player_play_radio_station(stations, index)
+
+
+def update_player_play_radio_station(stations: Sequence[RadioStation], index: int):
+    station = stations[index]
     stream_player = cast(StreamPlayer, current_piju_app.current_player)
     stream_player.play(station.Name, station.Url, station.ArtworkUrl,
                        index, len(stations),

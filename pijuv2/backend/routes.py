@@ -18,7 +18,7 @@ from .appwrapper import current_piju_app
 from .downloadinfo import DownloadInfoDatabaseSingleton
 from .deserialize import build_playlist_from_api_data, build_radio_station_from_api_data, extract_id, parse_bool
 from .nowplaying import get_current_status
-from .playerctrl import add_track_to_queue, queue_downloaded_files, select_player
+from .playerctrl import add_track_to_queue, queue_downloaded_files, select_player, update_player_play_radio_station
 from .playerctrl import update_player_play_from_local, update_player_play_from_radio, update_player_play_from_youtube
 from .playerctrl import update_player_streaming_prevnext
 from .routeconsts import RouteConstants
@@ -391,7 +391,16 @@ def update_player_resume():
         was_playing = select_player(current_piju_app, desired_player)
         if was_playing:
             time.sleep(1)
-    current_piju_app.current_player.resume()
+    else:
+        player_type = None
+
+    now_playing = current_piju_app.current_player.resume()
+    if (not now_playing) and (player_type == "radio"):
+        # start playing the first available radio station
+        with DatabaseAccess() as db:
+            radio_stations = db.get_all_radio_stations()
+            update_player_play_radio_station(radio_stations, 0)
+
     return ('', HTTPStatus.NO_CONTENT)
 
 

@@ -213,7 +213,7 @@ class StreamPlayer(PlayerInterface):
         self.send_now_playing_update()
         self.update_now_playing_thread.state_change(self.current_status)
 
-    def resume(self):
+    def resume(self) -> bool:
         """
         Like pause(), required for interface compatibility.
         Restarts playing the last url that was played.
@@ -222,6 +222,8 @@ class StreamPlayer(PlayerInterface):
             self._play()
             self.send_now_playing_update()
             self.update_now_playing_thread.state_change(self.current_status)
+            return True
+        return False
 
     def stop(self):
         self._stop()
