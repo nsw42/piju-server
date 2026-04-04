@@ -134,11 +134,15 @@ class FilePlayer(PlayerInterface):
             index += self.current_track_index
         if 0 <= index < len(self.queue) and self.queue[index].trackid == trackid:
             self.queue.pop(index)
-            # If this is the currently playing track, jump to the next track
-            # (which might result in us stopping playing completely).
-            # But, the next track is at the same index we're already at -
-            # we've just deleted from the list
-            if index == self.current_track_index:
+            if (self.current_track_index is not None) and (self.current_track_index >= len(self.queue)):
+                # We have just deleted the last item in the queue
+                self.stop()
+                self.clear_queue()
+            elif index == self.current_track_index:
+                # We just deleted the currently playing track, so jump to the next track
+                # (which might result in us stopping playing completely).
+                # But, the next track is at the same index we're already at -
+                # we've just deleted from the list
                 self.play_from_real_queue_index(self.current_track_index)
             return True
         return False
