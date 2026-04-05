@@ -8,9 +8,10 @@ import time
 
 
 class ChildMonitorThread(threading.Thread):
-    def __init__(self, child, callback):
+    def __init__(self, child, callback, callback_arg):
         self.child = child
         self.callback = callback
+        self.callback_arg = callback_arg
         self.should_terminate = threading.Event()
         super().__init__()
 
@@ -20,7 +21,7 @@ class ChildMonitorThread(threading.Thread):
         print(f"Monitor: end detected (or terminated). Callback {'enabled' if self.callback else 'suppressed'}")
         if self.child.poll() is not None:
             if self.callback:
-                self.callback()
+                self.callback(self.callback_arg)
 
 
 class MPVMusicPlayer:
@@ -81,7 +82,7 @@ class MPVMusicPlayer:
         logging.debug(f'MPVPlayer._play: {" ".join(cmd)}')
         self.child = subprocess.Popen(cmd, stdout=subprocess.DEVNULL)
         # Ensure we notice when the child finishes:
-        self.monitor = ChildMonitorThread(self.child, self.parent.on_music_end)
+        self.monitor = ChildMonitorThread(self.child, self.parent.on_music_end, filepath)
         self.monitor.start()
 
     def resume(self):

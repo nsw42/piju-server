@@ -8,6 +8,11 @@ class MP3MusicPlayer(MPyg321Player):
         super().__init__()
         self.volume(100)
         self.parent = parent
+        self.filename = None
+
+    def play_song(self, path, loop=False):
+        self.filename = path
+        super().play_song(path, loop)
 
     def playpause(self):
         if self.status == PlayerStatus.PLAYING:
@@ -24,5 +29,5 @@ class MP3MusicPlayer(MPyg321Player):
 
     # callbacks
     def on_music_end(self):
-        logging.debug(f"MP3MusicPlayer.on_music_end ({self})")
-        self.parent.on_music_end()
+        logging.debug(f"MP3MusicPlayer.on_music_end ({self}, {self.filename})")
+        self.parent.on_music_end(self.filename)
