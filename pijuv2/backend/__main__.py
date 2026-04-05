@@ -33,7 +33,7 @@ def main():
     args = parse_args()
 
     logging.basicConfig(level=logging.DEBUG)
-    app = create_app(args.database)
+    app = create_app(args.config, args.database)
     app.worker.start()
     mimetypes.init()
     # macOS: Need to disable AirPlay Receiver for listening on 0.0.0.0 to work

@@ -9,7 +9,7 @@ from pijuv2.database.database import DatabaseAccess
 
 @pytest.fixture()
 def test_app(tmp_path):
-    app = create_app(tmp_path / 'test.db', create_db=True)
+    app = create_app(config_file=None, db_path=tmp_path / 'test.db', create_db=True)
     app.config.update({
         'TESTING': True
     })

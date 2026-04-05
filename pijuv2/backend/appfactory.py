@@ -18,10 +18,11 @@ from .workthread import WorkerThread
 
 
 class PijuApp(Flask):
-    def __init__(self, db_path, create_db):
+    def __init__(self, config_file: Path | None, db_path: Path, create_db: bool):
         super().__init__(__name__)
         Database.init_db(self, db_path, create_db)
-        config_file = Path(os.environ.get('PIJU_CONFIG', Config.Defaults.FILEPATH))
+        if config_file is None:
+            config_file = Path(os.environ.get('PIJU_CONFIG', Config.Defaults.FILEPATH))
         if not config_file.is_file():
             raise FileNotFoundError(f"Config file {config_file} not found")
         self.piju_config = Config(config_file)
@@ -55,5 +56,5 @@ class PijuApp(Flask):
                     self.websocket_clients.remove(ws)
 
 
-def create_app(db_path: str, create_db=False) -> PijuApp:
-    return PijuApp(db_path, create_db)
+def create_app(config_file: Path | None, db_path: Path, create_db: bool = False) -> PijuApp:
+    return PijuApp(config_file, db_path, create_db)
