@@ -5,16 +5,25 @@ SCRIPT_DIR=$(realpath $(dirname $0))
 function usage() {
   echo "Usage: $0 [OPTIONS] DBFILE"
   echo "Options:"
-  echo "  -c   Create DBFILE as a new database"
+  echo "  -C         Create DBFILE as a new database"
+  echo "  -c  FILE   Use FILE as a config file"
   exit 1
 }
 
 create=false
+CONFIG_FILE=
+DB_FILE=
 
-while getopts :c arg; do
+while getopts :Cc:d: arg; do
   case $arg in
-    c)
+    C)
       create=true
+      ;;
+    c)
+      CONFIG_FILE=$OPTARG
+      ;;
+    d)
+      DB_FILE=$OPTARG
       ;;
     ?)
       usage
@@ -24,22 +33,24 @@ done
 
 shift $(( OPTIND - 1 ))
 
-if [ "$1" ]; then
-  DB_FILE=$1
-else
-  for f in "$SCRIPT_DIR/piju.db" "$SCRIPT_DIR/file.db"; do
-    if [ -f "$f" ]; then
-      DB_FILE=$f
-      break
-    fi
-  done
-fi
+if [ -z "$DB_FILE" ]; then
+  if [ "$1" ]; then
+    DB_FILE=$1
+  else
+    for f in "$SCRIPT_DIR/piju.db" "$SCRIPT_DIR/file.db"; do
+      if [ -f "$f" ]; then
+        DB_FILE=$f
+        break
+      fi
+    done
+  fi
 
-if [ -z "$DB_FILE" ]; then usage; fi
+  if [ -z "$DB_FILE" ]; then usage; fi
+fi
 
 if [ ! -f "$DB_FILE" ]; then
   $create || {
-    echo "File '$DB_FILE' does not exist. Use the -c option to create it"
+    echo "File '$DB_FILE' does not exist. Use the -C option to create it"
     exit 1
   }
   touch "$DB_FILE"
@@ -77,4 +88,8 @@ else
   PYTHON=python3
 fi
 
-exec $PYTHON -m pijuv2.backend -d "$DB_FILE"
+if [ "$CONFIG_FILE" ]; then
+  exec $PYTHON -m pijuv2.backend -d "$DB_FILE" -c "$CONFIG_FILE"
+else
+  exec $PYTHON -m pijuv2.backend -d "$DB_FILE"
+fi
