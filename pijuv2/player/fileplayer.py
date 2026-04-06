@@ -43,8 +43,8 @@ class FilePlayerControl(Thread):
     def has_player(self) -> bool:
         return self.current_player is not None
 
-    def queue_action(self, action, action_argument):
-        self._queue.put((action, action_argument))
+    def queue_action(self, action, arg1=None, arg2=None):
+        self._queue.put((action, arg1, arg2))
 
     def run(self):
         """
@@ -57,18 +57,18 @@ class FilePlayerControl(Thread):
         """
         while True:
             try:
-                (action, argument) = self._queue.get(timeout=1)
+                (action, arg1, arg2) = self._queue.get(timeout=1)
             except Empty:
                 continue
             match action:
                 case ControlAction.PAUSE:
                     self.pause()
                 case ControlAction.PLAY:
-                    self.play(argument)
+                    self.play(arg1, arg2)
                 case ControlAction.RESUME:
                     self.resume()
                 case ControlAction.SET_VOLUME:
-                    self.set_volume(argument)
+                    self.set_volume(arg1)
                 case ControlAction.STOP:
                     self.stop()
 
@@ -78,12 +78,12 @@ class FilePlayerControl(Thread):
         if self.current_player:
             self.current_player.pause()
 
-    def play(self, filename: str):
+    def play(self, filename: str, wait_for_old_player: bool):
         """Play the given file"""
         logging.debug(f"FilePlayerControl.play {filename}")
         self.now_playing = filename
         was_playing = self.stop()
-        if was_playing:
+        if was_playing and wait_for_old_player:
             time.sleep(1)
         logging.debug(f"Playing {filename}")
         if filename.endswith('.mp3'):
@@ -227,7 +227,8 @@ class FilePlayer(PlayerInterface):
 
     def play_from_real_queue_index(self,
                                    index,
-                                   trackid: int | None = None):
+                                   trackid: int | None = None,
+                                   wait_for_old_player: bool = True):
         """
         Play from the given index
         trackid, if given, acts as a sanity check that the desired track is going to be played.
@@ -249,31 +250,32 @@ class FilePlayer(PlayerInterface):
                     return False
         started = False
         logging.debug("play_from_real_queue_index: %d: %s", index, self.queue[index].filepath)
-        while (0 <= index < len(self.queue)) and not (started := self._play_song(self.queue[index].filepath)):
+        while 0 <= index < len(self.queue):
+            started = self._play_song(self.queue[index].filepath, wait_for_old_player)
+            if started:
+                self.current_track_index = index
+                self.current_status = 'playing'
+                self.send_now_playing_update()
+                return True
             index += 1
-        if started:
-            self.current_track_index = index
-            self.current_status = 'playing'
-            self.send_now_playing_update()
-            return True
-        else:
-            self.stop()
-            return False
+        self.stop()
+        return False
 
-    def _play_song(self, filename: str) -> bool:
+    def _play_song(self, filename: str, wait_for_old_player: bool) -> bool:
         if not os.path.isfile(filename):
             logging.warning(f"Skipping missing file {filename}")
             return False
-        self.control_thread.queue_action(ControlAction.PLAY, filename)
+        self.control_thread.queue_action(ControlAction.PLAY, filename, wait_for_old_player)
         return True
 
-    def next(self):
+    def next(self, wait_for_old_player=True):
         # play the next song in the queue
         if self.current_track_index is None:
             return
         logging.debug("FilePlayer.next")
         if self.current_track_index + 1 < len(self.queue):
-            self.play_from_real_queue_index(self.current_track_index + 1)
+            self.play_from_real_queue_index(self.current_track_index + 1,
+                                            wait_for_old_player=wait_for_old_player)
         else:
             self.stop()
             self.clear_queue()
@@ -287,13 +289,13 @@ class FilePlayer(PlayerInterface):
 
     def pause(self):
         logging.debug("FilePlayer.pause")
-        self.control_thread.queue_action(ControlAction.PAUSE, None)
+        self.control_thread.queue_action(ControlAction.PAUSE)
         self.current_status = CurrentStatusStrings.PAUSED if self.control_thread.has_player() else CurrentStatusStrings.STOPPED
         self.send_now_playing_update()
 
     def resume(self) -> bool:
         logging.debug("FilePlayer.resume")
-        self.control_thread.queue_action(ControlAction.RESUME, None)
+        self.control_thread.queue_action(ControlAction.RESUME)
         if self.control_thread.has_player():
             self.current_status = CurrentStatusStrings.PLAYING
             rtn = True
@@ -309,7 +311,7 @@ class FilePlayer(PlayerInterface):
         self.current_volume = volume
 
     def stop(self):
-        self.control_thread.queue_action(ControlAction.STOP, None)
+        self.control_thread.queue_action(ControlAction.STOP)
         self.current_tracklist_identifier = ''
         self.current_status = CurrentStatusStrings.STOPPED
         self.current_track_index = None
@@ -319,4 +321,4 @@ class FilePlayer(PlayerInterface):
     def on_music_end(self):
         # maybe flush the queue at the end??
         logging.debug("FilePlayer.on_music_end")
-        self.next()
+        self.next(wait_for_old_player=False)
