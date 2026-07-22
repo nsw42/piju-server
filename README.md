@@ -22,6 +22,8 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 * 5.1: Add the ability to retrieve download history
 * 6.0: Add support for playing streaming radio
 * 6.1: Updates as a result of moving artwork into a separate database table
+* 7.0: Use websockets for 'now playing' status updates
+* 7.1: Convert the search string in /search/ to a query argument
 
 ## Dependencies
 

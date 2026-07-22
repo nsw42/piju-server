@@ -33,7 +33,7 @@ class PijuApp(Flask):
         self.file_player = FilePlayer()
         self.stream_player = StreamPlayer()
         self.current_player = self.file_player
-        self.api_version_string = '7.0'
+        self.api_version_string = '7.1'
         self.download_history = DownloadHistory()
         self.websocket_clients = []
 

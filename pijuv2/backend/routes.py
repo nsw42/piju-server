@@ -705,8 +705,11 @@ def start_tidy():
     return ('', HTTPStatus.NO_CONTENT)
 
 
-@routes.get("/search/<search_string>")
-def search(search_string):
+@routes.get("/search/")
+def search():
+    search_string = request.args.get('q', None)
+    if not search_string:
+        raise BadRequest()
     search_words = normalize_punctuation(search_string).strip().split()
     do_search_albums = parse_bool(request.args.get('albums', 'True'))
     do_search_artists = parse_bool(request.args.get('artists', 'True'))
