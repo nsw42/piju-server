@@ -60,7 +60,7 @@ def select_player(app, desired_player) -> bool:
     """
     was_playing = False
     if (app.current_player != desired_player) and (app.current_player is not None):
-        if (app.current_player is not None) and (app.current_player.current_status == CurrentStatusStrings.PLAYING):
+        if app.current_player.current_status == CurrentStatusStrings.PLAYING:
             was_playing = True
         app.current_player.pause()
     app.current_player = desired_player
