@@ -13,7 +13,7 @@ from ..player.streamplayer import StreamPlayer
 from .config import Config
 from .downloadhistory import DownloadHistory
 from .nowplaying import get_current_status
-from .routes import routes, sock
+from .routes import routes, sock, get_current_queue
 from .workthread import WorkerThread
 
 
@@ -33,9 +33,10 @@ class PijuApp(Flask):
         self.file_player = FilePlayer()
         self.stream_player = StreamPlayer()
         self.current_player = self.file_player
-        self.api_version_string = '7.1'
+        self.api_version_string = '8.0'
         self.download_history = DownloadHistory()
-        self.websocket_clients = []
+        self.status_websocket_clients = []
+        self.queue_websocket_clients = []
 
         def state_change_callback():
             self.update_now_playing()
@@ -49,11 +50,25 @@ class PijuApp(Flask):
         context_manager = nullcontext if has_app_context() else self.app_context
         with context_manager():
             data = json.dumps(get_current_status())
-            for ws in self.websocket_clients[:]:
+            for ws in self.status_websocket_clients[:]:
                 try:
                     ws.send(data)
                 except ConnectionClosed:
-                    self.websocket_clients.remove(ws)
+                    self.status_websocket_clients.remove(ws)
+        # if the current track has changed, that could result in the queue
+        # updating too (e.g. we've moved to the next item in the queue) so
+        # send an update to that, too
+        self.update_queue()
+
+    def update_queue(self):
+        context_manager = nullcontext if has_app_context() else self.app_context
+        with context_manager():
+            data = json.dumps(get_current_queue())
+            for ws in self.queue_websocket_clients[:]:
+                try:
+                    ws.send(data)
+                except ConnectionClosed:
+                    self.queue_websocket_clients.remove(ws)
 
 
 def create_app(config_file: Path | None, db_path: Path, create_db: bool = False) -> PijuApp:

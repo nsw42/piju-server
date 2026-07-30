@@ -24,6 +24,7 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 * 6.1: Updates as a result of moving artwork into a separate database table
 * 7.0: Use websockets for 'now playing' status updates
 * 7.1: Convert the search string in /search/ to a query argument
+* 8.0: Use websockets for 'queue'
 
 ## Dependencies
 

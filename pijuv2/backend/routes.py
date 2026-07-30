@@ -501,17 +501,34 @@ def queue_delete():
     if not current_piju_app.current_player.remove_from_queue(index, trackid):
         # index or trackid mismatch
         raise BadRequest('Track id did not match at given index')
+    current_piju_app.update_queue()
     return ('', HTTPStatus.NO_CONTENT)
+
+
+def get_current_queue() -> list[Any]:
+    with DatabaseAccess() as db:
+        queue_data = [json_track_or_file(db, queued_track) for
+                      queued_track in current_piju_app.current_player.visible_queue]
+    return queue_data
 
 
 @routes.get("/queue/", provide_automatic_options=False)
 def queue_get():
     if current_piju_app.current_player != current_piju_app.file_player:
         raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
-    with DatabaseAccess() as db:
-        queue_data = [json_track_or_file(db, queued_track) for
-                      queued_track in current_piju_app.current_player.visible_queue]
+    queue_data = get_current_queue()
     return gzippable_jsonify(queue_data)
+
+
+@sock.route("/queue/ws", routes)
+def queue_websocket_client(ws):
+    if sock.app:
+        sock.app.queue_websocket_clients.append(ws)
+    queue_data = get_current_queue()
+    ws.send(json.dumps(queue_data))
+    while True:
+        _ = ws.receive()
+        # discard incoming requests on the websocket for now
 
 
 @routes.route("/queue/", methods=['OPTIONS'], provide_automatic_options=False)
@@ -758,9 +775,9 @@ def get_track(trackid):
 
 
 @sock.route('/ws', routes)
-def websocket_client(ws):
+def currentstatus_websocket_client(ws):
     if sock.app:
-        sock.app.websocket_clients.append(ws)
+        sock.app.status_websocket_clients.append(ws)
     data = get_current_status()
     ws.send(json.dumps(data))
     while True:
