@@ -4,8 +4,10 @@ import os
 from pathlib import Path
 from queue import Queue
 
+import cachelib.simple
 from flask import Flask, has_app_context
 from flask_sock import ConnectionClosed
+import flask_session
 
 from ..database.database import Database
 from ..player.fileplayer import FilePlayer
@@ -37,6 +39,11 @@ class PijuApp(Flask):
         self.download_history = DownloadHistory()
         self.status_websocket_clients = []
         self.queue_websocket_clients = []
+
+        self.config['SESSION_TYPE'] = 'cachelib'
+        self.config['SESSION_PERMANENT'] = False
+        self.config['SESSION_CACHELIB'] = cachelib.simple.SimpleCache(threshold=100)
+        flask_session.Session(self)
 
         def state_change_callback():
             self.update_now_playing()
