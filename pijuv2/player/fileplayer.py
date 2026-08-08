@@ -131,7 +131,7 @@ class FilePlayer(PlayerInterface):
     def __init__(self,
                  queue: List[Track] | None = None,
                  identifier: str = ''):
-        super().__init__()
+        super().__init__(has_queue=True)
         self.queue: List[QueuedTrack] = []
         self.current_tracklist_identifier = identifier
         self.control_thread = FilePlayerControl(self)

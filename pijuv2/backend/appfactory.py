@@ -58,7 +58,8 @@ class PijuApp(Flask):
         # if the current track has changed, that could result in the queue
         # updating too (e.g. we've moved to the next item in the queue) so
         # send an update to that, too
-        self.update_queue()
+        if self.current_player.has_queue:
+            self.update_queue()
 
     def update_queue(self):
         context_manager = nullcontext if has_app_context() else self.app_context

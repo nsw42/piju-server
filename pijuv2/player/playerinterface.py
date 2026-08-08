@@ -11,11 +11,12 @@ class PlayerInterface:
     """
     The methods common to both file-based and stream-based players
     """
-    def __init__(self):
+    def __init__(self, has_queue: bool):
         self.current_status = CurrentStatusStrings.STOPPED
         self.current_volume = 100
         self.current_track_index = None  # 0-based
         self.state_change_callback = None
+        self.has_queue = has_queue
         # self.number_of_tracks must be available, but can be a property
 
     def set_state_change_callback(self, state_change_callback):
