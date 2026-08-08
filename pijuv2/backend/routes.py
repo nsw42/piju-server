@@ -13,14 +13,15 @@ from flask_sock import Sock
 from werkzeug.exceptions import BadRequest, BadRequestKeyError, Conflict, InternalServerError, NotFound
 
 from ..database.database import DatabaseAccess, NotFoundException
-from ..database.schema import Album, Playlist
+from ..database.schema import Album, Playlist, Track
 from .appwrapper import current_piju_app
-from .downloadinfo import DownloadInfoDatabaseSingleton
+from .downloadinfo import DownloadInfo, DownloadInfoDatabaseSingleton
 from .deserialize import build_playlist_from_api_data, build_radio_station_from_api_data, extract_id, parse_bool
 from .nowplaying import get_current_status
 from .playerctrl import add_track_to_queue, queue_downloaded_files, select_player, update_player_play_radio_station
 from .playerctrl import update_player_play_from_local, update_player_play_from_radio, update_player_play_from_youtube
 from .playerctrl import update_player_streaming_prevnext
+from .queuesession import get_browser_queue, set_browser_queue, QUEUE_SESSION_HEADER
 from .routeconsts import RouteConstants
 from .serialize import json_genre, json_playlist, json_track_or_file
 from .serialize import InformationLevel
@@ -36,6 +37,13 @@ ERR_MSG_UNKNOWN_TRACK_ID = 'Unknown track id'
 ERR_MSG_UNKNOWN_PLAYLIST_ID = 'Unknown playlist id'
 ERR_MSG_UNKNOWN_RADIO_ID = 'Unknown radio station id'
 ERR_MSG_NO_QUEUE_WHEN_STREAMING = "Queue operations not permitted when playing streaming content"
+
+ARG_NAME_MODE = 'mode'
+
+
+class PlaybackMode:
+    SERVER = 'server'
+    BROWSER = 'browser'
 
 
 def gzippable_jsonify(content):
@@ -67,17 +75,19 @@ def response_for_import_playlist(playlist: Playlist, missing_tracks: List[str]):
 
 def make_options_response(methods):
     response = make_response('', HTTPStatus.NO_CONTENT)
-    response.headers['Access-Control-Allow-Headers'] = ', '.join(['Content-Type',
-                                                                  'Access-Control-Allow-Headers',
-                                                                  'Access-Control-Allow-Methods',
-                                                                  'Access-Control-Allow-Origin'])
+    # Access-Control-Allow-Headers lists headers the *client* may send on the actual
+    # request; these are the non-simple headers the webui sends.
+    response.headers['Access-Control-Allow-Headers'] = ', '.join(['Content-Type', QUEUE_SESSION_HEADER])
     response.headers['Access-Control-Allow-Methods'] = ', '.join(methods)
     return response
 
 
 @routes.after_request
-def add_security_headers(resp):
-    resp.headers['Access-Control-Allow-Origin'] = '*'
+def add_security_headers(resp: Response):
+    origin = request.headers.get('Origin')
+    if origin:
+        resp.headers['Access-Control-Allow-Origin'] = origin
+    resp.headers['Access-Control-Allow-Credentials'] = 'true'
     return resp
 
 
@@ -486,8 +496,6 @@ def edit_playlist(playlistid):
 
 @routes.delete("/queue/", provide_automatic_options=False)
 def queue_delete():
-    if current_piju_app.current_player != current_piju_app.file_player:
-        raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
     data = request.get_json()
     if not data:
         raise BadRequest()
@@ -498,25 +506,65 @@ def queue_delete():
         raise BadRequestKeyError() from exc
     except ValueError as exc:
         raise BadRequest() from exc
-    if not current_piju_app.current_player.remove_from_queue(index, trackid):
-        # index or trackid mismatch
-        raise BadRequest('Track id did not match at given index')
-    current_piju_app.update_queue()
+
+    mode = request.args.get(ARG_NAME_MODE, PlaybackMode.SERVER)
+    match mode:
+        case PlaybackMode.SERVER:
+            if current_piju_app.current_player != current_piju_app.file_player:
+                raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
+            if not current_piju_app.current_player.remove_from_queue(index, trackid):
+                # index or trackid mismatch
+                raise BadRequest('Track id did not match at given index')
+        case PlaybackMode.BROWSER:
+            current_queue = get_browser_queue(request)
+            if (0 <= index < len(current_queue)) and (current_queue[index] == trackid):
+                current_queue.pop(index)
+                set_browser_queue(request, current_queue)
+        case _:
+            raise BadRequest()
+
+    current_piju_app.send_queue_update()
     return ('', HTTPStatus.NO_CONTENT)
 
 
-def get_current_queue() -> list[Any]:
+def format_queue(tracks: list[int]) -> list[Any]:
+    with DatabaseAccess() as db:
+        # don't (yet?) support fake tracks for browser-based playback
+        return [json_track(db.get_track_by_id(trackid)) for trackid in tracks]
+
+
+def get_server_queue() -> list[Any]:
+    """
+    Retrieve the server (as opposed to browser) queue
+    """
     with DatabaseAccess() as db:
         queue_data = [json_track_or_file(db, queued_track) for
                       queued_track in current_piju_app.current_player.visible_queue]
     return queue_data
 
 
+def get_requested_queue() -> list[Any]:
+    """
+    Retrieve whichever of server or browser (session) queue
+    is appropriate for the current request. May therefore only
+    be called from within an endpoint handler.
+    """
+    mode = request.args.get(ARG_NAME_MODE, PlaybackMode.SERVER)
+    match mode:
+        case PlaybackMode.SERVER:
+            if current_piju_app.current_player != current_piju_app.file_player:
+                raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
+            queue_data = get_server_queue()
+        case PlaybackMode.BROWSER:
+            queue_data = format_queue(get_browser_queue(request))
+        case _:
+            raise BadRequest()
+    return queue_data
+
+
 @routes.get("/queue/", provide_automatic_options=False)
 def queue_get():
-    if current_piju_app.current_player != current_piju_app.file_player:
-        raise Conflict(ERR_MSG_NO_QUEUE_WHEN_STREAMING)
-    queue_data = get_current_queue()
+    queue_data = get_requested_queue()
     return gzippable_jsonify(queue_data)
 
 
@@ -524,7 +572,7 @@ def queue_get():
 def queue_websocket_client(ws):
     if sock.app:
         sock.app.queue_websocket_clients.append(ws)
-    queue_data = get_current_queue()
+    queue_data = get_requested_queue()
     ws.send(json.dumps(queue_data))
     while True:
         _ = ws.receive()
@@ -536,19 +584,17 @@ def queue_options():
     # the request to add to queue looks like a cross-domain request to Chrome,
     # so it sends OPTIONS before the PUT. Hence we need to support this.
 
-    if current_piju_app.current_player != current_piju_app.file_player:
-        select_player(current_piju_app, current_piju_app.file_player)
-
     return make_options_response(['DELETE', 'GET', 'OPTIONS', 'PUT'])
 
 
 @routes.put("/queue/", provide_automatic_options=False)
-def queue_put():
+def queue_put() -> Response:
     data = request.get_json()
     if not data:
         raise BadRequest()
 
-    if current_piju_app.current_player != current_piju_app.file_player:
+    mode = data.get(ARG_NAME_MODE, PlaybackMode.SERVER)
+    if (mode == PlaybackMode.SERVER) and (current_piju_app.current_player != current_piju_app.file_player):
         select_player(current_piju_app, current_piju_app.file_player)
 
     # there are five different possibilities here:
@@ -559,21 +605,32 @@ def queue_put():
     #   queue: [trackid_or_url]       # reorder the queue
     if albumid := extract_id(data.get('album', '')):
         disknr = extract_id(data.get('disk', ''))
-        return queue_put_album(albumid, disknr)
+        return queue_put_album(mode, albumid, disknr)
 
     if trackid := extract_id(data.get('track', '')):
-        return queue_put_track(trackid)
+        return queue_put_track(mode, trackid)
 
     if youtubeurl := data.get('url'):
         return queue_put_youtube(youtubeurl)
 
     if new_queue_order := data.get('queue'):
-        return queue_put_reorder(new_queue_order)
+        return queue_put_reorder(mode, new_queue_order)
 
     raise BadRequest("No album+disk id, track id, url or new queue order specified")
 
 
-def queue_put_album(albumid: int, disknr: int | None):
+def add_track_to_requested_queue(mode: str, track: Track):
+    match mode:
+        case PlaybackMode.SERVER:
+            add_track_to_queue(track)
+        case PlaybackMode.BROWSER:
+            current_queue = get_browser_queue(request)
+            set_browser_queue(request, current_queue + [track.Id])
+        case _:
+            raise BadRequest()
+
+
+def queue_put_album(mode: str, albumid: int, disknr: int | None) -> Response:
     with DatabaseAccess() as db:
         try:
             album = db.get_album_by_id(albumid)
@@ -584,32 +641,34 @@ def queue_put_album(albumid: int, disknr: int | None):
             tracks = [track for track in album.Tracks if track.VolumeNumber == disknr]
         tracks.sort(key=lambda track: (track.VolumeNumber, track.TrackNumber))
         for track in tracks:
-            add_track_to_queue(track)
-        current_piju_app.update_now_playing()
-    return ('', HTTPStatus.NO_CONTENT)
+            add_track_to_requested_queue(mode, track)
+        current_piju_app.send_now_playing_update()
+    return make_response('', HTTPStatus.NO_CONTENT)
 
 
-def queue_put_track(trackid: int):
+def queue_put_track(mode: str, trackid: int) -> Response:
     with DatabaseAccess() as db:
         try:
-            add_track_to_queue(db.get_track_by_id(trackid))
+            add_track_to_requested_queue(mode, db.get_track_by_id(trackid))
         except NotFoundException as exc:
             raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
-    current_piju_app.update_now_playing()
-    return ('', HTTPStatus.NO_CONTENT)
+    current_piju_app.send_now_playing_update()
+    return make_response('', HTTPStatus.NO_CONTENT)
 
 
-def queue_put_youtube(youtubeurl: str):
+def queue_put_youtube(youtubeurl: str) -> Response:
+    if request.args.get(ARG_NAME_MODE, PlaybackMode.SERVER) != PlaybackMode.SERVER:
+        raise BadRequest()
     current_piju_app.download_history.add(youtubeurl)
     current_piju_app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE,
                                     youtubeurl,
                                     current_piju_app.piju_config.download_dir,
                                     queue_downloaded_files))
-    return ('', HTTPStatus.NO_CONTENT)
+    return make_response('', HTTPStatus.NO_CONTENT)
 
 
-def queue_put_reorder(new_queue_order: List[Any]):
-    new_queue = []
+def queue_put_reorder(mode: str, new_queue_order: List[Any]) -> Response:
+    new_queue: list[Track | DownloadInfo] = []
     with DatabaseAccess() as db:
         try:
             for trackid in new_queue_order:
@@ -617,14 +676,23 @@ def queue_put_reorder(new_queue_order: List[Any]):
                 if trackid >= 0:
                     new_queue.append(db.get_track_by_id(trackid))
                 else:
-                    new_queue.append(DownloadInfoDatabaseSingleton().get_download_info(trackid))
+                    download_info = DownloadInfoDatabaseSingleton().get_download_info(trackid)
+                    if not download_info:
+                        raise NotFound()
+                    new_queue.append(download_info)
         except NotFoundException as exc:
             raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
         except ValueError as exc:
             raise BadRequest("Unrecognised track id") from exc
-        current_piju_app.current_player.set_queue(new_queue, "/queue/")
-    current_piju_app.update_now_playing()
-    return ('', HTTPStatus.NO_CONTENT)
+        match mode:
+            case PlaybackMode.SERVER:
+                current_piju_app.current_player.set_queue(new_queue, "/queue/")
+            case PlaybackMode.BROWSER:
+                set_browser_queue(request, [track.Id for track in new_queue if isinstance(track, Track)])
+            case _:
+                raise BadRequest()
+    current_piju_app.send_now_playing_update()
+    return make_response('', HTTPStatus.NO_CONTENT)
 
 
 @routes.get("/radio/", provide_automatic_options=False)

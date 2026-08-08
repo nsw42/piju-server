@@ -3,8 +3,6 @@ cachelib
 flake8
 Flask
 Flask-SQLAlchemy
-Flask-Session
-Flask-Session[cachelib]
 flask-sock
 json5
 mutagen
