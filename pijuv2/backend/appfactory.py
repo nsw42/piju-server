@@ -13,7 +13,7 @@ from ..player.streamplayer import StreamPlayer
 from .config import Config
 from .downloadhistory import DownloadHistory
 from .nowplaying import get_current_status
-from .routes import routes, sock, get_server_queue
+from .routes import routes, sock, queue_data_for_websocket_client
 from .workthread import WorkerThread
 
 
@@ -63,12 +63,11 @@ class PijuApp(Flask):
     def send_queue_update(self):
         context_manager = nullcontext if has_app_context() else self.app_context
         with context_manager():
-            data = json.dumps(get_server_queue())
-            for ws in self.queue_websocket_clients[:]:
+            for client in self.queue_websocket_clients[:]:
                 try:
-                    ws.send(data)
+                    client.ws.send(json.dumps(queue_data_for_websocket_client(client)))
                 except ConnectionClosed:
-                    self.queue_websocket_clients.remove(ws)
+                    self.queue_websocket_clients.remove(client)
 
 
 def create_app(config_file: Path | None, db_path: Path, create_db: bool = False) -> PijuApp:

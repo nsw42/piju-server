@@ -6,7 +6,7 @@ import mimetypes
 import os.path
 from pathlib import Path
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, NamedTuple
 
 from flask import Blueprint, jsonify, make_response, request, Response
 from flask_sock import Sock
@@ -21,7 +21,8 @@ from .nowplaying import get_current_status
 from .playerctrl import add_track_to_queue, queue_downloaded_files, select_player, update_player_play_radio_station
 from .playerctrl import update_player_play_from_local, update_player_play_from_radio, update_player_play_from_youtube
 from .playerctrl import update_player_streaming_prevnext
-from .queuesession import get_browser_queue, set_browser_queue, QUEUE_SESSION_HEADER
+from .queuesession import get_browser_queue, get_browser_queue_by_session_id, session_id_for_request
+from .queuesession import set_browser_queue, QUEUE_SESSION_HEADER
 from .routeconsts import RouteConstants
 from .serialize import json_genre, json_playlist, json_track_or_file
 from .serialize import InformationLevel
@@ -568,10 +569,30 @@ def queue_get():
     return gzippable_jsonify(queue_data)
 
 
+class QueueWebSocketClient(NamedTuple):
+    """
+    A connected /queue/ws client, along with enough of its original request to
+    know which queue (the shared server queue, or one particular browser's
+    queue) it should be sent on every subsequent broadcast.
+    """
+    ws: Any
+    mode: str
+    session_id: str | None
+
+
+def queue_data_for_websocket_client(client: QueueWebSocketClient) -> list[Any]:
+    if client.mode == PlaybackMode.BROWSER:
+        return format_queue(get_browser_queue_by_session_id(client.session_id))
+    return get_server_queue()
+
+
 @sock.route("/queue/ws", routes)
 def queue_websocket_client(ws):
+    mode = request.args.get(ARG_NAME_MODE, PlaybackMode.SERVER)
+    session_id = session_id_for_request(request) if mode == PlaybackMode.BROWSER else None
+    client = QueueWebSocketClient(ws, mode, session_id)
     if sock.app:
-        sock.app.queue_websocket_clients.append(ws)
+        sock.app.queue_websocket_clients.append(client)
     queue_data = get_requested_queue()
     ws.send(json.dumps(queue_data))
     while True:
@@ -619,6 +640,20 @@ def queue_put() -> Response:
     raise BadRequest("No album+disk id, track id, url or new queue order specified")
 
 
+def notify_queue_changed(mode: str):
+    """
+    A server-mode queue mutation is also a playback-state change (it may start
+    playback, change the current track, etc), so triggers a full now-playing
+    broadcast, which - for players with a queue - includes a queue broadcast.
+    A browser-mode mutation doesn't touch server playback at all, so only
+    needs its own (per-session) queue broadcast refreshed.
+    """
+    if mode == PlaybackMode.SERVER:
+        current_piju_app.send_now_playing_update()
+    else:
+        current_piju_app.send_queue_update()
+
+
 def add_track_to_requested_queue(mode: str, track: Track):
     match mode:
         case PlaybackMode.SERVER:
@@ -642,7 +677,7 @@ def queue_put_album(mode: str, albumid: int, disknr: int | None) -> Response:
         tracks.sort(key=lambda track: (track.VolumeNumber, track.TrackNumber))
         for track in tracks:
             add_track_to_requested_queue(mode, track)
-        current_piju_app.send_now_playing_update()
+        notify_queue_changed(mode)
     return make_response('', HTTPStatus.NO_CONTENT)
 
 
@@ -652,7 +687,7 @@ def queue_put_track(mode: str, trackid: int) -> Response:
             add_track_to_requested_queue(mode, db.get_track_by_id(trackid))
         except NotFoundException as exc:
             raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
-    current_piju_app.send_now_playing_update()
+    notify_queue_changed(mode)
     return make_response('', HTTPStatus.NO_CONTENT)
 
 
@@ -691,7 +726,7 @@ def queue_put_reorder(mode: str, new_queue_order: List[Any]) -> Response:
                 set_browser_queue(request, [track.Id for track in new_queue if isinstance(track, Track)])
             case _:
                 raise BadRequest()
-    current_piju_app.send_now_playing_update()
+    notify_queue_changed(mode)
     return make_response('', HTTPStatus.NO_CONTENT)
 
 

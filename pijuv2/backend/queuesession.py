@@ -27,16 +27,25 @@ _TIMEOUT_SECONDS = 60 * 60 * 24  # expire an abandoned queue after a day
 _cache = SimpleCache(threshold=500, default_timeout=_TIMEOUT_SECONDS)
 
 
-def _session_id(request: Request) -> str:
+def session_id_for_request(request: Request) -> str:
     session_id = request.headers.get(QUEUE_SESSION_HEADER) or request.args.get(QUEUE_SESSION_QUERY_ARG)
     if not session_id:
         raise BadRequest(f"{QUEUE_SESSION_HEADER} header is required for browser-mode queue operations")
     return session_id
 
 
+def get_browser_queue_by_session_id(session_id: str) -> list[int]:
+    """
+    Look up a browser queue directly by session id, for use where there's no
+    active request to read the id from (e.g. broadcasting to websocket
+    clients from send_queue_update, which may run from the worker thread).
+    """
+    return _cache.get(session_id) or []
+
+
 def get_browser_queue(request: Request) -> list[int]:
-    return _cache.get(_session_id(request)) or []
+    return get_browser_queue_by_session_id(session_id_for_request(request))
 
 
 def set_browser_queue(request: Request, queue: list[int]):
-    _cache.set(_session_id(request), queue)
+    _cache.set(session_id_for_request(request), queue)
