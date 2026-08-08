@@ -115,7 +115,7 @@ class NowPlayingUpdater(Thread):
 
 class StreamPlayer(PlayerInterface):
     def __init__(self):
-        super().__init__()
+        super().__init__(has_queue=False)
         self.currently_playing_name = None
         self.currently_playing_url = None
         self.currently_playing_artwork = None
