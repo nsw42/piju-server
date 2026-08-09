@@ -25,6 +25,7 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 * 7.0: Use websockets for 'now playing' status updates
 * 7.1: Convert the search string in /search/ to a query argument
 * 8.0: Use websockets for 'queue'
+* 8.1: Enable a queue for browser-based playback
 
 ## Dependencies
 
