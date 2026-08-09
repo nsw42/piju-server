@@ -47,6 +47,17 @@ class PlaybackMode:
     BROWSER = 'browser'
 
 
+class QueueWebSocketClient(NamedTuple):
+    """
+    A connected /queue/ws client, along with enough of its original request to
+    know which queue (the shared server queue, or one particular browser's
+    queue) it should be sent on every subsequent broadcast.
+    """
+    ws: Any
+    mode: str
+    session_id: str | None
+
+
 def gzippable_jsonify(content):
     if 'gzip' in request.headers.get('Accept-Encoding', '').lower():
         content = json.dumps(content, separators=(',', ':'))  # avoid whitespace in response
@@ -567,17 +578,6 @@ def get_requested_queue() -> list[Any]:
 def queue_get():
     queue_data = get_requested_queue()
     return gzippable_jsonify(queue_data)
-
-
-class QueueWebSocketClient(NamedTuple):
-    """
-    A connected /queue/ws client, along with enough of its original request to
-    know which queue (the shared server queue, or one particular browser's
-    queue) it should be sent on every subsequent broadcast.
-    """
-    ws: Any
-    mode: str
-    session_id: str | None
 
 
 def queue_data_for_websocket_client(client: QueueWebSocketClient) -> list[Any]:
