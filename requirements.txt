@@ -1,4 +1,5 @@
 alembic
+cachelib
 flake8
 Flask
 Flask-SQLAlchemy

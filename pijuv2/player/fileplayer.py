@@ -290,7 +290,10 @@ class FilePlayer(PlayerInterface):
     def pause(self):
         logging.debug("FilePlayer.pause")
         self.control_thread.queue_action(ControlAction.PAUSE)
-        self.current_status = CurrentStatusStrings.PAUSED if self.control_thread.has_player() else CurrentStatusStrings.STOPPED
+        if self.control_thread.has_player():
+            self.current_status = CurrentStatusStrings.PAUSED
+        else:
+            self.current_status = CurrentStatusStrings.STOPPED
         self.send_now_playing_update()
 
     def resume(self) -> bool:

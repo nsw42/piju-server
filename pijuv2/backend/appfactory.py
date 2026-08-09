@@ -13,7 +13,7 @@ from ..player.streamplayer import StreamPlayer
 from .config import Config
 from .downloadhistory import DownloadHistory
 from .nowplaying import get_current_status
-from .routes import routes, sock, get_current_queue
+from .routes import routes, sock, queue_data_for_websocket_client
 from .workthread import WorkerThread
 
 
@@ -29,24 +29,23 @@ class PijuApp(Flask):
         self.work_queue = Queue()
         self.worker = WorkerThread(self, self.work_queue)
         self.server_address = f'http://{self.piju_config.server_name}:5000'  # NB. *Not* config['SERVER_NAME']
-        self.config['SECRET_KEY'] = 'piju-server-key'
         self.file_player = FilePlayer()
         self.stream_player = StreamPlayer()
         self.current_player = self.file_player
-        self.api_version_string = '8.0'
+        self.api_version_string = '8.1'
         self.download_history = DownloadHistory()
         self.status_websocket_clients = []
         self.queue_websocket_clients = []
 
         def state_change_callback():
-            self.update_now_playing()
+            self.send_now_playing_update()
         self.file_player.set_state_change_callback(state_change_callback)
         self.stream_player.set_state_change_callback(state_change_callback)
 
         self.register_blueprint(routes)
         sock.init_app(self)
 
-    def update_now_playing(self):
+    def send_now_playing_update(self):
         context_manager = nullcontext if has_app_context() else self.app_context
         with context_manager():
             data = json.dumps(get_current_status())
@@ -59,17 +58,16 @@ class PijuApp(Flask):
         # updating too (e.g. we've moved to the next item in the queue) so
         # send an update to that, too
         if self.current_player.has_queue:
-            self.update_queue()
+            self.send_queue_update()
 
-    def update_queue(self):
+    def send_queue_update(self):
         context_manager = nullcontext if has_app_context() else self.app_context
         with context_manager():
-            data = json.dumps(get_current_queue())
-            for ws in self.queue_websocket_clients[:]:
+            for client in self.queue_websocket_clients[:]:
                 try:
-                    ws.send(data)
+                    client.ws.send(json.dumps(queue_data_for_websocket_client(client)))
                 except ConnectionClosed:
-                    self.queue_websocket_clients.remove(ws)
+                    self.queue_websocket_clients.remove(client)
 
 
 def create_app(config_file: Path | None, db_path: Path, create_db: bool = False) -> PijuApp:

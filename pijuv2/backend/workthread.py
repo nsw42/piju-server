@@ -67,4 +67,4 @@ class WorkerThread(threading.Thread):
 
     def set_current_status(self, status: str):
         self.current_status = status
-        self.app.update_now_playing()
+        self.app.send_now_playing_update()
