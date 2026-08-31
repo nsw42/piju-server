@@ -81,12 +81,11 @@ $ALEMBIC current 2> /dev/null | grep -q head && { echo Database schema is up-to-
 cd $SCRIPT_DIR
 
 # Now run the server
-if [ -x $SCRIPT_DIR/bin/python3 ]; then
-  PYTHON=$SCRIPT_DIR/bin/python3
-else
-  # let's hope $PATH is set
-  PYTHON=python3
+VENV_DIR=$SCRIPT_DIR/.venv
+if [ -e $VENV_DIR/bin/activate ]; then
+  . $VENV_DIR/bin/activate
 fi
+PYTHON=python3
 
 if [ "$CONFIG_FILE" ]; then
   exec $PYTHON -m pijuv2.backend -d "$DB_FILE" -c "$CONFIG_FILE"
