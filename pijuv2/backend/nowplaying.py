@@ -11,6 +11,7 @@ def get_current_status():
     with DatabaseAccess() as db:
         c_p = current_piju_app.current_player
         rtn = {
+            'ServerVersion': current_piju_app.version,
             'WorkerStatus': current_piju_app.worker.current_status,
             'PlayerStatus': c_p.current_status,
             'PlayerVolume': c_p.current_volume,

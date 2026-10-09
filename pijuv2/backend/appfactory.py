@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 from queue import Queue
+import subprocess
 
 from flask import Flask, has_app_context
 from flask_sock import ConnectionClosed
@@ -25,6 +26,7 @@ class PijuApp(Flask):
             config_file = Path(os.environ.get('PIJU_CONFIG', Config.Defaults.FILEPATH))
         if not config_file.is_file():
             raise FileNotFoundError(f"Config file {config_file} not found")
+        self.version = get_server_version()
         self.piju_config = Config(config_file)
         self.work_queue = Queue()
         self.worker = WorkerThread(self, self.work_queue)
@@ -32,7 +34,7 @@ class PijuApp(Flask):
         self.file_player = FilePlayer()
         self.stream_player = StreamPlayer()
         self.current_player = self.file_player
-        self.api_version_string = '8.1'
+        self.api_version_string = '8.2'
         self.download_history = DownloadHistory()
         self.status_websocket_clients = []
         self.queue_websocket_clients = []
@@ -68,6 +70,15 @@ class PijuApp(Flask):
                     client.ws.send(json.dumps(queue_data_for_websocket_client(client)))
                 except ConnectionClosed:
                     self.queue_websocket_clients.remove(client)
+
+
+def get_server_version() -> str:
+    for path in Path(__file__).parents:
+        git = path / '.git'
+        if git.is_dir():
+            child = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True, check=True)
+            return child.stdout.strip()
+    return 'unknown'
 
 
 def create_app(config_file: Path | None, db_path: Path, create_db: bool = False) -> PijuApp:
