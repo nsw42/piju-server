@@ -33,12 +33,41 @@ class PlaylistEntry(Base):
     Track = relationship("Track")
 
 
+class DisplayGenre(Base):
+    "A group of genres that are presented to the user as a single genre"
+    __tablename__ = 'DisplayGenres'
+
+    Id = mapped_column(Integer, primary_key=True)
+    Name = mapped_column(String)
+    Icon = mapped_column(String)  # one of the values of DisplayGenreIcon
+    ViewStyle = mapped_column(String)  # one of the values of DisplayGenreViewStyle
+    SortOrder = mapped_column(Integer)
+    IsDefault = mapped_column(Boolean, default=False)  # the home for genres that have no explicit mapping
+    Genres = relationship("Genre", back_populates="DisplayGenre")
+
+
+class DisplayGenreMapping(Base):
+    """
+    The rule that says which display genre a genre of the given name belongs to.
+    Kept separately from Genre.DisplayGenreId so that the rule exists before a genre
+    of that name is first scanned, and survives the genre being tidied away.
+    """
+    __tablename__ = 'DisplayGenreMappings'
+
+    GenreName = mapped_column(String, primary_key=True)  # normalized: see normalize_genre_name()
+    DisplayGenreId = mapped_column(Integer, ForeignKey('DisplayGenres.Id'))
+
+
 class Genre(Base):
     "A collection of albums and playlists that contain items of the same genre"
     __tablename__ = 'Genres'
 
     Id = mapped_column(Integer, primary_key=True)
     Name = mapped_column(String)
+    DisplayGenreId = mapped_column(Integer,
+                                   ForeignKey('DisplayGenres.Id', name='fk_Genres_DisplayGenreId_DisplayGenres'),
+                                   index=True)
+    DisplayGenre = relationship("DisplayGenre", back_populates="Genres")
     Albums = relationship("Album",
                           secondary=album_genre_association_table,
                           back_populates="Genres")

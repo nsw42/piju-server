@@ -17,6 +17,7 @@ class RouteConstants:
     GET_ARTIST = '/artists/<path:artist>'  # Pretend artist is a full-path, so we correctly handle bands like 'AC/DC'
     GET_ARTWORK = '/artwork/<artworkid>'
     GET_ARTWORK_INFO = '/artworkinfo/<artworkid>'
+    GET_DISPLAY_GENRE = '/display_genre/<displaygenreid>'
     GET_GENRE = '/genres/<genreid>'
     GET_ONE_PLAYLIST = '/playlists/<playlistid>'
     GET_ONE_RADIO_STATION = '/radio/<stationid>'
@@ -46,6 +47,10 @@ class RouteConstants:
     @staticmethod
     def url_for_get_artwork_info(artworkid):
         return RouteConstants.url_for(RouteConstants.GET_ARTWORK_INFO, artworkid=artworkid)
+
+    @staticmethod
+    def url_for_get_display_genre(displaygenreid):
+        return RouteConstants.url_for(RouteConstants.GET_DISPLAY_GENRE, displaygenreid=displaygenreid)
 
     @staticmethod
     def url_for_get_genre(genreid):

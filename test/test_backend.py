@@ -4,7 +4,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from pijuv2.backend.appfactory import create_app
-from pijuv2.database.database import DatabaseAccess
+from pijuv2.database.database import Database, DatabaseAccess, NotFoundException
+from pijuv2.database.schema import Album, DisplayGenre
 
 
 @pytest.fixture()
@@ -101,3 +102,129 @@ def test_get_track_with_artwork(client, mock_track12):
     assert response.status_code == 200
     assert response.json['artwork'] == '/artwork/6'
     assert response.json['artworkinfo'] == '/artworkinfo/6'
+
+
+@pytest.fixture()
+def mock_display_genre3(mock_dbaccess):
+    mock_genre = MagicMock()
+    mock_genre.Id = 8
+    mock_display_genre = MagicMock()
+    mock_display_genre.Id = 3
+    mock_display_genre.Name = 'Rock & Pop'
+    mock_display_genre.Icon = 'music'
+    mock_display_genre.ViewStyle = 'albums'
+    mock_display_genre.Genres = [mock_genre]
+    mock_albums = []
+    for album_id in (21, 22):
+        mock_album = MagicMock()
+        mock_album.Id = album_id
+        mock_albums.append(mock_album)
+    mock_db = mock_dbaccess().__enter__()
+    mock_db.get_all_display_genres.return_value = [mock_display_genre]
+    mock_db.get_display_genre_by_id.return_value = mock_display_genre
+    mock_db.get_display_genre_albums.return_value = (mock_albums, 45)
+    mock_db.get_display_genre_playlists.return_value = []
+    return mock_db
+
+
+def test_get_all_display_genres(client, mock_display_genre3):
+    response = client.get('/display_genre/')
+    assert response.status_code == 200
+    assert response.json == [{
+        'link': '/display_genre/3',
+        'id': 3,
+        'name': 'Rock & Pop',
+        'icon': 'music',
+        'view_style': 'albums',
+    }]
+
+
+def test_get_display_genre_default_paging(client, mock_display_genre3):
+    response = client.get('/display_genre/3')
+    assert response.status_code == 200
+    mock_display_genre3.get_display_genre_albums.assert_called_once_with(3, 0, 20)
+    assert response.json['link'] == '/display_genre/3'
+    assert response.json['name'] == 'Rock & Pop'
+    assert response.json['genres'] == ['/genres/8']
+    assert response.json['albums'] == ['/albums/21', '/albums/22']
+    assert response.json['playlists'] == []
+    assert response.json['pagination'] == {
+        'offset': 0,
+        'limit': 20,
+        'total': 45,
+        'next': '/display_genre/3?offset=20&limit=20',
+        'prev': None,
+    }
+
+
+def test_get_display_genre_middle_page(client, mock_display_genre3):
+    response = client.get('/display_genre/3?albums=none&offset=15&limit=10')
+    assert response.status_code == 200
+    mock_display_genre3.get_display_genre_albums.assert_called_once_with(3, 15, 10)
+    assert 'albums' not in response.json
+    pagination = response.json['pagination']
+    assert pagination['next'] == '/display_genre/3?albums=none&offset=25&limit=10'
+    assert pagination['prev'] == '/display_genre/3?albums=none&offset=5&limit=10'
+
+
+def test_get_display_genre_last_page(client, mock_display_genre3):
+    response = client.get('/display_genre/3?offset=40')
+    assert response.status_code == 200
+    assert response.json['pagination']['next'] is None
+    assert response.json['pagination']['prev'] == '/display_genre/3?offset=20&limit=20'
+
+
+def test_get_display_genre_limit_is_capped(client, mock_display_genre3):
+    response = client.get('/display_genre/3?limit=5000')
+    assert response.status_code == 200
+    mock_display_genre3.get_display_genre_albums.assert_called_once_with(3, 0, 100)
+    assert response.json['pagination']['limit'] == 100
+
+
+@pytest.mark.parametrize('query', ['offset=-1', 'offset=abc', 'limit=0', 'limit=-5', 'limit=lots'])
+def test_get_display_genre_bad_paging(client, mock_display_genre3, query):
+    response = client.get('/display_genre/3?' + query)
+    assert response.status_code == 400
+
+
+def test_get_display_genre_unknown_id(client, mock_display_genre3):
+    mock_display_genre3.get_display_genre_by_id.side_effect = NotFoundException()
+    response = client.get('/display_genre/99')
+    assert response.status_code == 404
+
+
+def test_display_genres_end_to_end(client, real_db):
+    with real_db() as db:
+        genre = db.ensure_genre_exists('Rock')
+        genre_id = genre.Id
+        default_id = genre.DisplayGenreId
+        db.ensure_album_exists(Album(Artist='Motörhead', Title='Ace of Spades', IsCompilation=False, Genres=[genre]))
+        other = DisplayGenre(Name='Rock & Pop', Icon='music', ViewStyle='albums', SortOrder=1)
+        Database.db.session.add(other)
+        Database.db.session.commit()
+        other_id = other.Id
+
+    response = client.get('/display_genre/')
+    assert [dg['name'] for dg in response.json] == ['Uncategorised', 'Rock & Pop']
+
+    response = client.get(f'/display_genre/{default_id}?albums=all')
+    assert response.status_code == 200
+    assert [album['title'] for album in response.json['albums']] == ['Ace of Spades']
+    assert response.json['pagination']['total'] == 1
+    assert response.json['pagination']['next'] is None
+
+    response = client.get(f'/genres/{genre_id}')
+    assert response.json['display_genre'] == f'/display_genre/{default_id}'
+
+    # Move the genre into the other display genre
+    response = client.put(f'/genres/{genre_id}', json={'display_genre': f'/display_genre/{other_id}'})
+    assert response.status_code == 200
+    assert response.json['display_genre'] == f'/display_genre/{other_id}'
+    assert client.get(f'/display_genre/{default_id}').json['pagination']['total'] == 0
+    response = client.get(f'/display_genre/{other_id}')
+    assert response.json['genres'] == [f'/genres/{genre_id}']
+    assert response.json['pagination']['total'] == 1
+
+    assert client.put(f'/genres/{genre_id}', json={'display_genre': 9999}).status_code == 400
+    assert client.put(f'/genres/{genre_id}', json={'display_genre': 'rock'}).status_code == 400
+    assert client.put('/genres/9999', json={'display_genre': other_id}).status_code == 404
