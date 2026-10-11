@@ -1,6 +1,6 @@
 import hashlib
 import logging
-from typing import Any, Callable, Iterable, List, Optional, Sequence, TYPE_CHECKING
+from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, TYPE_CHECKING
 
 from flask_sqlalchemy import SQLAlchemy
 
@@ -8,7 +8,10 @@ from sqlalchemy import func, select, or_
 from sqlalchemy.sql.expression import true
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 
-from .schema import Base, Album, ArtistAlias, Artwork, Genre, Playlist, RadioStation, Track
+from .displaygenre import DEFAULT_DISPLAY_GENRE_NAME, DisplayGenreIcon, DisplayGenreViewStyle, normalize_genre_name
+from .schema import Base, Album, ArtistAlias, Artwork, DisplayGenre, DisplayGenreMapping, Genre, Playlist
+from .schema import RadioStation, Track
+from .schema import album_genre_association_table, playlist_genre_association_table
 
 if not TYPE_CHECKING:
     func: Callable  # fixes false positives from pylint
@@ -151,6 +154,24 @@ class Database():
         Database.db.session.commit()
         return existing_playlist
 
+    def set_genre_display_genre(self, genreid: int, display_genre_id: int) -> Genre:
+        """
+        Move a genre to a different display genre, and remember the choice
+        for any genre of the same name that is created in future.
+        Raises NotFoundException if either id is unknown.
+        """
+        genre = self.get_genre_by_id(genreid)
+        display_genre = self.get_display_genre_by_id(display_genre_id)
+        genre.DisplayGenreId = display_genre.Id
+        mapping_name = normalize_genre_name(genre.Name)
+        mapping = Database.db.session.get(DisplayGenreMapping, mapping_name)
+        if mapping:
+            mapping.DisplayGenreId = display_genre.Id
+        else:
+            Database.db.session.add(DisplayGenreMapping(GenreName=mapping_name, DisplayGenreId=display_genre.Id))
+        Database.db.session.commit()
+        return genre
+
     def update_radio_station(self, stationid: int, station: RadioStation):
         existing_station = self.get_radio_station_by_id(stationid)
         if not existing_station:
@@ -270,6 +291,36 @@ class Database():
             logging.debug(f"ensure_artwork_exists: no existing artwork: New id {artworkref.Id}")
             return artworkref
 
+    def ensure_default_display_genre_exists(self) -> DisplayGenre:
+        """
+        Return the display genre that is home to genres with no explicit mapping,
+        creating it if necessary.
+        """
+        display_genre = Database.db.session.query(DisplayGenre).filter(
+            DisplayGenre.IsDefault == true()
+        ).first()
+        if display_genre is None:
+            max_sort_order = Database.db.session.query(func.max(DisplayGenre.SortOrder)).scalar()
+            display_genre = DisplayGenre(Name=DEFAULT_DISPLAY_GENRE_NAME,
+                                         Icon=DisplayGenreIcon.MUSIC.value,
+                                         ViewStyle=DisplayGenreViewStyle.LIST_OF_ALBUMS.value,
+                                         SortOrder=0 if max_sort_order is None else max_sort_order + 1,
+                                         IsDefault=True)
+            Database.db.session.add(display_genre)
+            Database.db.session.commit()
+            Database.db.session.refresh(display_genre)
+        return display_genre
+
+    def get_display_genre_for_genre_name(self, genre_name: str) -> DisplayGenre:
+        """
+        Return the display genre that a genre of the given name belongs to:
+        the one it has been explicitly mapped to, or the default display genre.
+        """
+        display_genre = Database.db.session.query(DisplayGenre).join(DisplayGenreMapping).filter(
+            DisplayGenreMapping.GenreName == normalize_genre_name(genre_name)
+        ).one_or_none()
+        return display_genre or self.ensure_default_display_genre_exists()
+
     def ensure_genre_exists(self, genre_name: str) -> Genre:
         """
         Ensure the given genre exists
@@ -278,7 +329,7 @@ class Database():
             Genre.Name == genre_name
         ).one_or_none()
         if genre is None:
-            genre = Genre(Name=genre_name)
+            genre = Genre(Name=genre_name, DisplayGenreId=self.get_display_genre_for_genre_name(genre_name).Id)
             Database.db.session.add(genre)
             Database.db.session.commit()
             Database.db.session.refresh(genre)
@@ -373,6 +424,10 @@ class Database():
         result = Database.db.session.execute(select(Artwork).order_by(Artwork.Id))
         return result.scalars().all()
 
+    def get_all_display_genres(self) -> Sequence[DisplayGenre]:
+        result = Database.db.session.execute(select(DisplayGenre).order_by(DisplayGenre.SortOrder, DisplayGenre.Id))
+        return result.scalars().all()
+
     def get_all_genres(self) -> Sequence[Genre]:
         """
         Primarily for debugging
@@ -455,6 +510,47 @@ class Database():
             .where(Album.IsCompilation == true())
             .order_by(Album.Title)
             .limit(limit)
+        )
+        return result.scalars().all()
+
+    def get_display_genre_by_id(self, display_genre_id: int) -> DisplayGenre:
+        """
+        Return the DisplayGenre object for a given id.
+        Raises NotFoundException for an unknown id
+        """
+        return self.get_x_by_id(DisplayGenre, display_genre_id)
+
+    def get_display_genre_albums(self, display_genre_id: int, offset: int, limit: int) -> Tuple[Sequence[Album], int]:
+        """
+        Return one page of the albums in any of the genres of the given display genre,
+        together with the total number of such albums.
+        Albums are ordered by artist, then release year, then title, with compilations last.
+        """
+        album_ids = (select(album_genre_association_table.c.album_id)
+                     .join(Genre, Genre.Id == album_genre_association_table.c.genre_id)
+                     .where(Genre.DisplayGenreId == display_genre_id))
+        in_display_genre = Album.Id.in_(album_ids)
+        total = Database.db.session.execute(select(func.count(Album.Id)).where(in_display_genre)).scalar()
+        result = Database.db.session.execute(
+            select(Album)
+            .where(in_display_genre)
+            # Album.Id as the final key keeps the order, and hence the pages, stable
+            .order_by(Album.Artist.is_(None), func.lower(Album.Artist), Album.ReleaseYear,
+                      func.lower(Album.Title), Album.Id)
+            .offset(offset)
+            .limit(limit)
+        )
+        return result.scalars().all(), total
+
+    def get_display_genre_playlists(self, display_genre_id: int) -> Sequence[Playlist]:
+        """
+        Return the playlists in any of the genres of the given display genre
+        """
+        playlist_ids = (select(playlist_genre_association_table.c.playlist_id)
+                        .join(Genre, Genre.Id == playlist_genre_association_table.c.genre_id)
+                        .where(Genre.DisplayGenreId == display_genre_id))
+        result = Database.db.session.execute(
+            select(Playlist).where(Playlist.Id.in_(playlist_ids)).order_by(Playlist.Title, Playlist.Id)
         )
         return result.scalars().all()
 

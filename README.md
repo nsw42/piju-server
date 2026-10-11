@@ -27,6 +27,7 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 * 8.0: Use websockets for 'queue'
 * 8.1: Enable a queue for browser-based playback
 * 8.2: Include server version in / response
+* 9.0: Add /display_genre/ returning a grouped collection of genres suitable for display
 
 ## Dependencies
 

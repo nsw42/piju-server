@@ -7,6 +7,7 @@ import os.path
 from pathlib import Path
 import time
 from typing import Any, Dict, List, NamedTuple
+from urllib.parse import urlencode
 
 from flask import Blueprint, jsonify, make_response, request, Response
 from flask_sock import Sock
@@ -16,7 +17,8 @@ from ..database.database import DatabaseAccess, NotFoundException
 from ..database.schema import Album, Playlist, Track
 from .appwrapper import current_piju_app
 from .downloadinfo import DownloadInfo, DownloadInfoDatabaseSingleton
-from .deserialize import build_playlist_from_api_data, build_radio_station_from_api_data, extract_id, parse_bool
+from .deserialize import build_playlist_from_api_data, build_radio_station_from_api_data
+from .deserialize import extract_display_genre_id_from_api_data, extract_id, parse_bool
 from .nowplaying import get_current_status
 from .playerctrl import add_track_to_queue, queue_downloaded_files, select_player, update_player_play_radio_station
 from .playerctrl import update_player_play_from_local, update_player_play_from_radio, update_player_play_from_youtube
@@ -24,6 +26,7 @@ from .playerctrl import update_player_streaming_prevnext
 from .queuesession import get_browser_queue, get_browser_queue_by_session_id, session_id_for_request
 from .queuesession import set_browser_queue, QUEUE_SESSION_HEADER
 from .routeconsts import RouteConstants
+from .serialize import json_display_genre, json_display_genre_contents
 from .serialize import json_genre, json_playlist, json_track_or_file
 from .serialize import InformationLevel
 from .serialize import json_album, json_radio_station, json_track
@@ -33,6 +36,7 @@ routes = Blueprint('routes', __name__, url_prefix='')
 sock = Sock()
 
 ERR_MSG_UNKNOWN_ALBUM_ID = 'Unknown album id'
+ERR_MSG_UNKNOWN_DISPLAY_GENRE_ID = 'Unknown display genre id'
 ERR_MSG_UNKNOWN_GENRE_ID = 'Unknown genre id'
 ERR_MSG_UNKNOWN_TRACK_ID = 'Unknown track id'
 ERR_MSG_UNKNOWN_PLAYLIST_ID = 'Unknown playlist id'
@@ -40,6 +44,11 @@ ERR_MSG_UNKNOWN_RADIO_ID = 'Unknown radio station id'
 ERR_MSG_NO_QUEUE_WHEN_STREAMING = "Queue operations not permitted when playing streaming content"
 
 ARG_NAME_MODE = 'mode'
+ARG_NAME_OFFSET = 'offset'
+ARG_NAME_LIMIT = 'limit'
+
+DEFAULT_PAGE_SIZE = 20
+MAX_PAGE_SIZE = 100
 
 
 class PlaybackMode:
@@ -285,6 +294,67 @@ def get_download_history():
     return gzippable_jsonify(rtn)
 
 
+def get_pagination_arg(arg_name: str, default: int, minimum: int) -> int:
+    value = request.args.get(arg_name, '')
+    if not value:
+        return default
+    if not value.isdigit() or int(value) < minimum:
+        raise BadRequest(f"Invalid value for {arg_name}")
+    return int(value)
+
+
+def build_pagination(base_url: str, offset: int, limit: int, total: int) -> Dict[str, Any]:
+    """
+    Describe the page of results that is being returned, including links to the
+    adjacent pages; those links preserve the other arguments of the current request.
+    """
+    def page_link(page_offset):
+        args = request.args.to_dict()
+        args[ARG_NAME_OFFSET] = page_offset
+        args[ARG_NAME_LIMIT] = limit
+        return base_url + '?' + urlencode(args)
+
+    return {
+        'offset': offset,
+        'limit': limit,
+        'total': total,
+        'next': page_link(offset + limit) if (offset + limit < total) else None,
+        'prev': page_link(max(0, offset - limit)) if (offset > 0) else None,
+    }
+
+
+@routes.get("/display_genre/")
+def get_all_display_genres():
+    with DatabaseAccess() as db:
+        return gzippable_jsonify([json_display_genre(display_genre) for display_genre in db.get_all_display_genres()])
+
+
+@routes.get(RouteConstants.GET_DISPLAY_GENRE)
+def get_display_genre(displaygenreid):
+    album_info = InformationLevel.from_string(request.args.get('albums', ''))
+    playlist_info = InformationLevel.from_string(request.args.get('playlists', ''))
+    offset = get_pagination_arg(ARG_NAME_OFFSET, default=0, minimum=0)
+    limit = min(get_pagination_arg(ARG_NAME_LIMIT, default=DEFAULT_PAGE_SIZE, minimum=1), MAX_PAGE_SIZE)
+    with DatabaseAccess() as db:
+        try:
+            display_genre = db.get_display_genre_by_id(displaygenreid)
+        except NotFoundException as exc:
+            raise NotFound(ERR_MSG_UNKNOWN_DISPLAY_GENRE_ID) from exc
+        albums, total = db.get_display_genre_albums(display_genre.Id, offset, limit)
+        if playlist_info == InformationLevel.NO_INFO:
+            playlists = []
+        else:
+            playlists = db.get_display_genre_playlists(display_genre.Id)
+        pagination = build_pagination(RouteConstants.url_for_get_display_genre(display_genre.Id),
+                                      offset, limit, total)
+        return gzippable_jsonify(json_display_genre_contents(display_genre,
+                                                             albums=albums,
+                                                             include_albums=album_info,
+                                                             playlists=playlists,
+                                                             include_playlists=playlist_info,
+                                                             pagination=pagination))
+
+
 @routes.get("/genres/")
 def get_all_genres():
     with DatabaseAccess() as db:
@@ -306,6 +376,23 @@ def get_genre(genreid):
         except NotFoundException as exc:
             raise NotFound(ERR_MSG_UNKNOWN_GENRE_ID) from exc
         return gzippable_jsonify(json_genre(genre, include_albums=album_info, include_playlists=playlist_info))
+
+
+@routes.put(RouteConstants.GET_GENRE)
+def update_genre(genreid):
+    display_genre_id = extract_display_genre_id_from_api_data()
+    with DatabaseAccess() as db:
+        try:
+            db.get_genre_by_id(genreid)
+        except NotFoundException as exc:
+            raise NotFound(ERR_MSG_UNKNOWN_GENRE_ID) from exc
+        try:
+            genre = db.set_genre_display_genre(genreid, display_genre_id)
+        except NotFoundException as exc:
+            raise BadRequest(ERR_MSG_UNKNOWN_DISPLAY_GENRE_ID) from exc
+        return gzippable_jsonify(json_genre(genre,
+                                            include_albums=InformationLevel.NO_INFO,
+                                            include_playlists=InformationLevel.NO_INFO))
 
 
 @routes.get("/mp3/<trackid>")

@@ -86,6 +86,16 @@ def build_radio_station_from_api_data() -> RadioStation:
                         NowPlayingArtworkUrl=now_playing_artwork_url, NowPlayingArtworkJq=now_playing_artwork_jq)
 
 
+def extract_display_genre_id_from_api_data() -> int:
+    data = request.get_json()
+    if not data:
+        raise BadRequest('No data found in request')
+    display_genre_id = extract_id(data.get('display_genre'))
+    if display_genre_id is None:
+        raise BadRequest('Missing or invalid display genre')
+    return display_genre_id
+
+
 def extract_id(uri_or_id):
     if uri_or_id and isinstance(uri_or_id, str) and '/' in uri_or_id:
         # this is a uri, map it to a string representation of an id, then fall-through

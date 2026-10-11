@@ -6,11 +6,11 @@ an over-the-wire representation
 import enum
 from functools import lru_cache
 import os.path
-from typing import overload
+from typing import Any, Dict, Optional, Sequence, overload
 
 from .routeconsts import RouteConstants
 from ..database.database import Database
-from ..database.schema import Album, Genre, Playlist, RadioStation, Track
+from ..database.schema import Album, DisplayGenre, Genre, Playlist, RadioStation, Track
 from ..player.fileplayer import QueuedTrack
 
 
@@ -80,11 +80,50 @@ def json_album(album: Album, include_tracks: InformationLevel):
     return rtn
 
 
+def json_display_genre(display_genre: DisplayGenre):
+    return {
+        'link': RouteConstants.url_for_get_display_genre(display_genre.Id),
+        'id': display_genre.Id,
+        'name': display_genre.Name,
+        'icon': display_genre.Icon,
+        'view_style': display_genre.ViewStyle,
+    }
+
+
+def json_display_genre_contents(display_genre: DisplayGenre,
+                                albums: Sequence[Album],
+                                include_albums: InformationLevel,
+                                playlists: Sequence[Playlist],
+                                include_playlists: InformationLevel,
+                                pagination: Optional[Dict[str, Any]] = None):
+    """
+    albums is the page of albums to be included in the response, which pagination describes.
+    """
+    rtn = json_display_genre(display_genre)
+    rtn['genres'] = [RouteConstants.url_for_get_genre(genre.Id) for genre in display_genre.Genres]
+    if include_albums == InformationLevel.LINKS:
+        rtn['albums'] = [RouteConstants.url_for_get_album(album.Id) for album in albums]
+    elif include_albums in (InformationLevel.ALL_INFO, InformationLevel.DEBUG_INFO):
+        rtn['albums'] = [json_album(album, include_tracks=include_albums) for album in albums]
+    if include_playlists == InformationLevel.LINKS:
+        rtn['playlists'] = [RouteConstants.url_for_get_one_playlist(playlist.Id) for playlist in playlists]
+    elif include_playlists in (InformationLevel.ALL_INFO, InformationLevel.DEBUG_INFO):
+        rtn['playlists'] = [json_playlist(playlist,
+                                          include_genres=InformationLevel.NO_INFO,
+                                          include_tracks=include_playlists)
+                            for playlist in playlists]
+    if pagination is not None:
+        rtn['pagination'] = pagination
+    return rtn
+
+
 @lru_cache(maxsize=32)
 def json_genre(genre: Genre, include_albums: InformationLevel, include_playlists: InformationLevel):
     rtn = {
         'link': RouteConstants.url_for_get_genre(genre.Id),
         'name': genre.Name,
+        'display_genre': (RouteConstants.url_for_get_display_genre(genre.DisplayGenreId)
+                          if genre.DisplayGenreId else None),
     }
     if include_albums == InformationLevel.LINKS:
         rtn['albums'] = [RouteConstants.url_for_get_album(album.Id) for album in genre.Albums]

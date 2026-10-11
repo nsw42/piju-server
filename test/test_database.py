@@ -5,8 +5,9 @@ from flask import Flask
 import pytest
 
 from pijuv2.scan.directory import set_cross_refs
-from pijuv2.database.database import Database
-from pijuv2.database.schema import Album, Artwork, Track
+from pijuv2.database.database import Database, NotFoundException
+from pijuv2.database.displaygenre import normalize_genre_name
+from pijuv2.database.schema import Album, Artwork, DisplayGenre, DisplayGenreMapping, Track
 
 TEST_DB = 'test.db'
 
@@ -265,3 +266,103 @@ def test_delete_one_artist_alias(db_in_app_context):
     # Check
     res = db_in_app_context.get_artist_aliases(tmbg)
     assert res == ['TMBG']
+
+
+def mk_display_genre(db, name, genre_names, sort_order=0):
+    display_genre = DisplayGenre(Name=name, Icon='music', ViewStyle='albums', SortOrder=sort_order)
+    Database.db.session.add(display_genre)
+    Database.db.session.commit()
+    for genre_name in genre_names:
+        Database.db.session.add(DisplayGenreMapping(GenreName=normalize_genre_name(genre_name),
+                                                    DisplayGenreId=display_genre.Id))
+    Database.db.session.commit()
+    return display_genre
+
+
+def mk_album_in_genres(db, artist, title, genres, year=None, is_compilation=False):
+    return db.ensure_album_exists(Album(Artist=artist, Title=title, ReleaseYear=year,
+                                        IsCompilation=is_compilation, Genres=genres))
+
+
+def test_new_genre_uses_display_genre_mapping(db_in_app_context):
+    rock = mk_display_genre(db_in_app_context, "Rock & Pop", ["Post Punk", "Rock"])
+
+    for genre_name in ("Rock", "post-punk", "(Post/Punk)"):
+        genre = db_in_app_context.ensure_genre_exists(genre_name)
+        assert genre.DisplayGenreId == rock.Id
+
+
+def test_new_unmapped_genre_uses_default_display_genre(db_in_app_context):
+    rock = mk_display_genre(db_in_app_context, "Rock & Pop", ["Rock"])
+
+    genre1 = db_in_app_context.ensure_genre_exists("Technocrat Jazz")
+    genre2 = db_in_app_context.ensure_genre_exists("Bureaucrat Blues")
+
+    assert genre1.DisplayGenreId != rock.Id
+    assert genre1.DisplayGenreId == genre2.DisplayGenreId
+    default = db_in_app_context.get_display_genre_by_id(genre1.DisplayGenreId)
+    assert default.IsDefault
+    assert default.Name == "Uncategorised"
+    # the default display genre is created once, after the existing ones
+    assert [dg.Id for dg in db_in_app_context.get_all_display_genres()] == [rock.Id, default.Id]
+
+
+def test_get_all_display_genres_is_in_sort_order(db_in_app_context):
+    mk_display_genre(db_in_app_context, "Second", [], sort_order=2)
+    mk_display_genre(db_in_app_context, "First", [], sort_order=1)
+
+    assert [dg.Name for dg in db_in_app_context.get_all_display_genres()] == ["First", "Second"]
+
+
+def test_get_display_genre_albums_order_and_paging(db_in_app_context):
+    rock = mk_display_genre(db_in_app_context, "Rock & Pop", ["Rock", "Pop"])
+    mk_display_genre(db_in_app_context, "Classical", ["Classical"], sort_order=1)
+    genre_rock = db_in_app_context.ensure_genre_exists("Rock")
+    genre_pop = db_in_app_context.ensure_genre_exists("Pop")
+    genre_classical = db_in_app_context.ensure_genre_exists("Classical")
+    mk_album_in_genres(db_in_app_context, "zebra", "Stripes", [genre_rock], year=2001)
+    mk_album_in_genres(db_in_app_context, "Aardvark", "Later", [genre_pop], year=2005)
+    # in two genres of the same display genre: must only be reported once
+    mk_album_in_genres(db_in_app_context, "Aardvark", "Earlier", [genre_rock, genre_pop], year=1999)
+    mk_album_in_genres(db_in_app_context, "not used", "Compilation", [genre_pop], is_compilation=True)
+    mk_album_in_genres(db_in_app_context, "Bach", "Fugues", [genre_classical])
+
+    albums, total = db_in_app_context.get_display_genre_albums(rock.Id, offset=0, limit=20)
+    assert total == 4
+    assert [album.Title for album in albums] == ["Earlier", "Later", "Stripes", "Compilation"]
+
+    albums, total = db_in_app_context.get_display_genre_albums(rock.Id, offset=1, limit=2)
+    assert total == 4
+    assert [album.Title for album in albums] == ["Later", "Stripes"]
+
+    albums, total = db_in_app_context.get_display_genre_albums(rock.Id, offset=4, limit=2)
+    assert total == 4
+    assert albums == []
+
+
+def test_set_genre_display_genre_is_remembered(db_in_app_context):
+    rock = mk_display_genre(db_in_app_context, "Rock & Pop", ["Rock"])
+    jazz = mk_display_genre(db_in_app_context, "Jazz", [], sort_order=1)
+    genre = db_in_app_context.ensure_genre_exists("Jazz-Rock")
+    assert genre.DisplayGenreId not in (rock.Id, jazz.Id)
+
+    db_in_app_context.set_genre_display_genre(genre.Id, jazz.Id)
+    assert db_in_app_context.get_genre_by_id(genre.Id).DisplayGenreId == jazz.Id
+    assert [g.Name for g in db_in_app_context.get_display_genre_by_id(jazz.Id).Genres] == ["Jazz-Rock"]
+
+    # The mapping survives the genre being deleted (eg by a tidy) and scanned again
+    db_in_app_context.delete_genre(genre.Id)
+    assert db_in_app_context.ensure_genre_exists("Jazz Rock").DisplayGenreId == jazz.Id
+
+    # ... and can be changed again
+    genre = db_in_app_context.ensure_genre_exists("Jazz Rock")
+    db_in_app_context.set_genre_display_genre(genre.Id, rock.Id)
+    assert db_in_app_context.ensure_genre_exists("jazz/rock").DisplayGenreId == rock.Id
+
+
+def test_set_genre_display_genre_unknown_ids(db_in_app_context):
+    genre = db_in_app_context.ensure_genre_exists("Rock")
+    with pytest.raises(NotFoundException):
+        db_in_app_context.set_genre_display_genre(genre.Id, 12345)
+    with pytest.raises(NotFoundException):
+        db_in_app_context.set_genre_display_genre(12345, genre.DisplayGenreId)
