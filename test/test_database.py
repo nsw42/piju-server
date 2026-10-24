@@ -340,6 +340,27 @@ def test_get_display_genre_albums_order_and_paging(db_in_app_context):
     assert albums == []
 
 
+def test_get_display_genre_albums_order_ignores_quotes(db_in_app_context):
+    comedy = mk_display_genre(db_in_app_context, "Comedy", ["Comedy"])
+    genre_comedy = db_in_app_context.ensure_genre_exists("Comedy")
+    mk_album_in_genres(db_in_app_context, "Yorgi Yorgesson", "Yorgi", [genre_comedy])
+    mk_album_in_genres(db_in_app_context, '"Weird Al" Yankovic', "Poodle Hat", [genre_comedy])
+    mk_album_in_genres(db_in_app_context, "Bob Newhart", "Something Like That", [genre_comedy], year=2001)
+    mk_album_in_genres(db_in_app_context, "Bob Newhart", "\u2018Something Like This\u2019", [genre_comedy], year=2001)
+    mk_album_in_genres(db_in_app_context, "Bob Newhart", "'Something Like Those'", [genre_comedy], year=2001)
+    mk_album_in_genres(db_in_app_context, "Billy Connolly", "Classic Connolly", [genre_comedy])
+
+    albums, _ = db_in_app_context.get_display_genre_albums(comedy.Id, offset=0, limit=20)
+    assert [(album.Artist, album.Title) for album in albums] == [
+        ("Billy Connolly", "Classic Connolly"),
+        ("Bob Newhart", "Something Like That"),
+        ("Bob Newhart", "\u2018Something Like This\u2019"),
+        ("Bob Newhart", "'Something Like Those'"),
+        ('"Weird Al" Yankovic', "Poodle Hat"),
+        ("Yorgi Yorgesson", "Yorgi"),
+    ]
+
+
 def test_set_genre_display_genre_is_remembered(db_in_app_context):
     rock = mk_display_genre(db_in_app_context, "Rock & Pop", ["Rock"])
     jazz = mk_display_genre(db_in_app_context, "Jazz", [], sort_order=1)

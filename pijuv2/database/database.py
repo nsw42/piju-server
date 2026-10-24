@@ -16,6 +16,18 @@ from .schema import album_genre_association_table, playlist_genre_association_ta
 if not TYPE_CHECKING:
     func: Callable  # fixes false positives from pylint
 
+SORT_IGNORED_CHARACTERS = '"\'\u2018\u2019\u201c\u201d'
+
+
+def sort_key(column):
+    """
+    A case-insensitive sort key for a text column that ignores quote marks,
+    so that, for example, '"Weird Al" Yankovic' sorts under W
+    """
+    for ch in SORT_IGNORED_CHARACTERS:
+        column = func.replace(column, ch, '')
+    return func.lower(column)
+
 
 class PijuDatabaseException(Exception):
     """
@@ -535,8 +547,8 @@ class Database():
             select(Album)
             .where(in_display_genre)
             # Album.Id as the final key keeps the order, and hence the pages, stable
-            .order_by(Album.Artist.is_(None), func.lower(Album.Artist), Album.ReleaseYear,
-                      func.lower(Album.Title), Album.Id)
+            .order_by(Album.Artist.is_(None), sort_key(Album.Artist), Album.ReleaseYear,
+                      sort_key(Album.Title), Album.Id)
             .offset(offset)
             .limit(limit)
         )
