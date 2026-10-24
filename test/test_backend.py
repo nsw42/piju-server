@@ -349,3 +349,17 @@ def test_get_unknown_artwork(client, real_db, route):
     response = client.get(route)
     assert response.status_code == 404
     assert 'Unknown artwork id' in response.get_data(as_text=True)
+
+
+def test_queue_url_rejected_in_browser_mode(test_app, client):
+    response = client.put('/queue/', json={'mode': 'browser', 'url': 'https://youtu.be/xyz'},
+                          headers={'X-Piju-Queue-Session': 'test-session'})
+    assert response.status_code == 400
+    assert test_app.work_queue.empty()
+
+
+def test_queue_url_accepted_in_server_mode(test_app, client):
+    response = client.put('/queue/', json={'mode': 'server', 'url': 'https://youtu.be/xyz'})
+    assert response.status_code == 204
+    request = test_app.work_queue.get_nowait()
+    assert request[:2] == (WorkRequests.FETCH_FROM_YOUTUBE, 'https://youtu.be/xyz')
