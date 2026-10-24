@@ -1,0 +1,1505 @@
+openapi: 3.0.0
+info:
+  version: '9.2'
+  title: Piju REST API
+  description: >
+    REST + WebSocket API for the piju music server. The version above matches the
+    ApiVersion reported in the / response.
+
+
+    JSON responses are gzip-compressed if the request includes `Accept-Encoding: gzip`.
+
+
+    Wherever a request identifies an album, playlist, track, display genre or radio station,
+    either the integer id or the URI of the object (as returned in a `link` field) may be used.
+
+
+    Boolean query parameters are true if their value is `y`, `yes` or `true` (case insensitive),
+    and false for any other value.
+
+servers:
+  - url: http://localhost:5000/
+
+paths:
+  /:
+    get:
+      summary: Get current status of the piju server
+      description: >
+        The same information is pushed to clients of the /ws WebSocket whenever it changes.
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+
+  /ws:
+    get:
+      summary: WebSocket for 'now playing' status updates
+      description: >
+        Upgrade to a WebSocket. The server immediately sends the current status (as per the /
+        response, serialized as JSON), and sends it again every time it changes. Messages sent
+        by the client are ignored.
+      responses:
+        101:
+          description: Switching protocols to WebSocket
+
+  /albums/:
+    get:
+      summary: Get index of all albums. Primarily for debugging purposes.
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Album'
+
+  /albums/{albumId}:
+    parameters:
+      - $ref: '#/components/parameters/AlbumId'
+    get:
+      summary: Get the information about a specific album
+      parameters:
+        - name: tracks
+          in: query
+          description: How much information to include about each track
+          schema:
+            $ref: '#/components/schemas/InformationLevel'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Album'
+        404:
+          description: Unknown album id
+    put:
+      summary: Update the information about an album
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                releasedate:
+                  type: integer
+                  description: The new release year. Omitted or 0 to leave it unchanged.
+      responses:
+        204:
+          description: OK
+        400:
+          description: No data in request
+        404:
+          description: Unknown album id
+
+  /artists/{artist}:
+    get:
+      summary: Get the albums by an artist
+      description: >
+        The artist name may contain slashes (e.g. AC/DC). The special artist name
+        'Various Artists' (case insensitive) returns all compilation albums.
+      parameters:
+        - name: artist
+          in: path
+          required: true
+          description: The artist name
+          schema:
+            type: string
+        - name: tracks
+          in: query
+          description: How much information to include about the tracks of each album
+          schema:
+            $ref: '#/components/schemas/InformationLevel'
+        - name: aliases
+          in: query
+          description: Whether to also include albums by the artist's aliases (see /artistaliases)
+          schema:
+            type: boolean
+            default: true
+        - name: exact
+          in: query
+          description: >
+            If true, the artist name must match (case insensitive) the complete artist name;
+            if false, it may match anywhere within it
+          schema:
+            type: boolean
+            default: true
+      responses:
+        200:
+          description: >
+            OK. An object whose keys are artist names (several may match if exact is false or
+            aliases is true), and whose values are the albums by that artist.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Album'
+        404:
+          description: No matching artist found
+
+  /artistaliases/{artist}:
+    parameters:
+      - name: artist
+        in: path
+        required: true
+        description: The artist name. May contain slashes.
+        schema:
+          type: string
+    get:
+      summary: Get the aliases of an artist
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  description: Alternative name for the artist
+        404:
+          description: No aliases found for the artist
+    post:
+      summary: Add an alias for an artist
+      description: The reverse mapping (from the alias to the artist) is added, too.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              description: The alternative name for the artist
+      responses:
+        204:
+          description: OK
+        400:
+          description: Request body is missing or not a JSON string
+    delete:
+      summary: Delete all aliases of an artist
+      description: The reverse mappings (from each alias to the artist) are removed, too.
+      responses:
+        204:
+          description: OK
+        404:
+          description: No aliases found for the artist
+
+  /artwork/{artworkId}:
+    get:
+      summary: Get an artwork image
+      parameters:
+        - $ref: '#/components/parameters/ArtworkId'
+      responses:
+        200:
+          description: OK
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: max-age=300
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        404:
+          description: Unknown artwork id
+        500:
+          description: Artwork has an unrecognised image format
+
+  /artworkinfo/{artworkId}:
+    get:
+      summary: Get information about an artwork image
+      parameters:
+        - $ref: '#/components/parameters/ArtworkId'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  width:
+                    type: integer
+                    nullable: true
+                  height:
+                    type: integer
+                    nullable: true
+                  image:
+                    type: string
+                    nullable: true
+                    description: URI of the artwork image; null if there is no image data
+        404:
+          description: Unknown artwork id
+
+  /display_genre/:
+    get:
+      summary: Get index of all display genres, in the order in which they should be presented
+      description: >
+        A display genre is a group of genres that is presented to the user as a single genre
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/DisplayGenreSummary'
+                    - type: object
+                      required:
+                        - album_count
+                      properties:
+                        album_count:
+                          type: integer
+                          description: >
+                            Number of albums in this display genre; 0 if it is empty
+                            (for example, so that a client can hide it)
+
+  /display_genre/{displayGenreId}:
+    get:
+      summary: Get one page of the contents of a specific display genre
+      parameters:
+        - name: displayGenreId
+          in: path
+          required: true
+          description: The ID of the display genre to return
+          schema:
+            type: integer
+        - name: albums
+          in: query
+          description: How much information to include about each album
+          schema:
+            $ref: '#/components/schemas/InformationLevel'
+        - name: playlists
+          in: query
+          description: How much information to include about each playlist
+          schema:
+            $ref: '#/components/schemas/InformationLevel'
+        - name: offset
+          in: query
+          description: The index of the first album to return
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          description: The maximum number of albums to return. Values above 100 are treated as 100.
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisplayGenre'
+        400:
+          description: Invalid offset or limit
+        404:
+          description: Unknown display genre id
+
+  /downloadhistory:
+    get:
+      summary: Get the history of URLs that have been downloaded for playing, most recent first
+      responses:
+        200:
+          description: >
+            OK. Each URL that has been successfully downloaded is expanded into one entry per
+            downloaded file (e.g. for a playlist URL); URLs that have not (yet) been downloaded
+            contain only the url.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - url
+                  properties:
+                    url:
+                      type: string
+                    artist:
+                      type: string
+                    title:
+                      type: string
+                    artwork:
+                      type: string
+                      nullable: true
+                      description: URI of the artwork
+
+  /genres/:
+    get:
+      summary: Get index of all genres
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GenreSummary'
+
+  /genres/{genreId}:
+    parameters:
+      - name: genreId
+        in: path
+        required: true
+        description: The ID of the genre
+        schema:
+          type: integer
+    get:
+      summary: Get the information about a specific genre
+      parameters:
+        - name: albums
+          in: query
+          description: How much information to include about each album
+          schema:
+            $ref: '#/components/schemas/InformationLevel'
+        - name: playlists
+          in: query
+          description: How much information to include about each playlist
+          schema:
+            $ref: '#/components/schemas/InformationLevel'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Genre'
+        404:
+          description: Unknown genre id
+    put:
+      summary: Move a genre into a different display genre
+      description: >
+        The choice is remembered, and applied to any genre of the same name that is created in future
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - display_genre
+              properties:
+                display_genre:
+                  $ref: '#/components/schemas/IdOrUri'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenreSummary'
+        400:
+          description: Missing, invalid or unknown display genre
+        404:
+          description: Unknown genre id
+
+  /mp3/{trackId}:
+    get:
+      summary: Get the audio data for a track
+      description: >
+        The file is returned as-is. Note that the Content-Type is always audio/mpeg, even if the
+        underlying file is in another format (see the track's fileformat).
+      parameters:
+        - $ref: '#/components/parameters/TrackId'
+      responses:
+        200:
+          description: OK
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+        404:
+          description: Unknown track id
+
+  /player/next:
+    post:
+      summary: Skip to the next track in the queue, or the next radio station
+      responses:
+        204:
+          description: OK
+
+  /player/pause:
+    post:
+      summary: Pause playback
+      responses:
+        204:
+          description: OK
+
+  /player/play:
+    post:
+      summary: Play an album, playlist, track, queue position, radio station or URL
+      description: |
+        Valid combinations are:
+        * album, optionally with one of track or disk
+        * playlist, optionally with track
+        * queuepos, optionally with track
+        * track on its own
+        * radio on its own
+        * url on its own
+
+        Playing an album, playlist or track replaces the queue.
+        Playing a URL downloads the audio in the background, and then replaces the queue with it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                album:
+                  $ref: '#/components/schemas/IdOrUri'
+                disk:
+                  type: integer
+                  description: The disk number within the album to play
+                playlist:
+                  $ref: '#/components/schemas/IdOrUri'
+                queuepos:
+                  type: integer
+                  description: The index within the (visible) queue to start playing at
+                track:
+                  allOf:
+                    - $ref: '#/components/schemas/IdOrUri'
+                  description: >
+                    The track id within the album/playlist/queue to start playing at, or the id of
+                    the individual track to play
+                radio:
+                  allOf:
+                    - $ref: '#/components/schemas/IdOrUri'
+                  description: The radio station to play
+                url:
+                  type: string
+                  description: A URL (e.g. YouTube) to download audio from and play
+      responses:
+        204:
+          description: OK
+        400:
+          description: |
+            Request was invalid for one of the following reasons:
+            * No request body.
+            * Nothing to play was specified.
+            * More than one of album, playlist and queuepos was specified.
+            * radio or url was specified in combination with something else.
+            * The requested track id does not exist within the requested album/playlist.
+        404:
+          description: The given album id, playlist id, track id or radio station id does not exist
+        409:
+          description: The given queuepos (and track, if specified) does not exist in the queue
+
+  /player/previous:
+    post:
+      summary: Go back to the previous track in the queue, or the previous radio station
+      responses:
+        204:
+          description: OK
+
+  /player/resume:
+    post:
+      summary: Resume playback, optionally switching between local and radio playback
+      description: >
+        If radio is requested and nothing was previously playing on the radio player,
+        the first radio station starts playing.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - player
+              properties:
+                player:
+                  type: string
+                  enum: [local, radio]
+      responses:
+        204:
+          description: OK
+        400:
+          description: Request body was present, but did not contain a valid player
+
+  /player/stop:
+    post:
+      summary: Stop playback
+      responses:
+        204:
+          description: OK
+
+  /player/volume:
+    get:
+      summary: Get the current volume
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  volume:
+                    type: integer
+    post:
+      summary: Set the volume (of both the local and radio players)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - volume
+              properties:
+                volume:
+                  type: integer
+      responses:
+        204:
+          description: OK
+        400:
+          description: Volume missing or not numeric
+
+  /playlists/:
+    get:
+      summary: Get index of all playlists
+      parameters:
+        - name: genres
+          in: query
+          description: How much information to include about the genres of each playlist
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/InformationLevel'
+            default: none
+        - name: tracks
+          in: query
+          description: How much information to include about the tracks of each playlist
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/InformationLevel'
+            default: none
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Playlist'
+    post:
+      summary: Create a new playlist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaylistImport'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaylistImportResult'
+        400:
+          description: >
+            No data, missing title, neither or both of tracks and files specified,
+            invalid track reference, or no tracks found
+        404:
+          description: Unknown track id
+
+  /playlists/{playlistId}:
+    parameters:
+      - name: playlistId
+        in: path
+        required: true
+        description: The ID of the playlist
+        schema:
+          type: integer
+    get:
+      summary: Get the information about a specific playlist
+      parameters:
+        - name: genres
+          in: query
+          description: How much information to include about the genres of the playlist
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/InformationLevel'
+            default: none
+        - name: tracks
+          in: query
+          description: How much information to include about the tracks of the playlist
+          schema:
+            $ref: '#/components/schemas/InformationLevel'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Playlist'
+        404:
+          description: Unknown playlist id
+    put:
+      summary: Update the definition of a playlist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaylistImport'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaylistImportResult'
+        400:
+          description: >
+            No data, missing title, neither or both of tracks and files specified,
+            invalid track reference, or no tracks found
+        404:
+          description: Unknown playlist id or track id
+    delete:
+      summary: Delete a playlist
+      responses:
+        204:
+          description: OK
+        404:
+          description: Unknown playlist id
+
+  /queue/:
+    get:
+      summary: Get the contents of the queue
+      description: >
+        In server mode, this is the remainder of the server's queue, starting with the current track.
+      parameters:
+        - $ref: '#/components/parameters/QueueMode'
+        - $ref: '#/components/parameters/QueueSession'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Track'
+        400:
+          description: Invalid mode, or missing session header in browser mode
+        409:
+          description: Server mode was requested while streaming radio
+    put:
+      summary: Add to, or reorder, the queue
+      description: |
+        Exactly one of the following is acted on, in this order of precedence:
+        * album (optionally with disk): append the tracks of the album (or that disk of it)
+        * track: append the track
+        * url: download audio from the URL in the background, then append it. Server mode only.
+        * queue: replace the queue with the given list of track ids
+
+        Note that, unlike GET and DELETE, the mode is specified in the request body.
+        In server mode, if radio is streaming, the server switches to local playback.
+      parameters:
+        - $ref: '#/components/parameters/QueueSession'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mode:
+                  type: string
+                  enum: [server, browser]
+                  default: server
+                album:
+                  $ref: '#/components/schemas/IdOrUri'
+                disk:
+                  type: integer
+                track:
+                  $ref: '#/components/schemas/IdOrUri'
+                url:
+                  type: string
+                queue:
+                  type: array
+                  description: >
+                    The new queue order, as track ids. Negative ids refer to downloaded
+                    (non-library) tracks; these are ignored in browser mode.
+                  items:
+                    type: integer
+      responses:
+        204:
+          description: OK
+        400:
+          description: >
+            No data, nothing to do, invalid mode or track id, url used in browser mode,
+            or missing session header in browser mode
+        404:
+          description: Unknown album or track id
+    delete:
+      summary: Remove a track from the queue
+      description: >
+        Both the index and track id must be given, to guard against the queue having changed.
+        In browser mode, a mismatched index/track id is silently ignored.
+      parameters:
+        - $ref: '#/components/parameters/QueueMode'
+        - $ref: '#/components/parameters/QueueSession'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - index
+                - track
+              properties:
+                index:
+                  type: integer
+                  description: Index within the queue (as returned by GET) of the track to remove
+                track:
+                  type: integer
+                  description: Id of the track at that index
+      responses:
+        204:
+          description: OK
+        400:
+          description: >
+            Missing or invalid index/track, track id did not match at the given index (server mode),
+            invalid mode, or missing session header in browser mode
+        409:
+          description: Server mode was requested while streaming radio
+
+  /queue/ws:
+    get:
+      summary: WebSocket for queue updates
+      description: >
+        Upgrade to a WebSocket. The server immediately sends the queue contents (as per
+        GET /queue/), and sends them again every time they change. Messages sent by the client
+        are ignored. A WebSocket handshake cannot carry custom headers, so in browser mode the
+        session id is passed via the session query parameter instead.
+      parameters:
+        - $ref: '#/components/parameters/QueueMode'
+        - name: session
+          in: query
+          description: The queue session id. Required in browser mode.
+          schema:
+            type: string
+      responses:
+        101:
+          description: Switching protocols to WebSocket
+
+  /radio/:
+    get:
+      summary: Get all radio stations, in their sort order
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RadioStation'
+    post:
+      summary: Add a radio station
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RadioStationDetails'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    description: Id of the new radio station
+        400:
+          description: No data, or missing name or URL
+    put:
+      summary: Reorder the radio stations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              description: Every radio station, exactly once, in the desired order
+              items:
+                $ref: '#/components/schemas/IdOrUri'
+      responses:
+        204:
+          description: OK
+        400:
+          description: >
+            Not a list, unrecognised station id, or the list does not contain every station
+            exactly once
+
+  /radio/{stationId}:
+    parameters:
+      - name: stationId
+        in: path
+        required: true
+        description: The ID of the radio station
+        schema:
+          type: integer
+    get:
+      summary: Get the information about a specific radio station
+      parameters:
+        - name: urls
+          in: query
+          description: Use all or debug to include the station's URLs and 'now playing' configuration
+          schema:
+            $ref: '#/components/schemas/InformationLevel'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/RadioStation'
+                  - $ref: '#/components/schemas/RadioStationUrls'
+        404:
+          description: Unknown radio station id
+    put:
+      summary: Update a radio station
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RadioStationDetails'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RadioStation'
+        400:
+          description: No data, or missing name or URL
+        404:
+          description: Unknown radio station id
+    delete:
+      summary: Delete a radio station
+      responses:
+        204:
+          description: OK
+        404:
+          description: Unknown radio station id
+
+  /scanner/scan:
+    post:
+      summary: Scan (a subdirectory) for new/updated music
+      description: The scan runs in the background; progress is reported in WorkerStatus.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dir:
+                  type: string
+                  description: >
+                    The sub-directory of the music directory to scan. If omitted, scans the whole
+                    music directory.
+      responses:
+        204:
+          description: OK
+        400:
+          description: No request body, or the directory does not exist
+
+  /scanner/tidy:
+    post:
+      summary: Remove database entries that are no longer needed
+      description: >
+        Runs in the background: deletes tracks whose files are missing, then albums without
+        tracks, empty genres, and artwork without tracks.
+      responses:
+        204:
+          description: OK
+
+  /search/:
+    get:
+      summary: Search for albums, artists and tracks
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: The words to search for
+          schema:
+            type: string
+        - name: albums
+          in: query
+          description: Whether to search album titles
+          schema:
+            type: boolean
+            default: true
+        - name: artists
+          in: query
+          description: Whether to search artist names
+          schema:
+            type: boolean
+            default: true
+        - name: tracks
+          in: query
+          description: Whether to search track titles
+          schema:
+            type: boolean
+            default: true
+      responses:
+        200:
+          description: OK. Each property is only present if that kind of search was requested.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  albums:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Album'
+                  artists:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        link:
+                          type: string
+                          description: URI of the artist
+                  tracks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Track'
+        400:
+          description: Missing search string
+
+  /tracks/:
+    get:
+      summary: Get index of all tracks. Primarily for debugging purposes.
+      parameters:
+        - name: limit
+          in: query
+          description: The maximum number of tracks to return
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Track'
+
+  /tracks/{trackId}:
+    get:
+      summary: Get the information about a specific track
+      parameters:
+        - $ref: '#/components/parameters/TrackId'
+        - name: infolevel
+          in: query
+          description: Use debug to include the track's filepath
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/InformationLevel'
+            default: all
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Track'
+        404:
+          description: Unknown track id
+
+components:
+  parameters:
+    AlbumId:
+      name: albumId
+      in: path
+      required: true
+      description: The ID of the album
+      schema:
+        type: integer
+    ArtworkId:
+      name: artworkId
+      in: path
+      required: true
+      description: The ID of the artwork
+      schema:
+        type: integer
+    TrackId:
+      name: trackId
+      in: path
+      required: true
+      description: The ID of the track
+      schema:
+        type: integer
+    QueueMode:
+      name: mode
+      in: query
+      description: >
+        server to operate on the server's own queue (played on the server); browser to operate on
+        a per-client queue for client-side playback, identified by the queue session id
+      schema:
+        type: string
+        enum: [server, browser]
+        default: server
+    QueueSession:
+      name: X-Piju-Queue-Session
+      in: header
+      description: >
+        An opaque client-generated id identifying the browser-mode queue. Required in browser mode.
+      schema:
+        type: string
+
+  schemas:
+    InformationLevel:
+      type: string
+      enum: [none, links, all, debug]
+      default: links
+      description: >
+        How much information to include about nested objects: none omits them entirely;
+        links gives just their URIs; all gives the full objects; debug additionally includes
+        information not normally exposed (e.g. file paths). Unrecognised values are treated as
+        the default.
+
+    IdOrUri:
+      description: The integer id of an object, or its URI
+      oneOf:
+        - type: integer
+        - type: string
+
+    Status:
+      type: object
+      properties:
+        ServerVersion:
+          type: string
+          description: Short git commit hash of the server, or 'unknown'
+        ApiVersion:
+          type: string
+          description: API version string
+        WorkerStatus:
+          type: string
+          description: Human-readable description of what the background worker is doing, e.g. 'Idle'
+        PlayerStatus:
+          type: string
+          enum: [stopped, playing, paused]
+        PlayerVolume:
+          type: integer
+        NumberAlbums:
+          type: integer
+        NumberArtworks:
+          type: integer
+        NumberTracks:
+          type: integer
+        CurrentTrackIndex:
+          type: integer
+          nullable: true
+          description: 1-based index of the current track (or radio station); null if none
+        MaximumTrackIndex:
+          type: integer
+          nullable: true
+          description: Number of tracks in the current tracklist (or number of radio stations)
+        CurrentTracklistUri:
+          type: string
+          nullable: true
+          description: >
+            Local playback only. URI of what is being played (e.g. an album or playlist URI,
+            or /queue/)
+        CurrentTrack:
+          description: >
+            For local playback, the current track ({} if none). For radio, the artist and title
+            of what is currently playing, if known; omitted otherwise.
+          oneOf:
+            - $ref: '#/components/schemas/Track'
+            - type: object
+              properties:
+                artist:
+                  type: string
+                title:
+                  type: string
+        CurrentArtwork:
+          type: string
+          nullable: true
+          description: URI of the artwork for what is currently playing
+        CurrentStream:
+          type: string
+          description: Radio playback only. Name of the station being played.
+
+    Album:
+      type: object
+      properties:
+        link:
+          type: string
+          description: URI of the album
+        artist:
+          type: string
+          nullable: true
+          description: Artist name; null for compilations
+        title:
+          type: string
+          description: Album name
+        releasedate:
+          type: integer
+          nullable: true
+          description: Release year
+        iscompilation:
+          type: boolean
+        numberdisks:
+          type: integer
+          nullable: true
+        artwork:
+          type: object
+          properties:
+            link:
+              type: string
+              nullable: true
+              description: URI of album artwork
+        genres:
+          type: array
+          items:
+            type: string
+            description: URI of the genre
+        display_genres:
+          type: array
+          items:
+            type: string
+            description: URI of a display genre that the album's genres belong to (each listed once)
+        tracks:
+          type: array
+          description: >
+            The album's tracks, in disk and track order. Only present if requested (e.g. via the
+            tracks query argument); URIs or track objects according to the information level.
+          items:
+            oneOf:
+              - type: string
+              - $ref: '#/components/schemas/Track'
+
+    Playlist:
+      type: object
+      properties:
+        link:
+          type: string
+          description: URI of the playlist
+        title:
+          type: string
+          description: Playlist title
+        genres:
+          type: array
+          description: >
+            Only present if requested via the genres query argument; URIs or genre objects
+            according to the information level
+          items:
+            oneOf:
+              - type: string
+              - $ref: '#/components/schemas/GenreSummary'
+        tracks:
+          type: array
+          description: >
+            Only present if requested via the tracks query argument; URIs or track objects
+            according to the information level
+          items:
+            oneOf:
+              - type: string
+              - $ref: '#/components/schemas/Track'
+
+    PlaylistImport:
+      oneOf:
+        - $ref: '#/components/schemas/PlaylistImportFromTracks'
+        - $ref: '#/components/schemas/PlaylistImportFromFiles'
+
+    PlaylistImportFromTracks:
+      type: object
+      required:
+        - title
+        - tracks
+      properties:
+        title:
+          type: string
+          description: Playlist title
+        tracks:
+          type: array
+          items:
+            $ref: '#/components/schemas/IdOrUri'
+
+    PlaylistImportFromFiles:
+      type: object
+      required:
+        - title
+        - files
+      properties:
+        title:
+          type: string
+          description: Playlist title
+        files:
+          type: array
+          items:
+            type: string
+            description: File path, relative to the configured music_dir
+
+    PlaylistImportResult:
+      type: object
+      properties:
+        playlistid:
+          type: integer
+        nrtracks:
+          type: integer
+          description: Number of tracks in the playlist
+        missing:
+          type: array
+          description: Files that could not be found (when importing from files)
+          items:
+            type: string
+
+    Track:
+      type: object
+      properties:
+        link:
+          type: string
+          description: >
+            URI of the track. Tracks downloaded from a URL (rather than from the library) have a
+            negative id.
+        artist:
+          type: string
+          description: Artist name
+        title:
+          type: string
+          description: Track name
+        genre:
+          type: integer
+          nullable: true
+          description: ID of the track's genre
+        disknumber:
+          type: integer
+          nullable: true
+        tracknumber:
+          type: integer
+          nullable: true
+        trackcount:
+          type: integer
+          nullable: true
+        fileformat:
+          type: string
+          description: File extension, including the leading dot (e.g. .mp3)
+        album:
+          type: string
+          nullable: true
+          description: URI of the containing album; "" if no album; null for downloaded tracks
+        artwork:
+          type: string
+          nullable: true
+          description: URI of the track artwork
+        artworkinfo:
+          type: string
+          nullable: true
+          description: URI of the track artwork information
+        filepath:
+          type: string
+          description: Path of the file on the server. Only included at the debug information level.
+
+    DisplayGenreSummary:
+      type: object
+      properties:
+        link:
+          type: string
+          description: URI of the display genre
+        id:
+          type: integer
+          description: ID of the display genre
+        name:
+          type: string
+          description: Display genre name
+        icon:
+          type: string
+          enum: [music, radio, spoken_word]
+          description: Identifies the kind of icon that represents this display genre
+        view_style:
+          type: string
+          enum: [albums, artists]
+          description: Whether the contents are best presented as a list of albums or of artists
+
+    DisplayGenre:
+      allOf:
+        - $ref: '#/components/schemas/DisplayGenreSummary'
+        - type: object
+          required:
+            - genres
+            - pagination
+          properties:
+            genres:
+              type: array
+              items:
+                type: string
+                description: URI of a genre in this display genre
+            albums:
+              type: array
+              description: >
+                One page of the albums in this display genre, ordered by artist, release year
+                and title, with compilations last. URIs or album objects, according to the
+                albums query argument; omitted if albums=none.
+              items:
+                oneOf:
+                  - type: string
+                  - $ref: '#/components/schemas/Album'
+            playlists:
+              type: array
+              description: >
+                All of the playlists in this display genre (not paginated). URIs or playlist
+                objects, according to the playlists query argument; omitted if playlists=none.
+              items:
+                oneOf:
+                  - type: string
+                  - $ref: '#/components/schemas/Playlist'
+            pagination:
+              type: object
+              properties:
+                offset:
+                  type: integer
+                  description: Index of the first album in this response
+                limit:
+                  type: integer
+                  description: Maximum number of albums in this response
+                total:
+                  type: integer
+                  description: Total number of albums in the display genre
+                next:
+                  type: string
+                  nullable: true
+                  description: URI of the next page; null on the last page
+                prev:
+                  type: string
+                  nullable: true
+                  description: URI of the previous page; null on the first page
+
+    GenreSummary:
+      type: object
+      properties:
+        link:
+          type: string
+          description: URI of the genre
+        name:
+          type: string
+          description: Genre name
+        display_genre:
+          type: string
+          nullable: true
+          description: URI of the display genre that this genre belongs to
+
+    Genre:
+      allOf:
+        - $ref: '#/components/schemas/GenreSummary'
+        - type: object
+          properties:
+            albums:
+              type: array
+              description: >
+                URIs or album objects, according to the albums query argument; omitted if albums=none
+              items:
+                oneOf:
+                  - type: string
+                  - $ref: '#/components/schemas/Album'
+            playlists:
+              type: array
+              description: >
+                URIs or playlist objects, according to the playlists query argument; omitted if
+                playlists=none
+              items:
+                oneOf:
+                  - type: string
+                  - $ref: '#/components/schemas/Playlist'
+
+    RadioStation:
+      type: object
+      properties:
+        link:
+          type: string
+          description: URI of the radio station
+        name:
+          type: string
+        artwork:
+          type: string
+          nullable: true
+          description: URL of the station's artwork
+
+    RadioStationUrls:
+      type: object
+      description: Only included in a response if requested
+      properties:
+        url:
+          type: string
+          description: URL of the stream
+        now_playing_url:
+          type: string
+          nullable: true
+          description: URL to fetch 'now playing' information from
+        now_playing_jq:
+          type: string
+          nullable: true
+          description: jq expression to extract the artist and title from the now_playing_url response
+        now_playing_artwork_url:
+          type: string
+          nullable: true
+          description: URL to fetch 'now playing' artwork information from
+        now_playing_artwork_jq:
+          type: string
+          nullable: true
+          description: jq expression to extract the artwork URL from the now_playing_artwork_url response
+
+    RadioStationDetails:
+      type: object
+      required:
+        - name
+        - url
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+          description: URL of the stream
+        artwork:
+          type: string
+          description: URL of the station's artwork
+        now_playing_url:
+          type: string
+        now_playing_jq:
+          type: string
+        now_playing_artwork_url:
+          type: string
+        now_playing_artwork_jq:
+          type: string
