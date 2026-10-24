@@ -31,6 +31,7 @@ from .routeconsts import RouteConstants
 from .serialize import json_display_genre, json_display_genre_contents
 from .serialize import json_genre, json_playlist, json_track_or_file
 from .serialize import clear_cached_responses, InformationLevel, library_version, LibraryVersion
+from .selfupdate import pull_latest, UpdateException
 from .serialize import json_album, json_radio_station, json_track
 from .workrequests import WorkRequests
 
@@ -996,6 +997,18 @@ def search():
             tracks = db.search_for_tracks(search_words)
             rtn['tracks'] = [json_track(track) for track in tracks]
     return gzippable_jsonify(rtn)
+
+
+@routes.post("/update")
+def update_server():
+    try:
+        old_head, new_head = pull_latest()
+    except UpdateException as exc:
+        raise InternalServerError(str(exc)) from exc
+    if old_head == new_head:
+        return gzippable_jsonify({'updated': False, 'version': old_head[:7]})
+    current_piju_app.work_queue.put((WorkRequests.INSTALL_UPDATE_AND_RESTART, old_head, new_head))
+    return gzippable_jsonify({'updated': True, 'from': old_head[:7], 'to': new_head[:7]}), HTTPStatus.ACCEPTED
 
 
 @routes.get("/tracks/")

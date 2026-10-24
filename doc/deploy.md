@@ -19,8 +19,8 @@ Logged in as piju:
 ```sh
 git clone https://github.com/nsw42/piju-server.git
 cd piju-server
-python3 -m venv --system-site-packages .
-. bin/activate
+python3 -m venv --system-site-packages .venv
+. .venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -87,6 +87,19 @@ them.)
 
 Installing logrotate automatically causes it to run daily. It shouldn't be
 necessary to perform any further configuration.
+
+### Updating the server software
+
+To update to the latest version, either `git pull` and restart the service by hand, or ask the
+running server to do it:
+
+```sh
+curl -X POST http://piju:5000/update
+```
+
+This pulls the latest version (fast-forward only, so local changes that conflict will cause it to
+fail), reinstalls the Python dependencies if `requirements.txt` changed, and restarts the server
+via `run.sh` (which upgrades the database schema if necessary).
 
 ### Update the database
 
