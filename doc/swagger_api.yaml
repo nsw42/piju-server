@@ -269,6 +269,13 @@ paths:
                           description: >
                             Number of albums in this display genre; 0 if it is empty
                             (for example, so that a client can hide it)
+          headers:
+            ETag:
+              $ref: '#/components/headers/LibraryETag'
+            Last-Modified:
+              $ref: '#/components/headers/LibraryLastModified'
+        304:
+          description: Not modified since the version identified by the If-None-Match or If-Modified-Since request header
 
   /display_genre/{displayGenreId}:
     get:
@@ -311,6 +318,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DisplayGenre'
+          headers:
+            ETag:
+              $ref: '#/components/headers/LibraryETag'
+            Last-Modified:
+              $ref: '#/components/headers/LibraryLastModified'
+        304:
+          description: Not modified since the version identified by the If-None-Match or If-Modified-Since request header
         400:
           description: Invalid offset or limit
         404:
@@ -1088,6 +1102,19 @@ components:
       schema:
         type: string
 
+  headers:
+    LibraryETag:
+      description: >
+        Weak entity tag identifying the state of the music library. Send it in If-None-Match
+        to receive 304 Not Modified if the library is unchanged
+      schema:
+        type: string
+    LibraryLastModified:
+      description: >
+        When the music library last changed (or the server started, if later). Send it in
+        If-Modified-Since to receive 304 Not Modified if the library is unchanged
+      schema:
+        type: string
   schemas:
     InformationLevel:
       type: string
