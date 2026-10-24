@@ -237,8 +237,8 @@ def test_get_display_genre_last_page(client, mock_display_genre3):
 def test_get_display_genre_limit_is_capped(client, mock_display_genre3):
     response = client.get('/display_genre/3?limit=5000')
     assert response.status_code == 200
-    mock_display_genre3.get_display_genre_albums.assert_called_once_with(3, 0, 100)
-    assert response.json['pagination']['limit'] == 100
+    mock_display_genre3.get_display_genre_albums.assert_called_once_with(3, 0, 1000)
+    assert response.json['pagination']['limit'] == 1000
 
 
 @pytest.mark.parametrize('query', ['offset=-1', 'offset=abc', 'limit=0', 'limit=-5', 'limit=lots'])

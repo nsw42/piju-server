@@ -299,7 +299,7 @@ paths:
             default: 0
         - name: limit
           in: query
-          description: The maximum number of albums to return. Values above 100 are treated as 100.
+          description: The maximum number of albums to return. Values above 1000 are treated as 1000.
           schema:
             type: integer
             minimum: 1

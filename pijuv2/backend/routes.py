@@ -49,7 +49,7 @@ ARG_NAME_OFFSET = 'offset'
 ARG_NAME_LIMIT = 'limit'
 
 DEFAULT_PAGE_SIZE = 20
-MAX_PAGE_SIZE = 100
+MAX_PAGE_SIZE = 1000
 
 
 class PlaybackMode:
