@@ -26,6 +26,8 @@ class PijuApp(Flask):
             config_file = Path(os.environ.get('PIJU_CONFIG', Config.Defaults.FILEPATH))
         if not config_file.is_file():
             raise FileNotFoundError(f"Config file {config_file} not found")
+        self.config_file = config_file
+        self.db_path = db_path
         self.version = get_server_version()
         self.piju_config = Config(config_file)
         self.work_queue = Queue()
@@ -34,7 +36,7 @@ class PijuApp(Flask):
         self.file_player = FilePlayer()
         self.stream_player = StreamPlayer()
         self.current_player = self.file_player
-        self.api_version_string = '9.5'
+        self.api_version_string = '9.6'
         self.download_history = DownloadHistory()
         self.status_websocket_clients = []
         self.queue_websocket_clients = []

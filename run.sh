@@ -58,6 +58,12 @@ fi
 
 DB_FILE=`realpath "$DB_FILE"`
 
+# Use the virtual environment, if there is one, for both alembic and the server
+VENV_DIR=$SCRIPT_DIR/.venv
+if [ -e $VENV_DIR/bin/activate ]; then
+  . $VENV_DIR/bin/activate
+fi
+
 # Check for alembic
 ALEMBIC=$(command -v alembic)
 if [ -z "$ALEMBIC" ]; then
@@ -81,10 +87,6 @@ $ALEMBIC current 2> /dev/null | grep -q head && { echo Database schema is up-to-
 cd $SCRIPT_DIR
 
 # Now run the server
-VENV_DIR=$SCRIPT_DIR/.venv
-if [ -e $VENV_DIR/bin/activate ]; then
-  . $VENV_DIR/bin/activate
-fi
 PYTHON=python3
 
 if [ "$CONFIG_FILE" ]; then

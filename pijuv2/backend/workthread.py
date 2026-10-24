@@ -9,6 +9,7 @@ from ..database.tidy import (delete_albums_without_tracks,
                              delete_empty_genres,
                              delete_missing_tracks)
 from ..scan.directory import scan_directory
+from .selfupdate import install_and_restart
 from .serialize import clear_cached_responses
 from .workrequests import WorkRequests
 from .ytdlp import fetch_audio
@@ -73,6 +74,10 @@ class WorkerThread(threading.Thread):
                     case WorkRequests.DELETE_EMPTY_GENRES:
                         self.set_current_status('Deleting genres without albums/playlists')
                         delete_empty_genres(db)
+
+                    case WorkRequests.INSTALL_UPDATE_AND_RESTART:
+                        old_head, new_head = request[1], request[2]
+                        install_and_restart(self.app, old_head, new_head, self.set_current_status)
 
                     case _:
                         logging.error(f"Unrecognised request: {request[0]}")

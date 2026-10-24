@@ -1,6 +1,6 @@
 openapi: 3.0.0
 info:
-  version: '9.4'
+  version: '9.6'
   title: Piju REST API
   description: >
     REST + WebSocket API for the piju music server. The version above matches the
@@ -1018,6 +1018,50 @@ paths:
                       $ref: '#/components/schemas/Track'
         400:
           description: Missing search string
+
+  /update:
+    post:
+      summary: Update the server to the latest version, and restart it
+      description: >
+        Pulls the latest version from the git upstream of the branch the server is running from
+        (fast-forward only). If anything changed, the response is sent and then, in the background,
+        dependencies are reinstalled (if requirements.txt changed) and the server restarts via run.sh,
+        which also applies any database migrations. Progress is reported in WorkerStatus; the new
+        version is visible as ServerVersion once the server is back.
+      responses:
+        200:
+          description: Already up to date; no restart
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated:
+                    type: boolean
+                    example: false
+                  version:
+                    type: string
+                    description: The (short) git commit hash of the running server
+        202:
+          description: Updated; the server will restart
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated:
+                    type: boolean
+                    example: true
+                  from:
+                    type: string
+                    description: The (short) git commit hash before the update
+                  to:
+                    type: string
+                    description: The (short) git commit hash after the update
+        500:
+          description: >
+            The update could not be performed (e.g. not running from a git clone, local changes
+            that prevent a fast-forward, or no network access)
 
   /tracks/:
     get:
