@@ -33,6 +33,8 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 * 9.3: Add the `summary` information level, which gives nested objects without their own nested objects
   (e.g. `/display_genre/<n>?albums=summary` gives albums without their tracks)
 * 9.4: Omit genres from /display_genre/<n>, and genres and display_genres from the albums in it
+* 9.5: Add `Last-Modified` and `ETag` headers to /display_genre/ and /display_genre/<n>, and respond
+  `304 Not Modified` to a conditional request (`If-None-Match` or `If-Modified-Since`) if the library is unchanged
 
 ## Dependencies
 

@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from pijuv2.backend.appfactory import create_app
+from pijuv2.backend.serialize import clear_cached_responses
 from pijuv2.backend.workrequests import WorkRequests
 from pijuv2.database.database import Database, DatabaseAccess, NotFoundException
 from pijuv2.database.schema import Album, DisplayGenre, Track
@@ -264,6 +265,40 @@ def test_get_display_genre_unknown_id(client, mock_display_genre3):
     mock_display_genre3.get_display_genre_by_id.side_effect = NotFoundException()
     response = client.get('/display_genre/99')
     assert response.status_code == 404
+    assert 'ETag' not in response.headers
+
+
+@pytest.mark.parametrize('url', ['/display_genre/', '/display_genre/3'])
+@pytest.mark.parametrize('accept_encoding', ['', 'gzip'])
+def test_get_display_genre_has_validators(client, mock_display_genre3, url, accept_encoding):
+    response = client.get(url, headers={'Accept-Encoding': accept_encoding})
+    assert response.status_code == 200
+    assert response.headers['ETag'].startswith('W/"')
+    assert response.last_modified is not None
+    assert response.headers['Cache-Control'] == 'no-cache'
+
+
+@pytest.mark.parametrize('validator', ['If-None-Match', 'If-Modified-Since'])
+def test_get_display_genre_not_modified(client, mock_display_genre3, validator):
+    first = client.get('/display_genre/3')
+    mock_display_genre3.get_display_genre_albums.reset_mock()
+    request_value = first.headers['ETag'] if validator == 'If-None-Match' else first.headers['Last-Modified']
+    response = client.get('/display_genre/3', headers={validator: request_value})
+    assert response.status_code == 304
+    assert response.data == b''
+    assert response.headers['ETag'] == first.headers['ETag']
+    mock_display_genre3.get_display_genre_albums.assert_not_called()
+
+
+@pytest.mark.parametrize('validator', ['If-None-Match', 'If-Modified-Since'])
+def test_get_display_genre_modified_after_library_change(client, mock_display_genre3, validator):
+    first = client.get('/display_genre/3')
+    request_value = first.headers['ETag'] if validator == 'If-None-Match' else first.headers['Last-Modified']
+    clear_cached_responses()
+    response = client.get('/display_genre/3', headers={validator: request_value})
+    assert response.status_code == 200
+    assert response.headers['ETag'] != first.headers['ETag']
+    assert response.last_modified > first.last_modified
 
 
 def test_display_genres_end_to_end(client, real_db):

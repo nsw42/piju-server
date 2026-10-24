@@ -3,10 +3,12 @@ Functions related to data serialization, ie converting from in-memory to
 an over-the-wire representation
 """
 
+from datetime import datetime, timedelta, timezone
 import enum
 from functools import lru_cache
 import os.path
-from typing import Any, Dict, Optional, Sequence, overload
+import threading
+from typing import Any, Dict, NamedTuple, Optional, Sequence, overload
 
 from .routeconsts import RouteConstants
 from ..database.database import Database
@@ -52,14 +54,43 @@ def information_level_from_string(info: str,
 InformationLevel.from_string = information_level_from_string
 
 
+class LibraryVersion(NamedTuple):
+    "Identifies the state of the library, for use in HTTP conditional requests"
+    etag: str
+    last_modified: datetime
+
+
+def _whole_seconds_now() -> datetime:
+    return datetime.now(timezone.utc).replace(microsecond=0)
+
+
+# Server start is the best available initial value: the database may have been changed while the server was down
+_server_start = _whole_seconds_now()
+_library_version_lock = threading.Lock()
+_library_generation = 0
+_library_last_modified = _server_start
+
+
+def library_version() -> LibraryVersion:
+    with _library_version_lock:
+        return LibraryVersion(etag=f'{int(_server_start.timestamp())}-{_library_generation}',
+                              last_modified=_library_last_modified)
+
+
 def clear_cached_responses():
     """
-    Discard all cached responses. Call this after a change to the database
-    that may have changed albums, genres, playlists or tracks.
+    Discard all cached responses, and update the library version.
+    Call this after a change to the database that may have changed albums, genres, playlists or tracks.
     """
+    global _library_generation, _library_last_modified  # pylint: disable=global-statement
     for cached_function in (json_album, json_genre, json_playlist, json_radio_station, json_track,
                             json_track_or_file):
         cached_function.cache_clear()
+    with _library_version_lock:
+        _library_generation += 1
+        # HTTP dates only have one second resolution, so ensure that a change in the same second
+        # as an earlier response still gives a later Last-Modified
+        _library_last_modified = max(_whole_seconds_now(), _library_last_modified + timedelta(seconds=1))
 
 
 @lru_cache(maxsize=32)

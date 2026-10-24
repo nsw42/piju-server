@@ -1,4 +1,5 @@
 from collections import defaultdict
+from functools import wraps
 import gzip
 from http import HTTPStatus
 import json
@@ -12,6 +13,7 @@ from urllib.parse import urlencode
 from flask import Blueprint, jsonify, make_response, request, Response
 from flask_sock import Sock
 from werkzeug.exceptions import BadRequest, BadRequestKeyError, Conflict, InternalServerError, NotFound
+from werkzeug.http import is_resource_modified
 
 from ..database.database import DatabaseAccess, NotFoundException
 from ..database.schema import Album, Playlist, Track
@@ -28,7 +30,7 @@ from .queuesession import set_browser_queue, QUEUE_SESSION_HEADER
 from .routeconsts import RouteConstants
 from .serialize import json_display_genre, json_display_genre_contents
 from .serialize import json_genre, json_playlist, json_track_or_file
-from .serialize import clear_cached_responses, InformationLevel
+from .serialize import clear_cached_responses, InformationLevel, library_version, LibraryVersion
 from .serialize import json_album, json_radio_station, json_track
 from .workrequests import WorkRequests
 
@@ -77,6 +79,32 @@ def gzippable_jsonify(content):
         response.headers['Content-Encoding'] = 'gzip'
         return response
     return jsonify(content)
+
+
+def conditional_on_library_version(route_function):
+    """
+    Decorator for routes whose response depends only on the library contents (and the request):
+    adds Last-Modified and ETag headers, and responds 304 Not Modified, without calling the route
+    function, if the client already has the current version
+    """
+    def add_validators(response: Response, version: LibraryVersion):
+        response.set_etag(version.etag, weak=True)
+        response.last_modified = version.last_modified
+        response.headers['Cache-Control'] = 'no-cache'
+        return response
+
+    @wraps(route_function)
+    def wrapper(*args, **kwargs):
+        # Read the version before the database, so a concurrent change errs towards a later full response
+        version = library_version()
+        if not is_resource_modified(request.environ, etag=version.etag, last_modified=version.last_modified):
+            return add_validators(Response(status=HTTPStatus.NOT_MODIFIED), version)
+        response = make_response(route_function(*args, **kwargs))
+        if response.status_code == HTTPStatus.OK:
+            add_validators(response, version)
+        return response
+
+    return wrapper
 
 
 def normalize_punctuation(search_string):
@@ -151,7 +179,8 @@ def edit_album(albumid):
             raise NotFound(ERR_MSG_UNKNOWN_ALBUM_ID) from exc
         if year := int(data.get('releasedate', 0)):
             album.ReleaseYear = year
-        return ('', HTTPStatus.NO_CONTENT)
+    clear_cached_responses()
+    return ('', HTTPStatus.NO_CONTENT)
 
 
 @routes.get('/artistaliases/<path:artist>')
@@ -325,6 +354,7 @@ def build_pagination(base_url: str, offset: int, limit: int, total: int) -> Dict
 
 
 @routes.get("/display_genre/")
+@conditional_on_library_version
 def get_all_display_genres():
     with DatabaseAccess() as db:
         album_counts = db.get_display_genre_album_counts()
@@ -333,6 +363,7 @@ def get_all_display_genres():
 
 
 @routes.get(RouteConstants.GET_DISPLAY_GENRE)
+@conditional_on_library_version
 def get_display_genre(displaygenreid):
     album_info = InformationLevel.from_string(request.args.get('albums', ''))
     playlist_info = InformationLevel.from_string(request.args.get('playlists', ''))
@@ -393,11 +424,13 @@ def update_genre(genreid):
             genre = db.set_genre_display_genre(genreid, display_genre_id)
         except NotFoundException as exc:
             raise BadRequest(ERR_MSG_UNKNOWN_DISPLAY_GENRE_ID) from exc
-        # Cached genre and album responses include the display genre, so would now be stale
-        clear_cached_responses()
-        return gzippable_jsonify(json_genre(genre,
-                                            include_albums=InformationLevel.NO_INFO,
-                                            include_playlists=InformationLevel.NO_INFO))
+        response = gzippable_jsonify(json_genre(genre,
+                                                include_albums=InformationLevel.NO_INFO,
+                                                include_playlists=InformationLevel.NO_INFO))
+    # Cached genre and album responses include the display genre, so would now be stale.
+    # Only clear them once the change has been committed: see WorkerThread.process_request
+    clear_cached_responses()
+    return response
 
 
 def audio_mime_type(filepath):
@@ -576,7 +609,9 @@ def add_playlist():
     with DatabaseAccess() as db:
         playlist, missing = build_playlist_from_api_data(db)
         db.create_playlist(playlist)
-        return response_for_import_playlist(playlist, missing)
+        response = response_for_import_playlist(playlist, missing)
+    clear_cached_responses()
+    return response
 
 
 @routes.delete("/playlists/<playlistid>")
@@ -586,7 +621,8 @@ def delete_playlist(playlistid):
             db.delete_playlist(playlistid)
         except NotFoundException as exc:
             raise NotFound(ERR_MSG_UNKNOWN_PLAYLIST_ID) from exc
-        return ('', HTTPStatus.NO_CONTENT)
+    clear_cached_responses()
+    return ('', HTTPStatus.NO_CONTENT)
 
 
 @routes.get(RouteConstants.GET_ONE_PLAYLIST)
@@ -609,7 +645,9 @@ def edit_playlist(playlistid):
             playlist = db.update_playlist(playlistid, playlist)
         except NotFoundException as exc:
             raise NotFound(ERR_MSG_UNKNOWN_PLAYLIST_ID) from exc
-        return response_for_import_playlist(playlist, missing)
+        response = response_for_import_playlist(playlist, missing)
+    clear_cached_responses()
+    return response
 
 
 @routes.delete("/queue/", provide_automatic_options=False)
