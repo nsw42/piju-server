@@ -20,8 +20,8 @@ def db_in_app_context(tmp_path):
         yield Database()
 
 
-def mk_albumref(artist, is_compilation, genres=None):
-    return Album(Artist=artist, Title="Test Album Title", IsCompilation=is_compilation, Genres=genres if genres else [])
+def mk_albumref(artist, is_compilation):
+    return Album(Artist=artist, Title="Test Album Title", IsCompilation=is_compilation)
 
 
 def mk_compilation_albumref():
@@ -121,7 +121,8 @@ def test_get_genre_by_id(db_in_app_context):
     genre_name = "Technocrat Jazz"
     genre = db_in_app_context.ensure_genre_exists(genre_name)
 
-    db_in_app_context.ensure_album_exists(mk_albumref(artist="Da Vinci", is_compilation=False, genres=[genre]))
+    album = db_in_app_context.ensure_album_exists(mk_albumref(artist="Da Vinci", is_compilation=False))
+    album.Genres = [genre]
     db_in_app_context.ensure_album_exists(mk_other_albumref())
 
     assert db_in_app_context.get_nr_albums() == 2
@@ -319,8 +320,13 @@ def mk_display_genre(db, name, genre_names, sort_order=0):
 
 
 def mk_album_in_genres(db, artist, title, genres, year=None, is_compilation=False):
-    return db.ensure_album_exists(Album(Artist=artist, Title=title, ReleaseYear=year,
-                                        IsCompilation=is_compilation, Genres=genres))
+    # Add the genres once the album is in the session, as scan.directory does: attaching them to the
+    # album reference beforehand makes SQLAlchemy warn when ensure_album_exists' lookup autoflushes
+    album = db.ensure_album_exists(Album(Artist=artist, Title=title, ReleaseYear=year,
+                                         IsCompilation=is_compilation))
+    album.Genres = genres
+    Database.db.session.commit()
+    return album
 
 
 def test_new_genre_uses_display_genre_mapping(db_in_app_context):

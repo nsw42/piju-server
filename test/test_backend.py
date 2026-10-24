@@ -258,8 +258,8 @@ def test_display_genres_end_to_end(client, real_db):
         genre = db.ensure_genre_exists('Rock')
         genre_id = genre.Id
         default_id = genre.DisplayGenreId
-        album = db.ensure_album_exists(Album(Artist='Motörhead', Title='Ace of Spades', IsCompilation=False,
-                                             Genres=[genre]))
+        album = db.ensure_album_exists(Album(Artist='Motörhead', Title='Ace of Spades', IsCompilation=False))
+        album.Genres = [genre]
         album_id = album.Id
         other = DisplayGenre(Name='Rock & Pop', Icon='music', ViewStyle='albums', SortOrder=1)
         Database.db.session.add(other)
@@ -299,8 +299,8 @@ def test_display_genres_end_to_end(client, real_db):
 def test_scan_clears_cached_responses(test_app, client, real_db):
     with real_db() as db:
         genre = db.ensure_genre_exists('Rock')
-        album = db.ensure_album_exists(Album(Artist='Motörhead', Title='Ace of Spades', IsCompilation=False,
-                                             Genres=[genre]))
+        album = db.ensure_album_exists(Album(Artist='Motörhead', Title='Ace of Spades', IsCompilation=False))
+        album.Genres = [genre]
         album_id = album.Id
         other = DisplayGenre(Name='Rock & Pop', Icon='music', ViewStyle='albums', SortOrder=1)
         Database.db.session.add(other)

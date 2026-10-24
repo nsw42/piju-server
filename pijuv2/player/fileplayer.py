@@ -249,8 +249,8 @@ class FilePlayer(PlayerInterface):
                     # We failed the sanity check - couldn't find the requested track
                     return False
         started = False
-        logging.debug("play_from_real_queue_index: %d: %s", index, self.queue[index].filepath)
         while 0 <= index < len(self.queue):
+            logging.debug("play_from_real_queue_index: %d: %s", index, self.queue[index].filepath)
             started = self._play_song(self.queue[index].filepath, wait_for_old_player)
             if started:
                 self.current_track_index = index
