@@ -116,6 +116,19 @@ def test_get_track(client, mock_track12):
     assert response.json['artworkinfo'] is None
 
 
+@pytest.mark.parametrize('filename,mime', [('track.mp3', 'audio/mpeg'),
+                                           ('track.MP3', 'audio/mpeg'),
+                                           ('track.m4a', 'audio/mp4')])
+def test_get_mp3_content_type(client, mock_track12, tmp_path, filename, mime):
+    audio_file = tmp_path / filename
+    audio_file.write_bytes(b'not really audio')
+    mock_track12.Filepath = str(audio_file)
+    response = client.get('/mp3/12')
+    assert response.status_code == 200
+    assert response.headers['Content-Type'] == mime
+    assert response.data == b'not really audio'
+
+
 def test_get_track_with_artwork(client, mock_track12):
     mock_track12.Artwork = 6
     response = client.get('/tracks/12')

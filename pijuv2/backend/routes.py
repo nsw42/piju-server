@@ -400,6 +400,17 @@ def update_genre(genreid):
                                             include_playlists=InformationLevel.NO_INFO))
 
 
+def audio_mime_type(filepath):
+    # Don't rely solely on mimetypes: it reads the system's mime.types, which (e.g. on macOS) can map
+    # .m4a to audio/mp4a-latm, which browsers won't play
+    suffix = Path(filepath).suffix.lower()
+    if suffix == '.mp3':
+        return 'audio/mpeg'
+    if suffix in ('.m4a', '.mp4'):
+        return 'audio/mp4'
+    return mimetypes.guess_type(filepath)[0] or 'application/octet-stream'
+
+
 @routes.get("/mp3/<trackid>")
 def get_mp3(trackid):
     with DatabaseAccess() as db:
@@ -411,7 +422,7 @@ def get_mp3(trackid):
         with open(track.Filepath, 'rb') as handle:
             content = handle.read()
         response = make_response(content)
-        response.headers['Content-Type'] = 'audio/mpeg'
+        response.headers['Content-Type'] = audio_mime_type(track.Filepath)
         response.headers['Content-Length'] = len(content)
         return response
 
