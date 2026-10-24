@@ -6,7 +6,7 @@ import pytest
 from pijuv2.backend.appfactory import create_app
 from pijuv2.backend.workrequests import WorkRequests
 from pijuv2.database.database import Database, DatabaseAccess, NotFoundException
-from pijuv2.database.schema import Album, DisplayGenre
+from pijuv2.database.schema import Album, DisplayGenre, Track
 
 
 @pytest.fixture()
@@ -278,3 +278,16 @@ def test_scan_clears_cached_responses(test_app, client, real_db):
         test_app.worker.process_request((WorkRequests.SCAN_DIRECTORY, '/music'))
 
     assert client.get(f'/albums/{album_id}').json['display_genres'] == [f'/display_genre/{other_id}']
+
+
+def test_edit_unknown_playlist(client, real_db):
+    with real_db() as db:
+        track = db.ensure_track_exists(Track(Filepath='/beware/of/the/leopard.mp3', Title='Ace of Spades'))
+        track_id = track.Id
+    response = client.put('/playlists/9999', json={'title': 'Loud', 'tracks': [f'/tracks/{track_id}']})
+    assert response.status_code == 404
+
+
+def test_edit_unknown_radio_station(client, real_db):
+    response = client.put('/radio/9999', json={'name': 'Radio Nowhere', 'url': 'http://example.com/stream'})
+    assert response.status_code == 404

@@ -593,7 +593,10 @@ def get_one_playlist(playlistid):
 def edit_playlist(playlistid):
     with DatabaseAccess() as db:
         playlist, missing = build_playlist_from_api_data(db)
-        playlist = db.update_playlist(playlistid, playlist)
+        try:
+            playlist = db.update_playlist(playlistid, playlist)
+        except NotFoundException as exc:
+            raise NotFound(ERR_MSG_UNKNOWN_PLAYLIST_ID) from exc
         return response_for_import_playlist(playlist, missing)
 
 
@@ -890,7 +893,10 @@ def get_one_radio_station(stationid):
 def edit_radio_station(stationid):
     station = build_radio_station_from_api_data()
     with DatabaseAccess() as db:
-        existing_station = db.update_radio_station(stationid, station)
+        try:
+            existing_station = db.update_radio_station(stationid, station)
+        except NotFoundException as exc:
+            raise NotFound(ERR_MSG_UNKNOWN_RADIO_ID) from exc
         return gzippable_jsonify(json_radio_station(existing_station))
 
 
