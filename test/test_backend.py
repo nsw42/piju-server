@@ -126,15 +126,11 @@ def test_get_track_with_artwork(client, mock_track12):
 
 @pytest.fixture()
 def mock_display_genre3(mock_dbaccess):
-    mock_genre = MagicMock()
-    mock_genre.Id = 8
-    mock_genre.DisplayGenreId = 3
     mock_display_genre = MagicMock()
     mock_display_genre.Id = 3
     mock_display_genre.Name = 'Rock & Pop'
     mock_display_genre.Icon = 'music'
     mock_display_genre.ViewStyle = 'albums'
-    mock_display_genre.Genres = [mock_genre]
     mock_albums = []
     for album_id in (21, 22):
         mock_album = MagicMock()
@@ -145,7 +141,6 @@ def mock_display_genre3(mock_dbaccess):
         mock_album.IsCompilation = False
         mock_album.VolumeCount = 1
         mock_album.Artwork = album_id + 100
-        mock_album.Genres = [mock_genre]
         mock_albums.append(mock_album)
     mock_db = mock_dbaccess().__enter__()
     mock_db.get_all_display_genres.return_value = [mock_display_genre]
@@ -182,7 +177,7 @@ def test_get_display_genre_default_paging(client, mock_display_genre3):
     mock_display_genre3.get_display_genre_albums.assert_called_once_with(3, 0, 20)
     assert response.json['link'] == '/display_genre/3'
     assert response.json['name'] == 'Rock & Pop'
-    assert response.json['genres'] == ['/genres/8']
+    assert 'genres' not in response.json
     assert response.json['albums'] == ['/albums/21', '/albums/22']
     assert response.json['playlists'] == []
     assert response.json['pagination'] == {
@@ -211,6 +206,17 @@ def test_get_display_genre_summary_omits_tracks(client, mock_display_genre3):
     assert [album['title'] for album in albums] == ['Album 21', 'Album 22']
     assert [album['artwork']['link'] for album in albums] == ['/artwork/121', '/artwork/122']
     assert all('tracks' not in album for album in albums)
+
+
+@pytest.mark.parametrize('albums', ['summary', 'all'])
+def test_get_display_genre_albums_omit_genres(client, mock_display_genre3, albums):
+    for mock_album in mock_display_genre3.get_display_genre_albums.return_value[0]:
+        mock_album.Tracks = []
+    response = client.get('/display_genre/3?albums=' + albums)
+    assert response.status_code == 200
+    for album in response.json['albums']:
+        assert 'genres' not in album
+        assert 'display_genres' not in album
 
 
 def test_get_display_genre_all_includes_tracks(client, mock_display_genre3):
@@ -279,7 +285,6 @@ def test_display_genres_end_to_end(client, real_db):
     assert response.json['display_genre'] == f'/display_genre/{other_id}'
     assert client.get(f'/display_genre/{default_id}').json['pagination']['total'] == 0
     response = client.get(f'/display_genre/{other_id}')
-    assert response.json['genres'] == [f'/genres/{genre_id}']
     assert response.json['pagination']['total'] == 1
     assert client.get(f'/albums/{album_id}').json['display_genres'] == [f'/display_genre/{other_id}']
 

@@ -63,10 +63,7 @@ def clear_cached_responses():
 
 
 @lru_cache(maxsize=32)
-def json_album(album: Album, include_tracks: InformationLevel):
-    # An album's genres may share a display genre: report each display genre once, in genre order
-    display_genre_ids = dict.fromkeys(genre.DisplayGenreId for genre in album.Genres if genre.DisplayGenreId)
-
+def json_album(album: Album, include_tracks: InformationLevel, include_genres: bool = True):
     rtn = {
         'link': RouteConstants.url_for_get_album(album.Id),
         'artist': album.Artist,
@@ -77,10 +74,13 @@ def json_album(album: Album, include_tracks: InformationLevel):
         'artwork': {
             'link': RouteConstants.url_for_get_artwork(album.Artwork) if album.Artwork else None,
         },
-        'genres': [RouteConstants.url_for_get_genre(genre.Id) for genre in album.Genres],
-        'display_genres': [RouteConstants.url_for_get_display_genre(display_genre_id)
-                           for display_genre_id in display_genre_ids],
     }
+    if include_genres:
+        # An album's genres may share a display genre: report each display genre once, in genre order
+        display_genre_ids = dict.fromkeys(genre.DisplayGenreId for genre in album.Genres if genre.DisplayGenreId)
+        rtn['genres'] = [RouteConstants.url_for_get_genre(genre.Id) for genre in album.Genres]
+        rtn['display_genres'] = [RouteConstants.url_for_get_display_genre(display_genre_id)
+                                 for display_genre_id in display_genre_ids]
     if include_tracks in (InformationLevel.LINKS, InformationLevel.ALL_INFO, InformationLevel.DEBUG_INFO):
         tracks = sorted(album.Tracks, key=lambda track: (track.VolumeNumber or 0, track.TrackNumber or 0))
         if include_tracks == InformationLevel.LINKS:
@@ -112,15 +112,17 @@ def json_display_genre_contents(display_genre: DisplayGenre,
                                 pagination: Optional[Dict[str, Any]] = None):
     """
     albums is the page of albums to be included in the response, which pagination describes.
+    The albums omit their genres and display genres, as they are implied by the display genre.
     """
     rtn = json_display_genre(display_genre)
-    rtn['genres'] = [RouteConstants.url_for_get_genre(genre.Id) for genre in display_genre.Genres]
     if include_albums == InformationLevel.LINKS:
         rtn['albums'] = [RouteConstants.url_for_get_album(album.Id) for album in albums]
     elif include_albums == InformationLevel.SUMMARY:
-        rtn['albums'] = [json_album(album, include_tracks=InformationLevel.NO_INFO) for album in albums]
+        rtn['albums'] = [json_album(album, include_tracks=InformationLevel.NO_INFO, include_genres=False)
+                         for album in albums]
     elif include_albums in (InformationLevel.ALL_INFO, InformationLevel.DEBUG_INFO):
-        rtn['albums'] = [json_album(album, include_tracks=include_albums) for album in albums]
+        rtn['albums'] = [json_album(album, include_tracks=include_albums, include_genres=False)
+                         for album in albums]
     if include_playlists == InformationLevel.LINKS:
         rtn['playlists'] = [RouteConstants.url_for_get_one_playlist(playlist.Id) for playlist in playlists]
     elif include_playlists in (InformationLevel.SUMMARY, InformationLevel.ALL_INFO, InformationLevel.DEBUG_INFO):

@@ -1,6 +1,6 @@
 openapi: 3.0.0
 info:
-  version: '9.3'
+  version: '9.4'
   title: Piju REST API
   description: >
     REST + WebSocket API for the piju music server. The version above matches the
@@ -1194,11 +1194,13 @@ components:
               description: URI of album artwork
         genres:
           type: array
+          description: Omitted from the albums in a display genre's contents
           items:
             type: string
             description: URI of the genre
         display_genres:
           type: array
+          description: Omitted from the albums in a display genre's contents
           items:
             type: string
             description: URI of a display genre that the album's genres belong to (each listed once)
@@ -1360,20 +1362,15 @@ components:
         - $ref: '#/components/schemas/DisplayGenreSummary'
         - type: object
           required:
-            - genres
             - pagination
           properties:
-            genres:
-              type: array
-              items:
-                type: string
-                description: URI of a genre in this display genre
             albums:
               type: array
               description: >
                 One page of the albums in this display genre, ordered by artist, release year
                 and title, with compilations last. URIs or album objects, according to the
-                albums query argument; omitted if albums=none.
+                albums query argument; omitted if albums=none. Album objects omit their genres
+                and display_genres.
               items:
                 oneOf:
                   - type: string
