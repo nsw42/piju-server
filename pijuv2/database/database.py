@@ -1,10 +1,13 @@
 import hashlib
 import logging
+import sqlite3
+import unicodedata
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, TYPE_CHECKING
 
 from flask_sqlalchemy import SQLAlchemy
 
-from sqlalchemy import distinct, func, select, or_
+from sqlalchemy import distinct, event, func, select, or_
+from sqlalchemy.engine import Engine
 from sqlalchemy.sql.expression import true
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 
@@ -17,16 +20,40 @@ if not TYPE_CHECKING:
     func: Callable  # fixes false positives from pylint
 
 SORT_IGNORED_CHARACTERS = '"\'\u2018\u2019\u201c\u201d'
+SORT_KEY_SQL_FUNCTION = 'piju_sort_key'
+# Compilations are stored with no artist, but are displayed (and so should be sorted) as this
+COMPILATION_SORT_ARTIST = 'Various Artists'
+
+
+def sort_key_for_string(value: Optional[str]) -> Optional[str]:
+    """
+    The sort key for a string: case-insensitive, accent-insensitive, and ignoring quote marks.
+
+    >>> sort_key_for_string('"Weird Al" Yankovic')
+    'weird al yankovic'
+    >>> sort_key_for_string('\u00d3lafur Arnalds')
+    'olafur arnalds'
+    """
+    if value is None:
+        return None
+    for ch in SORT_IGNORED_CHARACTERS:
+        value = value.replace(ch, '')
+    decomposed = unicodedata.normalize('NFKD', value)
+    return ''.join(ch for ch in decomposed if not unicodedata.combining(ch)).casefold()
+
+
+@event.listens_for(Engine, "connect")
+def _register_sort_key_function(dbapi_connection, _connection_record):
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        dbapi_connection.create_function(SORT_KEY_SQL_FUNCTION, 1, sort_key_for_string, deterministic=True)
 
 
 def sort_key(column):
     """
-    A case-insensitive sort key for a text column that ignores quote marks,
-    so that, for example, '"Weird Al" Yankovic' sorts under W
+    A sort key for a text column that is case- and accent-insensitive and ignores quote marks,
+    so that, for example, '"Weird Al" Yankovic' sorts under W and 'Ólafur Arnalds' sorts under O
     """
-    for ch in SORT_IGNORED_CHARACTERS:
-        column = func.replace(column, ch, '')
-    return func.lower(column)
+    return getattr(func, SORT_KEY_SQL_FUNCTION)(column)
 
 
 class PijuDatabaseException(Exception):
@@ -549,7 +576,7 @@ class Database():
         """
         Return one page of the albums in any of the genres of the given display genre,
         together with the total number of such albums.
-        Albums are ordered by artist, then release year, then title, with compilations last.
+        Albums are ordered by artist, then release year, then title, with compilations sorted as 'Various Artists'.
         """
         album_ids = (select(album_genre_association_table.c.album_id)
                      .join(Genre, Genre.Id == album_genre_association_table.c.genre_id)
@@ -560,7 +587,7 @@ class Database():
             select(Album)
             .where(in_display_genre)
             # Album.Id as the final key keeps the order, and hence the pages, stable
-            .order_by(Album.Artist.is_(None), sort_key(Album.Artist), Album.ReleaseYear,
+            .order_by(sort_key(func.coalesce(Album.Artist, COMPILATION_SORT_ARTIST)), Album.ReleaseYear,
                       sort_key(Album.Title), Album.Id)
             .offset(offset)
             .limit(limit)

@@ -329,11 +329,12 @@ def test_get_display_genre_albums_order_and_paging(db_in_app_context):
 
     albums, total = db_in_app_context.get_display_genre_albums(rock.Id, offset=0, limit=20)
     assert total == 4
-    assert [album.Title for album in albums] == ["Earlier", "Later", "Stripes", "Compilation"]
+    # compilations sort as 'Various Artists'
+    assert [album.Title for album in albums] == ["Earlier", "Later", "Compilation", "Stripes"]
 
     albums, total = db_in_app_context.get_display_genre_albums(rock.Id, offset=1, limit=2)
     assert total == 4
-    assert [album.Title for album in albums] == ["Later", "Stripes"]
+    assert [album.Title for album in albums] == ["Later", "Compilation"]
 
     albums, total = db_in_app_context.get_display_genre_albums(rock.Id, offset=4, limit=2)
     assert total == 4
@@ -376,6 +377,25 @@ def test_get_display_genre_albums_order_ignores_quotes(db_in_app_context):
         ("Bob Newhart", "'Something Like Those'"),
         ('"Weird Al" Yankovic', "Poodle Hat"),
         ("Yorgi Yorgesson", "Yorgi"),
+    ]
+
+
+def test_get_display_genre_albums_order_ignores_accents(db_in_app_context):
+    ambient = mk_display_genre(db_in_app_context, "Ambient", ["Ambient"])
+    genre_ambient = db_in_app_context.ensure_genre_exists("Ambient")
+    mk_album_in_genres(db_in_app_context, "Zero 7", "Simple Things", [genre_ambient])
+    mk_album_in_genres(db_in_app_context, "\u00d3lafur Arnalds", "For Now I Am Winter", [genre_ambient])
+    mk_album_in_genres(db_in_app_context, "Nils Frahm", "Spaces", [genre_ambient])
+    mk_album_in_genres(db_in_app_context, "Pink Floyd", "Meddle", [genre_ambient])
+    mk_album_in_genres(db_in_app_context, "\u00f3lafur Arnalds", "Re:member", [genre_ambient], year=2018)
+
+    albums, _ = db_in_app_context.get_display_genre_albums(ambient.Id, offset=0, limit=20)
+    assert [album.Artist for album in albums] == [
+        "Nils Frahm",
+        "\u00d3lafur Arnalds",
+        "\u00f3lafur Arnalds",
+        "Pink Floyd",
+        "Zero 7",
     ]
 
 
