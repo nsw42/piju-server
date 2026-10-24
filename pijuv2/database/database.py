@@ -183,6 +183,26 @@ class Database():
         Database.db.session.refresh(playlist)
         return playlist
 
+    def update_album_artwork(self, albumid: Optional[int]):
+        """
+        Set the stored artwork for the given album to that of its first track (in disk and track order)
+        that has any, so that it does not have to be recomputed every time the album is retrieved.
+        Call this after any change to the album's tracks, or to their artwork or order.
+        Does nothing if albumid is None or does not identify an album.
+        """
+        if albumid is None:
+            return
+        album = Database.db.session.get(Album, albumid)
+        if album is None:
+            return
+        album.Artwork = Database.db.session.execute(
+            select(Track.Artwork)
+            .where(Track.Album == albumid)
+            .where(Track.Artwork.is_not(None))
+            .order_by(func.coalesce(Track.VolumeNumber, 0), func.coalesce(Track.TrackNumber, 0), Track.Id)
+            .limit(1)
+        ).scalar()
+
     def update_playlist(self, playlistid: int, playlist: Playlist):
         existing_playlist = self.get_playlist_by_id(playlistid)
         if not existing_playlist:
@@ -253,7 +273,10 @@ class Database():
 
     def delete_track(self, trackid: int):
         track = self.get_track_by_id(trackid)  # raises NotFoundException if necessary
+        album_id = track.Album
         Database.db.session.delete(track)
+        Database.db.session.flush()
+        self.update_album_artwork(album_id)
         Database.db.session.commit()
 
     def ensure_album_exists(self, albumref: Album) -> Album:
@@ -399,6 +422,8 @@ class Database():
                 # Track does not exist
                 logging.debug("New track: %s", trackref.Filepath)
                 Database.db.session.add(trackref)
+                Database.db.session.flush()
+                self.update_album_artwork(trackref.Album)
                 Database.db.session.commit()
                 Database.db.session.refresh(trackref)
                 return trackref
@@ -417,6 +442,8 @@ class Database():
         # We now know we've found a track in the database
         # Update it if necessary - except for cross-references (eg Album)
 
+        previous_album_id = track.Album
+        changed_attrs = set()
         for attr in ['Filepath', 'Title', 'Duration', 'Composer', 'Artist', 'Genre',
                      'VolumeNumber', 'TrackCount', 'TrackNumber', 'ReleaseDate',
                      'MusicBrainzTrackId', 'MusicBrainzArtistId', 'Album', 'Artwork']:
@@ -426,6 +453,12 @@ class Database():
                 logging.debug("ensure_track_exists: %s changing %s from %s to %s",
                               trackref.Filepath, attr, old_val, new_val)
                 setattr(track, attr, new_val)
+                changed_attrs.add(attr)
+
+        if changed_attrs & {'VolumeNumber', 'TrackNumber', 'Album', 'Artwork'}:
+            Database.db.session.flush()
+            for album_id in {previous_album_id, track.Album}:
+                self.update_album_artwork(album_id)
 
         return track
 

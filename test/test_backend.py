@@ -46,6 +46,7 @@ def mock_album6(mock_dbaccess, mock_track12):
     mock_album.VolumeCount = 30
     mock_album.Tracks = [mock_track12]
     mock_album.Genres = []
+    mock_album.Artwork = None
     mock_dbaccess().__enter__().get_album_by_id.return_value = mock_album
 
 
@@ -79,6 +80,13 @@ def test_get_album_all_info(client, mock_album6):
     assert response.status_code == 200
     assert response.json['tracks'][0]['artist'] == 'Motörhead'
     assert response.json['tracks'][0]['title'] == 'Ace of Spades'
+
+
+def test_get_album_artwork(client, mock_dbaccess, mock_album6):
+    mock_dbaccess().__enter__().get_album_by_id.return_value.Artwork = 4
+    response = client.get('/albums/6')
+    assert response.status_code == 200
+    assert response.json['artwork'] == {'link': '/artwork/4'}
 
 
 def test_get_album_display_genres(client, mock_dbaccess, mock_album6):
@@ -120,6 +128,7 @@ def test_get_track_with_artwork(client, mock_track12):
 def mock_display_genre3(mock_dbaccess):
     mock_genre = MagicMock()
     mock_genre.Id = 8
+    mock_genre.DisplayGenreId = 3
     mock_display_genre = MagicMock()
     mock_display_genre.Id = 3
     mock_display_genre.Name = 'Rock & Pop'
@@ -130,6 +139,13 @@ def mock_display_genre3(mock_dbaccess):
     for album_id in (21, 22):
         mock_album = MagicMock()
         mock_album.Id = album_id
+        mock_album.Artist = 'Motörhead'
+        mock_album.Title = f'Album {album_id}'
+        mock_album.ReleaseYear = 1980
+        mock_album.IsCompilation = False
+        mock_album.VolumeCount = 1
+        mock_album.Artwork = album_id + 100
+        mock_album.Genres = [mock_genre]
         mock_albums.append(mock_album)
     mock_db = mock_dbaccess().__enter__()
     mock_db.get_all_display_genres.return_value = [mock_display_genre]
@@ -186,6 +202,23 @@ def test_get_display_genre_middle_page(client, mock_display_genre3):
     pagination = response.json['pagination']
     assert pagination['next'] == '/display_genre/3?albums=none&offset=25&limit=10'
     assert pagination['prev'] == '/display_genre/3?albums=none&offset=5&limit=10'
+
+
+def test_get_display_genre_summary_omits_tracks(client, mock_display_genre3):
+    response = client.get('/display_genre/3?albums=summary')
+    assert response.status_code == 200
+    albums = response.json['albums']
+    assert [album['title'] for album in albums] == ['Album 21', 'Album 22']
+    assert [album['artwork']['link'] for album in albums] == ['/artwork/121', '/artwork/122']
+    assert all('tracks' not in album for album in albums)
+
+
+def test_get_display_genre_all_includes_tracks(client, mock_display_genre3):
+    for mock_album in mock_display_genre3.get_display_genre_albums.return_value[0]:
+        mock_album.Tracks = []
+    response = client.get('/display_genre/3?albums=all')
+    assert response.status_code == 200
+    assert all(album['tracks'] == [] for album in response.json['albums'])
 
 
 def test_get_display_genre_last_page(client, mock_display_genre3):

@@ -210,6 +210,45 @@ def test_delete_track_deletes_artwork(db_in_app_context):
     assert len(db_in_app_context.get_all_tracks()) == 0
 
 
+def mk_artwork(db, path):
+    return db.ensure_artwork_exists(Artwork(Path=path, Width=100, Height=100))
+
+
+def test_album_artwork_is_first_track_with_artwork(db_in_app_context):
+    db = db_in_app_context
+    album = db.ensure_album_exists(mk_other_albumref())
+    art2 = mk_artwork(db, '/art2.jpg')
+    art3 = mk_artwork(db, '/art3.jpg')
+    assert album.Artwork is None
+
+    db.ensure_track_exists(Track(Title="Track 3", Album=album.Id, TrackNumber=3, Artwork=art3.Id))
+    assert album.Artwork == art3.Id
+
+    db.ensure_track_exists(Track(Title="Track 1", Album=album.Id, TrackNumber=1))
+    track2 = db.ensure_track_exists(Track(Title="Track 2", Album=album.Id, TrackNumber=2, Artwork=art2.Id))
+    assert album.Artwork == art2.Id
+
+    db.delete_track(track2.Id)
+    assert album.Artwork == art3.Id
+
+
+def test_album_artwork_follows_track_changes(db_in_app_context):
+    db = db_in_app_context
+    album1 = db.ensure_album_exists(mk_other_albumref())
+    album2 = db.ensure_album_exists(mk_compilation_albumref())
+    art = mk_artwork(db, '/art.jpg')
+    track = db.ensure_track_exists(Track(Title="Track 1", Album=album1.Id, Artwork=art.Id))
+    assert (album1.Artwork, album2.Artwork) == (art.Id, None)
+
+    # Moving the track to another album moves its artwork too
+    db.ensure_track_exists(Track(Id=track.Id, Title="Track 1", Album=album2.Id, Artwork=art.Id))
+    assert (album1.Artwork, album2.Artwork) == (None, art.Id)
+
+    # Removing the track's artwork removes it from the album
+    db.ensure_track_exists(Track(Id=track.Id, Title="Track 1", Album=album2.Id, Artwork=None))
+    assert album2.Artwork is None
+
+
 def test_get_unknown_artist_alias_gives_empty_list(db_in_app_context):
     # Setup
     # Act

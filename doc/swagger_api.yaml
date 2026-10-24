@@ -1,6 +1,6 @@
 openapi: 3.0.0
 info:
-  version: '9.2'
+  version: '9.3'
   title: Piju REST API
   description: >
     REST + WebSocket API for the piju music server. The version above matches the
@@ -1091,11 +1091,12 @@ components:
   schemas:
     InformationLevel:
       type: string
-      enum: [none, links, all, debug]
+      enum: [none, links, summary, all, debug]
       default: links
       description: >
         How much information to include about nested objects: none omits them entirely;
-        links gives just their URIs; all gives the full objects; debug additionally includes
+        links gives just their URIs; summary gives the objects without their own nested objects
+        (e.g. albums without their tracks); all gives the full objects; debug additionally includes
         information not normally exposed (e.g. file paths). Unrecognised values are treated as
         the default.
 

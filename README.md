@@ -30,6 +30,8 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 * 9.0: Add /display_genre/ returning a grouped collection of genres suitable for display
 * 9.1: Include display genres in album responses
 * 9.2: Include album counts in the /display_genre/ index
+* 9.3: Add the `summary` information level, which gives nested objects without their own nested objects
+  (e.g. `/display_genre/<n>?albums=summary` gives albums without their tracks)
 
 ## Dependencies
 

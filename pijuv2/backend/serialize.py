@@ -17,8 +17,9 @@ from ..player.fileplayer import QueuedTrack
 class InformationLevel(enum.Enum):
     NO_INFO = 0
     LINKS = 1
-    ALL_INFO = 2
-    DEBUG_INFO = 3  # All Info plus information that's not normally exposed via the API (eg file paths)
+    SUMMARY = 2  # The objects themselves, but without their own nested objects (eg an album without its tracks)
+    ALL_INFO = 3
+    DEBUG_INFO = 4  # All Info plus information that's not normally exposed via the API (eg file paths)
 
     @overload
     @staticmethod
@@ -38,6 +39,8 @@ def information_level_from_string(info: str,
         return InformationLevel.NO_INFO
     elif info == 'links':
         return InformationLevel.LINKS
+    elif info == 'summary':
+        return InformationLevel.SUMMARY
     elif info == 'all':
         return InformationLevel.ALL_INFO
     elif info == 'debug':
@@ -61,15 +64,6 @@ def clear_cached_responses():
 
 @lru_cache(maxsize=32)
 def json_album(album: Album, include_tracks: InformationLevel):
-    tracks = list(album.Tracks)
-    tracks = sorted(tracks, key=lambda track: (track.VolumeNumber or 0, track.TrackNumber or 0))
-    for track in tracks:
-        if bool(track.Artwork):
-            artwork_uri = RouteConstants.url_for_get_artwork(track.Artwork)
-            break
-    else:
-        artwork_uri = None
-
     # An album's genres may share a display genre: report each display genre once, in genre order
     display_genre_ids = dict.fromkeys(genre.DisplayGenreId for genre in album.Genres if genre.DisplayGenreId)
 
@@ -81,17 +75,19 @@ def json_album(album: Album, include_tracks: InformationLevel):
         'iscompilation': album.IsCompilation,
         'numberdisks': album.VolumeCount,
         'artwork': {
-            'link': artwork_uri,
+            'link': RouteConstants.url_for_get_artwork(album.Artwork) if album.Artwork else None,
         },
         'genres': [RouteConstants.url_for_get_genre(genre.Id) for genre in album.Genres],
         'display_genres': [RouteConstants.url_for_get_display_genre(display_genre_id)
                            for display_genre_id in display_genre_ids],
     }
-    if include_tracks == InformationLevel.LINKS:
-        rtn['tracks'] = [RouteConstants.url_for_get_track(track.Id) for track in tracks]
-    elif include_tracks in (InformationLevel.ALL_INFO, InformationLevel.DEBUG_INFO):
-        include_debuginfo = (include_tracks == InformationLevel.DEBUG_INFO)
-        rtn['tracks'] = [json_track(track, include_debuginfo=include_debuginfo) for track in tracks]
+    if include_tracks in (InformationLevel.LINKS, InformationLevel.ALL_INFO, InformationLevel.DEBUG_INFO):
+        tracks = sorted(album.Tracks, key=lambda track: (track.VolumeNumber or 0, track.TrackNumber or 0))
+        if include_tracks == InformationLevel.LINKS:
+            rtn['tracks'] = [RouteConstants.url_for_get_track(track.Id) for track in tracks]
+        else:
+            include_debuginfo = (include_tracks == InformationLevel.DEBUG_INFO)
+            rtn['tracks'] = [json_track(track, include_debuginfo=include_debuginfo) for track in tracks]
     return rtn
 
 
@@ -121,14 +117,18 @@ def json_display_genre_contents(display_genre: DisplayGenre,
     rtn['genres'] = [RouteConstants.url_for_get_genre(genre.Id) for genre in display_genre.Genres]
     if include_albums == InformationLevel.LINKS:
         rtn['albums'] = [RouteConstants.url_for_get_album(album.Id) for album in albums]
+    elif include_albums == InformationLevel.SUMMARY:
+        rtn['albums'] = [json_album(album, include_tracks=InformationLevel.NO_INFO) for album in albums]
     elif include_albums in (InformationLevel.ALL_INFO, InformationLevel.DEBUG_INFO):
         rtn['albums'] = [json_album(album, include_tracks=include_albums) for album in albums]
     if include_playlists == InformationLevel.LINKS:
         rtn['playlists'] = [RouteConstants.url_for_get_one_playlist(playlist.Id) for playlist in playlists]
-    elif include_playlists in (InformationLevel.ALL_INFO, InformationLevel.DEBUG_INFO):
+    elif include_playlists in (InformationLevel.SUMMARY, InformationLevel.ALL_INFO, InformationLevel.DEBUG_INFO):
+        include_tracks = (InformationLevel.NO_INFO if include_playlists == InformationLevel.SUMMARY
+                          else include_playlists)
         rtn['playlists'] = [json_playlist(playlist,
                                           include_genres=InformationLevel.NO_INFO,
-                                          include_tracks=include_playlists)
+                                          include_tracks=include_tracks)
                             for playlist in playlists]
     if pagination is not None:
         rtn['pagination'] = pagination
@@ -145,14 +145,18 @@ def json_genre(genre: Genre, include_albums: InformationLevel, include_playlists
     }
     if include_albums == InformationLevel.LINKS:
         rtn['albums'] = [RouteConstants.url_for_get_album(album.Id) for album in genre.Albums]
+    elif include_albums == InformationLevel.SUMMARY:
+        rtn['albums'] = [json_album(album, include_tracks=InformationLevel.NO_INFO) for album in genre.Albums]
     elif include_albums in (InformationLevel.ALL_INFO, InformationLevel.DEBUG_INFO):
         rtn['albums'] = [json_album(album, include_tracks=include_albums) for album in genre.Albums]
     if include_playlists == InformationLevel.LINKS:
         rtn['playlists'] = [RouteConstants.url_for_get_one_playlist(playlist.Id) for playlist in genre.Playlists]
-    elif include_playlists in (InformationLevel.ALL_INFO, InformationLevel.DEBUG_INFO):
+    elif include_playlists in (InformationLevel.SUMMARY, InformationLevel.ALL_INFO, InformationLevel.DEBUG_INFO):
+        include_tracks = (InformationLevel.NO_INFO if include_playlists == InformationLevel.SUMMARY
+                          else include_playlists)
         rtn['playlists'] = [json_playlist(playlist,
                                           include_genres=InformationLevel.NO_INFO,
-                                          include_tracks=include_playlists)
+                                          include_tracks=include_tracks)
                             for playlist in genre.Playlists]
     return rtn
 

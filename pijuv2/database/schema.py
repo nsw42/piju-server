@@ -88,6 +88,8 @@ class Album(Base):
     MusicBrainzAlbumArtistId = mapped_column(String)
     ReleaseYear = mapped_column(Integer)
     IsCompilation = mapped_column(Boolean)
+    # The artwork of the first track (in disk and track order) that has any: see Database.update_album_artwork()
+    Artwork = mapped_column(Integer, ForeignKey('Artwork.Id', name='fk_Albums_Artwork_Artwork'))
     Tracks = relationship("Track")
     Genres = relationship("Genre",
                           secondary=album_genre_association_table,
