@@ -738,7 +738,7 @@ def queue_put() -> Response:
         return queue_put_track(mode, trackid)
 
     if youtubeurl := data.get('url'):
-        return queue_put_youtube(youtubeurl)
+        return queue_put_youtube(mode, youtubeurl)
 
     if new_queue_order := data.get('queue'):
         return queue_put_reorder(mode, new_queue_order)
@@ -797,9 +797,9 @@ def queue_put_track(mode: str, trackid: int) -> Response:
     return make_response('', HTTPStatus.NO_CONTENT)
 
 
-def queue_put_youtube(youtubeurl: str) -> Response:
-    if request.args.get(ARG_NAME_MODE, PlaybackMode.SERVER) != PlaybackMode.SERVER:
-        raise BadRequest()
+def queue_put_youtube(mode: str, youtubeurl: str) -> Response:
+    if mode != PlaybackMode.SERVER:
+        raise BadRequest("URLs can only be added to the server-mode queue")
     current_piju_app.download_history.add(youtubeurl)
     current_piju_app.work_queue.put((WorkRequests.FETCH_FROM_YOUTUBE,
                                     youtubeurl,
