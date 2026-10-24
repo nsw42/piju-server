@@ -8,6 +8,7 @@ class GenreCache:
     def __init__(self, host):
         self.host = host
         self.genres = {}
+
     def __getitem__(self, genre):
         if genre not in self.genres:
             uri = f'{self.host}genres/{genre}'
