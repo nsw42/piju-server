@@ -28,7 +28,7 @@ from .queuesession import set_browser_queue, QUEUE_SESSION_HEADER
 from .routeconsts import RouteConstants
 from .serialize import json_display_genre, json_display_genre_contents
 from .serialize import json_genre, json_playlist, json_track_or_file
-from .serialize import InformationLevel
+from .serialize import clear_cached_responses, InformationLevel
 from .serialize import json_album, json_radio_station, json_track
 from .workrequests import WorkRequests
 
@@ -326,7 +326,9 @@ def build_pagination(base_url: str, offset: int, limit: int, total: int) -> Dict
 @routes.get("/display_genre/")
 def get_all_display_genres():
     with DatabaseAccess() as db:
-        return gzippable_jsonify([json_display_genre(display_genre) for display_genre in db.get_all_display_genres()])
+        album_counts = db.get_display_genre_album_counts()
+        return gzippable_jsonify([json_display_genre(display_genre, album_count=album_counts.get(display_genre.Id, 0))
+                                  for display_genre in db.get_all_display_genres()])
 
 
 @routes.get(RouteConstants.GET_DISPLAY_GENRE)
@@ -390,6 +392,8 @@ def update_genre(genreid):
             genre = db.set_genre_display_genre(genreid, display_genre_id)
         except NotFoundException as exc:
             raise BadRequest(ERR_MSG_UNKNOWN_DISPLAY_GENRE_ID) from exc
+        # Cached genre and album responses include the display genre, so would now be stale
+        clear_cached_responses()
         return gzippable_jsonify(json_genre(genre,
                                             include_albums=InformationLevel.NO_INFO,
                                             include_playlists=InformationLevel.NO_INFO))

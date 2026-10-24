@@ -1,10 +1,10 @@
 import hashlib
 import logging
-from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, TYPE_CHECKING
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, TYPE_CHECKING
 
 from flask_sqlalchemy import SQLAlchemy
 
-from sqlalchemy import func, select, or_
+from sqlalchemy import distinct, func, select, or_
 from sqlalchemy.sql.expression import true
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 
@@ -531,6 +531,19 @@ class Database():
         Raises NotFoundException for an unknown id
         """
         return self.get_x_by_id(DisplayGenre, display_genre_id)
+
+    def get_display_genre_album_counts(self) -> Dict[int, int]:
+        """
+        Return a dict mapping display genre id to the number of albums in any of its genres.
+        Display genres that contain no albums are omitted.
+        """
+        result = Database.db.session.execute(
+            select(Genre.DisplayGenreId, func.count(distinct(album_genre_association_table.c.album_id)))
+            .join(album_genre_association_table, Genre.Id == album_genre_association_table.c.genre_id)
+            .where(Genre.DisplayGenreId.is_not(None))
+            .group_by(Genre.DisplayGenreId)
+        )
+        return {display_genre_id: count for display_genre_id, count in result}
 
     def get_display_genre_albums(self, display_genre_id: int, offset: int, limit: int) -> Tuple[Sequence[Album], int]:
         """
