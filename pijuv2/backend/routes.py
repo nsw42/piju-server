@@ -36,6 +36,7 @@ routes = Blueprint('routes', __name__, url_prefix='')
 sock = Sock()
 
 ERR_MSG_UNKNOWN_ALBUM_ID = 'Unknown album id'
+ERR_MSG_UNKNOWN_ARTWORK_ID = 'Unknown artwork id'
 ERR_MSG_UNKNOWN_DISPLAY_GENRE_ID = 'Unknown display genre id'
 ERR_MSG_UNKNOWN_GENRE_ID = 'Unknown genre id'
 ERR_MSG_UNKNOWN_TRACK_ID = 'Unknown track id'
@@ -232,7 +233,7 @@ def get_artwork(artworkid):
         try:
             artwork = db.get_artwork_by_id(artworkid)
         except NotFoundException as exc:
-            raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
+            raise NotFound(ERR_MSG_UNKNOWN_ARTWORK_ID) from exc
 
         if artwork.Path:
             path = Path(artwork.Path)
@@ -255,7 +256,7 @@ def get_artwork(artworkid):
             return Response(artwork.Blob, headers={'Cache-Control': 'max-age=300'}, mimetype=mime)
 
         else:
-            raise NotFound("Unknown artwork id")
+            raise NotFound(ERR_MSG_UNKNOWN_ARTWORK_ID)
 
 
 @routes.get(RouteConstants.GET_ARTWORK_INFO)
@@ -264,7 +265,7 @@ def get_artwork_info(artworkid):
         try:
             artwork = db.get_artwork_by_id(artworkid)
         except NotFoundException as exc:
-            raise NotFound(ERR_MSG_UNKNOWN_TRACK_ID) from exc
+            raise NotFound(ERR_MSG_UNKNOWN_ARTWORK_ID) from exc
 
         has_artwork = (artwork.Path or artwork.Blob)
         rtn = {

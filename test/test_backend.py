@@ -291,3 +291,10 @@ def test_edit_unknown_playlist(client, real_db):
 def test_edit_unknown_radio_station(client, real_db):
     response = client.put('/radio/9999', json={'name': 'Radio Nowhere', 'url': 'http://example.com/stream'})
     assert response.status_code == 404
+
+
+@pytest.mark.parametrize('route', ['/artwork/9999', '/artworkinfo/9999'])
+def test_get_unknown_artwork(client, real_db, route):
+    response = client.get(route)
+    assert response.status_code == 404
+    assert 'Unknown artwork id' in response.get_data(as_text=True)
