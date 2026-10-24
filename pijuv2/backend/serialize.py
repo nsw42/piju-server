@@ -49,6 +49,16 @@ def information_level_from_string(info: str,
 InformationLevel.from_string = information_level_from_string
 
 
+def clear_cached_responses():
+    """
+    Discard all cached responses. Call this after a change to the database
+    that may have changed albums, genres, playlists or tracks.
+    """
+    for cached_function in (json_album, json_genre, json_playlist, json_radio_station, json_track,
+                            json_track_or_file):
+        cached_function.cache_clear()
+
+
 @lru_cache(maxsize=32)
 def json_album(album: Album, include_tracks: InformationLevel):
     tracks = list(album.Tracks)
@@ -59,6 +69,9 @@ def json_album(album: Album, include_tracks: InformationLevel):
             break
     else:
         artwork_uri = None
+
+    # An album's genres may share a display genre: report each display genre once, in genre order
+    display_genre_ids = dict.fromkeys(genre.DisplayGenreId for genre in album.Genres if genre.DisplayGenreId)
 
     rtn = {
         'link': RouteConstants.url_for_get_album(album.Id),
@@ -71,6 +84,8 @@ def json_album(album: Album, include_tracks: InformationLevel):
             'link': artwork_uri,
         },
         'genres': [RouteConstants.url_for_get_genre(genre.Id) for genre in album.Genres],
+        'display_genres': [RouteConstants.url_for_get_display_genre(display_genre_id)
+                           for display_genre_id in display_genre_ids],
     }
     if include_tracks == InformationLevel.LINKS:
         rtn['tracks'] = [RouteConstants.url_for_get_track(track.Id) for track in tracks]

@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from pijuv2.backend.appfactory import create_app
+from pijuv2.backend.workrequests import WorkRequests
 from pijuv2.database.database import Database, DatabaseAccess, NotFoundException
 from pijuv2.database.schema import Album, DisplayGenre
 
@@ -78,6 +79,17 @@ def test_get_album_all_info(client, mock_album6):
     assert response.status_code == 200
     assert response.json['tracks'][0]['artist'] == 'Motörhead'
     assert response.json['tracks'][0]['title'] == 'Ace of Spades'
+
+
+def test_get_album_display_genres(client, mock_dbaccess, mock_album6):
+    mock_album = mock_dbaccess().__enter__().get_album_by_id.return_value
+    mock_album.Genres = [MagicMock(Id=8, DisplayGenreId=3),
+                         MagicMock(Id=9, DisplayGenreId=5),
+                         MagicMock(Id=10, DisplayGenreId=3)]
+    response = client.get('/albums/6')
+    assert response.status_code == 200
+    assert response.json['genres'] == ['/genres/8', '/genres/9', '/genres/10']
+    assert response.json['display_genres'] == ['/display_genre/3', '/display_genre/5']
 
 
 def test_get_status(client, real_db):
@@ -198,7 +210,9 @@ def test_display_genres_end_to_end(client, real_db):
         genre = db.ensure_genre_exists('Rock')
         genre_id = genre.Id
         default_id = genre.DisplayGenreId
-        db.ensure_album_exists(Album(Artist='Motörhead', Title='Ace of Spades', IsCompilation=False, Genres=[genre]))
+        album = db.ensure_album_exists(Album(Artist='Motörhead', Title='Ace of Spades', IsCompilation=False,
+                                             Genres=[genre]))
+        album_id = album.Id
         other = DisplayGenre(Name='Rock & Pop', Icon='music', ViewStyle='albums', SortOrder=1)
         Database.db.session.add(other)
         Database.db.session.commit()
@@ -215,6 +229,7 @@ def test_display_genres_end_to_end(client, real_db):
 
     response = client.get(f'/genres/{genre_id}')
     assert response.json['display_genre'] == f'/display_genre/{default_id}'
+    assert client.get(f'/albums/{album_id}').json['display_genres'] == [f'/display_genre/{default_id}']
 
     # Move the genre into the other display genre
     response = client.put(f'/genres/{genre_id}', json={'display_genre': f'/display_genre/{other_id}'})
@@ -224,7 +239,30 @@ def test_display_genres_end_to_end(client, real_db):
     response = client.get(f'/display_genre/{other_id}')
     assert response.json['genres'] == [f'/genres/{genre_id}']
     assert response.json['pagination']['total'] == 1
+    assert client.get(f'/albums/{album_id}').json['display_genres'] == [f'/display_genre/{other_id}']
 
     assert client.put(f'/genres/{genre_id}', json={'display_genre': 9999}).status_code == 400
     assert client.put(f'/genres/{genre_id}', json={'display_genre': 'rock'}).status_code == 400
     assert client.put('/genres/9999', json={'display_genre': other_id}).status_code == 404
+
+
+def test_scan_clears_cached_responses(test_app, client, real_db):
+    with real_db() as db:
+        genre = db.ensure_genre_exists('Rock')
+        album = db.ensure_album_exists(Album(Artist='Motörhead', Title='Ace of Spades', IsCompilation=False,
+                                             Genres=[genre]))
+        album_id = album.Id
+        other = DisplayGenre(Name='Rock & Pop', Icon='music', ViewStyle='albums', SortOrder=1)
+        Database.db.session.add(other)
+        Database.db.session.commit()
+        other_id = other.Id
+    assert client.get(f'/albums/{album_id}').json['display_genres'] != [f'/display_genre/{other_id}']
+
+    def fake_scan_directory(_dir_to_scan, db):
+        # Stands in for a scan that changes the album's genres
+        db.get_album_by_id(album_id).Genres[0].DisplayGenreId = other_id
+
+    with patch('pijuv2.backend.workthread.scan_directory', side_effect=fake_scan_directory):
+        test_app.worker.process_request((WorkRequests.SCAN_DIRECTORY, '/music'))
+
+    assert client.get(f'/albums/{album_id}').json['display_genres'] == [f'/display_genre/{other_id}']
