@@ -29,6 +29,7 @@ See <https://app.swaggerhub.com/apis/nwalker/piju/1.0#/>
 * 8.2: Include server version in / response
 * 9.0: Add /display_genre/ returning a grouped collection of genres suitable for display
 * 9.1: Include display genres in album responses
+* 9.2: Include album counts in the /display_genre/ index
 
 ## Dependencies
 

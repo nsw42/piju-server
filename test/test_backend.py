@@ -133,6 +133,7 @@ def mock_display_genre3(mock_dbaccess):
         mock_albums.append(mock_album)
     mock_db = mock_dbaccess().__enter__()
     mock_db.get_all_display_genres.return_value = [mock_display_genre]
+    mock_db.get_display_genre_album_counts.return_value = {3: 45}
     mock_db.get_display_genre_by_id.return_value = mock_display_genre
     mock_db.get_display_genre_albums.return_value = (mock_albums, 45)
     mock_db.get_display_genre_playlists.return_value = []
@@ -148,7 +149,15 @@ def test_get_all_display_genres(client, mock_display_genre3):
         'name': 'Rock & Pop',
         'icon': 'music',
         'view_style': 'albums',
+        'album_count': 45,
     }]
+
+
+def test_get_all_display_genres_empty(client, mock_display_genre3):
+    mock_display_genre3.get_display_genre_album_counts.return_value = {}
+    response = client.get('/display_genre/')
+    assert response.status_code == 200
+    assert response.json[0]['album_count'] == 0
 
 
 def test_get_display_genre_default_paging(client, mock_display_genre3):
@@ -219,7 +228,7 @@ def test_display_genres_end_to_end(client, real_db):
         other_id = other.Id
 
     response = client.get('/display_genre/')
-    assert [dg['name'] for dg in response.json] == ['Uncategorised', 'Rock & Pop']
+    assert [(dg['name'], dg['album_count']) for dg in response.json] == [('Uncategorised', 1), ('Rock & Pop', 0)]
 
     response = client.get(f'/display_genre/{default_id}?albums=all')
     assert response.status_code == 200
@@ -240,6 +249,9 @@ def test_display_genres_end_to_end(client, real_db):
     assert response.json['genres'] == [f'/genres/{genre_id}']
     assert response.json['pagination']['total'] == 1
     assert client.get(f'/albums/{album_id}').json['display_genres'] == [f'/display_genre/{other_id}']
+
+    response = client.get('/display_genre/')
+    assert [(dg['name'], dg['album_count']) for dg in response.json] == [('Uncategorised', 0), ('Rock & Pop', 1)]
 
     assert client.put(f'/genres/{genre_id}', json={'display_genre': 9999}).status_code == 400
     assert client.put(f'/genres/{genre_id}', json={'display_genre': 'rock'}).status_code == 400

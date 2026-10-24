@@ -95,14 +95,17 @@ def json_album(album: Album, include_tracks: InformationLevel):
     return rtn
 
 
-def json_display_genre(display_genre: DisplayGenre):
-    return {
+def json_display_genre(display_genre: DisplayGenre, album_count: Optional[int] = None):
+    rtn = {
         'link': RouteConstants.url_for_get_display_genre(display_genre.Id),
         'id': display_genre.Id,
         'name': display_genre.Name,
         'icon': display_genre.Icon,
         'view_style': display_genre.ViewStyle,
     }
+    if album_count is not None:
+        rtn['album_count'] = album_count
+    return rtn
 
 
 def json_display_genre_contents(display_genre: DisplayGenre,

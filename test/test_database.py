@@ -340,6 +340,24 @@ def test_get_display_genre_albums_order_and_paging(db_in_app_context):
     assert albums == []
 
 
+def test_get_display_genre_album_counts(db_in_app_context):
+    rock = mk_display_genre(db_in_app_context, "Rock & Pop", ["Rock", "Pop"])
+    classical = mk_display_genre(db_in_app_context, "Classical", ["Classical"], sort_order=1)
+    jazz = mk_display_genre(db_in_app_context, "Jazz", ["Jazz"], sort_order=2)
+    genre_rock = db_in_app_context.ensure_genre_exists("Rock")
+    genre_pop = db_in_app_context.ensure_genre_exists("Pop")
+    genre_classical = db_in_app_context.ensure_genre_exists("Classical")
+    db_in_app_context.ensure_genre_exists("Jazz")
+    mk_album_in_genres(db_in_app_context, "zebra", "Stripes", [genre_rock])
+    # in two genres of the same display genre: must only be counted once
+    mk_album_in_genres(db_in_app_context, "Aardvark", "Earlier", [genre_rock, genre_pop])
+    mk_album_in_genres(db_in_app_context, "Bach", "Fugues", [genre_classical])
+
+    counts = db_in_app_context.get_display_genre_album_counts()
+    assert counts == {rock.Id: 2, classical.Id: 1}
+    assert jazz.Id not in counts
+
+
 def test_get_display_genre_albums_order_ignores_quotes(db_in_app_context):
     comedy = mk_display_genre(db_in_app_context, "Comedy", ["Comedy"])
     genre_comedy = db_in_app_context.ensure_genre_exists("Comedy")

@@ -326,7 +326,9 @@ def build_pagination(base_url: str, offset: int, limit: int, total: int) -> Dict
 @routes.get("/display_genre/")
 def get_all_display_genres():
     with DatabaseAccess() as db:
-        return gzippable_jsonify([json_display_genre(display_genre) for display_genre in db.get_all_display_genres()])
+        album_counts = db.get_display_genre_album_counts()
+        return gzippable_jsonify([json_display_genre(display_genre, album_count=album_counts.get(display_genre.Id, 0))
+                                  for display_genre in db.get_all_display_genres()])
 
 
 @routes.get(RouteConstants.GET_DISPLAY_GENRE)
